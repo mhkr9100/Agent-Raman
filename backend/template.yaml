@@ -174,7 +174,7 @@ Resources:
             Path: /api/memory/{proxy+}
             Method: OPTIONS
 
-  # ──── AI Proxy (Vertex AI + AI Studio) ────
+  # ──── AI Proxy (Vertex AI + AI Studio + Bedrock) ────
   AIProxyFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -188,6 +188,13 @@ Resources:
           GCP_LOCATION: us-central1
           GCP_SERVICE_ACCOUNT_KEY: !Ref GcpServiceAccountKey
           GEMINI_API_KEY: !Ref GeminiApiKey
+          AWS_BEDROCK_REGION: us-east-1
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: '*'
       Events:
         AIGenerate:
           Type: Api

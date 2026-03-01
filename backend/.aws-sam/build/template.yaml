@@ -7,6 +7,11 @@ Parameters:
     Description: Gemini API Key for embedding and AI services
     Default: ''
     NoEcho: true
+  GcpServiceAccountKey:
+    Type: String
+    Description: GCP Service Account JSON key for Vertex AI authentication
+    Default: ''
+    NoEcho: true
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -57,6 +62,11 @@ Resources:
           Properties:
             Path: /api/auth/login
             Method: POST
+        AuthDelete:
+          Type: Api
+          Properties:
+            Path: /api/auth/delete
+            Method: DELETE
         AuthOptions:
           Type: Api
           Properties:
@@ -168,6 +178,46 @@ Resources:
             Method: OPTIONS
     Metadata:
       SamResourceId: MemoryFunction
+  AIProxyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/ai-proxy.handler
+      CodeUri: AIProxyFunction
+      Timeout: 120
+      MemorySize: 512
+      Environment:
+        Variables:
+          GCP_PROJECT_ID: ramn-ai
+          GCP_LOCATION: us-central1
+          GCP_SERVICE_ACCOUNT_KEY:
+            Ref: GcpServiceAccountKey
+          GEMINI_API_KEY:
+            Ref: GeminiApiKey
+          AWS_BEDROCK_REGION: us-east-1
+      Policies:
+      - Statement:
+        - Effect: Allow
+          Action:
+          - bedrock:InvokeModel
+          Resource: '*'
+      Events:
+        AIGenerate:
+          Type: Api
+          Properties:
+            Path: /api/ai/generate
+            Method: POST
+        AIHealth:
+          Type: Api
+          Properties:
+            Path: /api/ai/health
+            Method: GET
+        AIOptions:
+          Type: Api
+          Properties:
+            Path: /api/ai/{proxy+}
+            Method: OPTIONS
+    Metadata:
+      SamResourceId: AIProxyFunction
 Outputs:
   ApiUrl:
     Description: API Gateway URL

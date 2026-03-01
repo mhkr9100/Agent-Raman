@@ -91,101 +91,72 @@ export async function hybridGenerateContent(
 
     for (let i = 0; i < maxRetries; i++) {
         try {
-            // Rate limiting is now enforced per-user in useScatter.handleSendMessage
-
 
             // ========== ROUTE BY PROVIDER ==========
             if (provider === 'aws') {
+                // For explicitly-AWS models, try backend proxy first (server-side Bedrock)
+                const backendUrl = import.meta.env.VITE_BACKEND_URL;
+                if (backendUrl) {
+                    try {
+                        const proxyResponse = await fetch(`${backendUrl}/api/ai/generate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                model: params.model,
+                                contents: params.contents,
+                                systemInstruction: params.config?.systemInstruction,
+                                tools: params.config?.tools,
+                                generationConfig: { temperature: 0.7, topP: 0.95 }
+                            })
+                        });
+                        if (proxyResponse.ok) {
+                            const data = await proxyResponse.json();
+                            const part = data.candidates?.[0]?.content?.parts?.[0];
+                            if (part?.functionCall) {
+                                return { functionCalls: [{ id: part.functionCall.name, name: part.functionCall.name, args: part.functionCall.args }], text: '' };
+                            }
+                            return { text: part?.text || '', candidates: data.candidates };
+                        }
+                    } catch (e) {
+                        console.warn('[RamN] Backend proxy unavailable for AWS model, trying direct...');
+                    }
+                }
                 return await bedrockGenerateContent(params);
             }
             if (provider === 'openai') {
                 return await openaiGenerateContent(params);
             }
 
-            // ========== GOOGLE MODELS: 3-TIER FALLBACK ==========
-            // Tier 1: Backend AI Proxy (Vertex AI + AI Studio server-side)
-            // Tier 2: Direct AI Studio from browser (client-side, uses API key)
-            // Tier 3: AWS Bedrock fallback (Claude)
+            // ========== GOOGLE MODELS: Backend AI Proxy ==========
+            // All Google model calls go through the backend Lambda which handles:
+            //   Tier 1: Vertex AI (service account, highest quota)
+            //   Tier 2: AI Studio (API key)
+            //   Tier 3: Bedrock Claude (always available)
+            // No VITE_GEMINI_API_KEY needed on the frontend for Prism/Agents!
 
             const backendUrl = import.meta.env.VITE_BACKEND_URL;
-            const { apiKey } = getPlatformConfig();
 
-            // --- TIER 1: Backend AI Proxy (Vertex AI first, then AI Studio) ---
             if (backendUrl) {
-                try {
-                    console.info('[RamN] Using Backend AI Proxy (Vertex AI / AI Studio)...');
-                    const proxyResponse = await fetch(`${backendUrl}/api/ai/generate`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            model: params.model,
-                            contents: params.contents,
-                            systemInstruction: params.config?.systemInstruction,
-                            tools: params.config?.tools,
-                            generationConfig: {
-                                ...(params.config?.thinkingConfig ? { thinkingConfig: params.config.thinkingConfig } : {}),
-                                temperature: 0.7,
-                                topP: 0.95,
-                            }
-                        })
-                    });
-
-                    if (proxyResponse.ok) {
-                        const data = await proxyResponse.json();
-                        const part = data.candidates?.[0]?.content?.parts?.[0];
-                        if (part?.functionCall) {
-                            return { functionCalls: [{ id: part.functionCall.name, name: part.functionCall.name, args: part.functionCall.args }], text: '' };
-                        }
-                        return { text: part?.text || '', candidates: data.candidates };
-                    }
-
-                    const proxyErr = await proxyResponse.text();
-                    console.warn('[RamN] Backend AI Proxy failed:', proxyResponse.status, proxyErr.substring(0, 200));
-
-                    // If proxy returned a quota error, fall through to Tier 2
-                    if (!proxyErr.includes('RESOURCE_EXHAUSTED') && proxyResponse.status !== 429 && proxyResponse.status !== 503) {
-                        throw new Error(`Backend AI Proxy error: ${proxyErr.substring(0, 300)}`);
-                    }
-                } catch (proxyError: any) {
-                    if (!proxyError.message.includes('RESOURCE_EXHAUSTED') && !proxyError.message.includes('Backend AI Proxy')) {
-                        console.warn('[RamN] Backend AI Proxy unreachable, falling through to direct...', proxyError.message);
-                    }
-                    // Fall through to Tier 2
-                }
-            }
-
-            // --- TIER 2: Direct Google AI Studio (browser-side) ---
-            if (apiKey) {
-                console.info('[RamN] Using direct Google AI Studio...');
-                const payload: any = {
-                    contents: params.contents,
-                    tools: params.config?.tools,
-                    generationConfig: {
-                        ...(params.config?.thinkingConfig ? { thinkingConfig: params.config.thinkingConfig } : {}),
-                        temperature: 0.7,
-                        topP: 0.95,
-                    }
-                };
-
-                const cachedContentId: string | undefined = params.cachedContentId;
-                if (cachedContentId) {
-                    payload.cachedContent = cachedContentId;
-                } else {
-                    payload.systemInstruction = params.config?.systemInstruction
-                        ? { parts: [{ text: params.config.systemInstruction }] }
-                        : undefined;
-                }
-
-                const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${params.model}:generateContent?key=${apiKey}`;
-
-                const response = await fetch(targetUrl, {
+                console.info('[RamN] Routing to Backend AI Proxy (Vertex → Studio → Bedrock)...');
+                const proxyResponse = await fetch(`${backendUrl}/api/ai/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        model: params.model,
+                        contents: params.contents,
+                        systemInstruction: params.config?.systemInstruction,
+                        tools: params.config?.tools,
+                        generationConfig: {
+                            ...(params.config?.thinkingConfig ? { thinkingConfig: params.config.thinkingConfig } : {}),
+                            temperature: 0.7,
+                            topP: 0.95,
+                        }
+                    })
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
+                if (proxyResponse.ok) {
+                    const data = await proxyResponse.json();
+                    console.info(`[RamN] ✅ Response from: ${data.source || 'proxy'}`);
                     const part = data.candidates?.[0]?.content?.parts?.[0];
                     if (part?.functionCall) {
                         return { functionCalls: [{ id: part.functionCall.name, name: part.functionCall.name, args: part.functionCall.args }], text: '' };
@@ -193,48 +164,24 @@ export async function hybridGenerateContent(
                     return { text: part?.text || '', candidates: data.candidates };
                 }
 
-                const errText = await response.text();
-                console.warn('[RamN] Direct AI Studio Error:', response.status, errText.substring(0, 200));
-                if (errText.includes('API_KEY_INVALID')) throw new Error('[RamN] Platform API key is invalid. Contact support.');
-                if (errText.includes('RESOURCE_EXHAUSTED') || response.status === 429) {
-                    throw new Error('RESOURCE_EXHAUSTED: All Google endpoints exhausted. Falling back to Bedrock...');
-                }
-                throw new Error(`Google API error: ${response.statusText}`);
+                const proxyErr = await proxyResponse.text();
+                console.error('[RamN] Backend AI Proxy failed:', proxyResponse.status, proxyErr.substring(0, 300));
+                throw new Error(`AI Proxy failed (${proxyResponse.status}): All server-side providers exhausted.`);
             }
 
-            // --- No Google providers available at all ---
-            if (!backendUrl && !apiKey) {
-                console.error('[RamN] No Google AI providers configured.');
-                throw new Error('RESOURCE_EXHAUSTED: No Google AI providers available.');
-            }
+            // No backend URL configured — cannot reach any AI provider
+            throw new Error('[RamN] VITE_BACKEND_URL is not configured. Set it in your .env to enable AI.');
 
         } catch (error: any) {
             lastError = error;
 
-            // ─── RESOURCE EXHAUSTED → TIER 3: AWS BEDROCK FALLBACK ───
-            if (error.message.includes("RESOURCE_EXHAUSTED")) {
-                if (provider === 'google' && i === 0) {
-                    console.warn('[RamN] All Google endpoints exhausted. Attempting AWS Bedrock (Claude 3.5)...');
-                    const fallbackParams = {
-                        ...params,
-                        model: 'anthropic.claude-3-5-sonnet-20240620-v1:0'
-                    };
-                    try {
-                        return await bedrockGenerateContent(fallbackParams);
-                    } catch (fallbackErr) {
-                        console.error('[RamN] Bedrock fallback also failed:', fallbackErr);
-                    }
-                }
-
-                if (i < maxRetries - 1) {
-                    const delayMs = (i + 1) * 3000;
-                    console.warn(`[RamN] Rate limited. Retry ${i + 1}/${maxRetries - 1} in ${delayMs / 1000}s...`);
-                    await new Promise(resolve => setTimeout(resolve, delayMs));
-                    continue;
-                }
-
-                throw new Error('⏳ All AI providers are temporarily busy. Please wait 30 seconds and try again.');
+            if (i < maxRetries - 1) {
+                const delayMs = (i + 1) * 2000;
+                console.warn(`[RamN] Retry ${i + 1}/${maxRetries - 1} in ${delayMs / 1000}s...`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue;
             }
+
             throw error;
         }
     }
