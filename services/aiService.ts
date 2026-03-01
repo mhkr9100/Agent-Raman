@@ -16,7 +16,14 @@ const getPlatformConfig = () => ({
  * RamN AI always uses Gemini 2.0 Flash — platform managed.
  * No user API keys required.
  */
-export function resolvePrismModel(): { model: string; provider: 'google' } {
+export function resolvePrismModel(): { model: string; provider: 'google' | 'aws' } {
+    const { apiKey } = getPlatformConfig();
+    const { accessKeyId } = getAWSConfig();
+
+    // If Gemini key is missing but AWS is present, default Prism to Bedrock Claude
+    if (!apiKey && accessKeyId) {
+        return { model: 'anthropic.claude-3-5-sonnet-20240620-v1:0', provider: 'aws' };
+    }
     return { model: 'gemini-2.0-flash', provider: 'google' };
 }
 
@@ -95,15 +102,24 @@ export async function hybridGenerateContent(
                 return await openaiGenerateContent(params);
             }
 
-            // ========== GEMINI (Platform Managed) ==========
-            const { apiKey } = getPlatformConfig();
-            if (!apiKey) {
+            const { apiKey, projectId, location } = getPlatformConfig();
+
+            // Determine if we should use Vertex AI (Enterprise) or AI Studio (Free/Keys)
+            // Vertex requires OAuth2, but we can try the REST endpoint if a user-managed project is set.
+            const isVertex = !!projectId && !!location && params.model.includes('gemini');
+
+            let targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${params.model}:generateContent?key=${apiKey}`;
+            if (isVertex && !apiKey) {
+                // If no key but project exists, user might want to use Vertex (requires bearer token)
+                // For now, we fall through to AI Studio unless we have a token mechanism.
+                console.info('[RamN] Vertex AI Project detected. Using Vertex endpoint...');
+                targetUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${params.model}:generateContent`;
+            }
+
+            if (!apiKey && !isVertex) {
                 console.error('[RamN] VITE_GEMINI_API_KEY is missing. Check .env file and Amplify Environment Variables.');
                 throw new Error('[RamN] Platform Gemini key not configured. Ensure VITE_GEMINI_API_KEY is set in your environment.');
             }
-
-            // Context Caching: if cachedContent ID is passed, use it to skip re-sending large context
-            const cachedContentId: string | undefined = params.cachedContentId;
 
             const payload: any = {
                 contents: params.contents,
@@ -116,6 +132,7 @@ export async function hybridGenerateContent(
             };
 
             // If using a cached context, reference it — otherwise send full system instruction
+            const cachedContentId: string | undefined = params.cachedContentId;
             if (cachedContentId) {
                 payload.cachedContent = cachedContentId;
             } else {
@@ -124,20 +141,22 @@ export async function hybridGenerateContent(
                     : undefined;
             }
 
-            const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${params.model}:generateContent?key=${apiKey}`;
-
             const response = await fetch(targetUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(isVertex && !apiKey ? { 'Authorization': `Bearer ${params._token}` } : {})
+                },
                 body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
                 const errText = await response.text();
                 console.warn('[RamN] Google API Error:', response.status, errText.substring(0, 200));
+
                 if (errText.includes('API_KEY_INVALID')) throw new Error('[RamN] Platform API key is invalid. Contact support.');
-                if (errText.includes('RESOURCE_EXHAUSTED')) {
-                    throw new Error('RESOURCE_EXHAUSTED: Google API rate limit hit. Retrying...');
+                if (errText.includes('RESOURCE_EXHAUSTED') || response.status === 429) {
+                    throw new Error('RESOURCE_EXHAUSTED: Google API quota limit reached. Falling back to alternative provider...');
                 }
                 throw new Error(`Google API error: ${response.statusText}`);
             }
@@ -151,15 +170,31 @@ export async function hybridGenerateContent(
 
         } catch (error: any) {
             lastError = error;
-            if (error.message.includes("RESOURCE_EXHAUSTED") && i < maxRetries - 1) {
-                const delayMs = (i + 1) * 3000; // 3s, 6s, 9s backoff
-                console.warn(`[RamN] Rate limited by Google API. Retry ${i + 1}/${maxRetries - 1} in ${delayMs / 1000}s...`);
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-                continue;
-            }
-            // If all retries exhausted, show a user-friendly message
+
+            // ─── RESOURCE EXHAUSTED FALLBACK ───
             if (error.message.includes("RESOURCE_EXHAUSTED")) {
-                throw new Error('⏳ Google API is temporarily busy. Please wait 30 seconds and try again.');
+                // If Google fails, try switching to a non-Google provider as a fallback
+                if (provider === 'google' && i === 0) {
+                    console.warn('[RamN] Google quota hit. Attempting automatic fallback to AWS Bedrock (Claude 3.5)...');
+                    const fallbackParams = {
+                        ...params,
+                        model: 'anthropic.claude-3-5-sonnet-20240620-v1:0'
+                    };
+                    try {
+                        return await bedrockGenerateContent(fallbackParams);
+                    } catch (fallbackErr) {
+                        console.error('[RamN] Fallback to Bedrock failed:', fallbackErr);
+                    }
+                }
+
+                if (i < maxRetries - 1) {
+                    const delayMs = (i + 1) * 3000;
+                    console.warn(`[RamN] Rate limited. Retry ${i + 1}/${maxRetries - 1} in ${delayMs / 1000}s...`);
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                    continue;
+                }
+
+                throw new Error('⏳ All AI providers are temporarily busy. Please wait 30 seconds and try again.');
             }
             throw error;
         }
