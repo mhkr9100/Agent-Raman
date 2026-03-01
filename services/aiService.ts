@@ -102,80 +102,119 @@ export async function hybridGenerateContent(
                 return await openaiGenerateContent(params);
             }
 
-            const { apiKey, projectId, location } = getPlatformConfig();
+            // ========== GOOGLE MODELS: 3-TIER FALLBACK ==========
+            // Tier 1: Backend AI Proxy (Vertex AI + AI Studio server-side)
+            // Tier 2: Direct AI Studio from browser (client-side, uses API key)
+            // Tier 3: AWS Bedrock fallback (Claude)
 
-            // Determine if we should use Vertex AI (Enterprise) or AI Studio (Free/Keys)
-            // Vertex requires OAuth2, but we can try the REST endpoint if a user-managed project is set.
-            const isVertex = !!projectId && !!location && params.model.includes('gemini');
+            const backendUrl = import.meta.env.VITE_BACKEND_URL;
+            const { apiKey } = getPlatformConfig();
 
-            let targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${params.model}:generateContent?key=${apiKey}`;
-            if (isVertex && !apiKey) {
-                // If no key but project exists, user might want to use Vertex (requires bearer token)
-                // For now, we fall through to AI Studio unless we have a token mechanism.
-                console.info('[RamN] Vertex AI Project detected. Using Vertex endpoint...');
-                targetUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${params.model}:generateContent`;
-            }
+            // --- TIER 1: Backend AI Proxy (Vertex AI first, then AI Studio) ---
+            if (backendUrl) {
+                try {
+                    console.info('[RamN] Using Backend AI Proxy (Vertex AI / AI Studio)...');
+                    const proxyResponse = await fetch(`${backendUrl}/api/ai/generate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: params.model,
+                            contents: params.contents,
+                            systemInstruction: params.config?.systemInstruction,
+                            tools: params.config?.tools,
+                            generationConfig: {
+                                ...(params.config?.thinkingConfig ? { thinkingConfig: params.config.thinkingConfig } : {}),
+                                temperature: 0.7,
+                                topP: 0.95,
+                            }
+                        })
+                    });
 
-            if (!apiKey && !isVertex) {
-                console.error('[RamN] VITE_GEMINI_API_KEY is missing. Check .env file and Amplify Environment Variables.');
-                throw new Error('[RamN] Platform Gemini key not configured. Ensure VITE_GEMINI_API_KEY is set in your environment.');
-            }
+                    if (proxyResponse.ok) {
+                        const data = await proxyResponse.json();
+                        const part = data.candidates?.[0]?.content?.parts?.[0];
+                        if (part?.functionCall) {
+                            return { functionCalls: [{ id: part.functionCall.name, name: part.functionCall.name, args: part.functionCall.args }], text: '' };
+                        }
+                        return { text: part?.text || '', candidates: data.candidates };
+                    }
 
-            const payload: any = {
-                contents: params.contents,
-                tools: params.config?.tools,
-                generationConfig: {
-                    ...(params.config?.thinkingConfig ? { thinkingConfig: params.config.thinkingConfig } : {}),
-                    temperature: 0.7,
-                    topP: 0.95,
+                    const proxyErr = await proxyResponse.text();
+                    console.warn('[RamN] Backend AI Proxy failed:', proxyResponse.status, proxyErr.substring(0, 200));
+
+                    // If proxy returned a quota error, fall through to Tier 2
+                    if (!proxyErr.includes('RESOURCE_EXHAUSTED') && proxyResponse.status !== 429 && proxyResponse.status !== 503) {
+                        throw new Error(`Backend AI Proxy error: ${proxyErr.substring(0, 300)}`);
+                    }
+                } catch (proxyError: any) {
+                    if (!proxyError.message.includes('RESOURCE_EXHAUSTED') && !proxyError.message.includes('Backend AI Proxy')) {
+                        console.warn('[RamN] Backend AI Proxy unreachable, falling through to direct...', proxyError.message);
+                    }
+                    // Fall through to Tier 2
                 }
-            };
-
-            // If using a cached context, reference it — otherwise send full system instruction
-            const cachedContentId: string | undefined = params.cachedContentId;
-            if (cachedContentId) {
-                payload.cachedContent = cachedContentId;
-            } else {
-                payload.systemInstruction = params.config?.systemInstruction
-                    ? { parts: [{ text: params.config.systemInstruction }] }
-                    : undefined;
             }
 
-            const response = await fetch(targetUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(isVertex && !apiKey ? { 'Authorization': `Bearer ${params._token}` } : {})
-                },
-                body: JSON.stringify(payload)
-            });
+            // --- TIER 2: Direct Google AI Studio (browser-side) ---
+            if (apiKey) {
+                console.info('[RamN] Using direct Google AI Studio...');
+                const payload: any = {
+                    contents: params.contents,
+                    tools: params.config?.tools,
+                    generationConfig: {
+                        ...(params.config?.thinkingConfig ? { thinkingConfig: params.config.thinkingConfig } : {}),
+                        temperature: 0.7,
+                        topP: 0.95,
+                    }
+                };
 
-            if (!response.ok) {
+                const cachedContentId: string | undefined = params.cachedContentId;
+                if (cachedContentId) {
+                    payload.cachedContent = cachedContentId;
+                } else {
+                    payload.systemInstruction = params.config?.systemInstruction
+                        ? { parts: [{ text: params.config.systemInstruction }] }
+                        : undefined;
+                }
+
+                const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${params.model}:generateContent?key=${apiKey}`;
+
+                const response = await fetch(targetUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const part = data.candidates?.[0]?.content?.parts?.[0];
+                    if (part?.functionCall) {
+                        return { functionCalls: [{ id: part.functionCall.name, name: part.functionCall.name, args: part.functionCall.args }], text: '' };
+                    }
+                    return { text: part?.text || '', candidates: data.candidates };
+                }
+
                 const errText = await response.text();
-                console.warn('[RamN] Google API Error:', response.status, errText.substring(0, 200));
-
+                console.warn('[RamN] Direct AI Studio Error:', response.status, errText.substring(0, 200));
                 if (errText.includes('API_KEY_INVALID')) throw new Error('[RamN] Platform API key is invalid. Contact support.');
                 if (errText.includes('RESOURCE_EXHAUSTED') || response.status === 429) {
-                    throw new Error('RESOURCE_EXHAUSTED: Google API quota limit reached. Falling back to alternative provider...');
+                    throw new Error('RESOURCE_EXHAUSTED: All Google endpoints exhausted. Falling back to Bedrock...');
                 }
                 throw new Error(`Google API error: ${response.statusText}`);
             }
 
-            const data = await response.json();
-            const part = data.candidates?.[0]?.content?.parts?.[0];
-            if (part?.functionCall) {
-                return { functionCalls: [{ id: part.functionCall.name, name: part.functionCall.name, args: part.functionCall.args }], text: '' };
+            // --- No Google providers available at all ---
+            if (!backendUrl && !apiKey) {
+                console.error('[RamN] No Google AI providers configured.');
+                throw new Error('RESOURCE_EXHAUSTED: No Google AI providers available.');
             }
-            return { text: part?.text || '', candidates: data.candidates };
 
         } catch (error: any) {
             lastError = error;
 
-            // ─── RESOURCE EXHAUSTED FALLBACK ───
+            // ─── RESOURCE EXHAUSTED → TIER 3: AWS BEDROCK FALLBACK ───
             if (error.message.includes("RESOURCE_EXHAUSTED")) {
-                // If Google fails, try switching to a non-Google provider as a fallback
                 if (provider === 'google' && i === 0) {
-                    console.warn('[RamN] Google quota hit. Attempting automatic fallback to AWS Bedrock (Claude 3.5)...');
+                    console.warn('[RamN] All Google endpoints exhausted. Attempting AWS Bedrock (Claude 3.5)...');
                     const fallbackParams = {
                         ...params,
                         model: 'anthropic.claude-3-5-sonnet-20240620-v1:0'
@@ -183,7 +222,7 @@ export async function hybridGenerateContent(
                     try {
                         return await bedrockGenerateContent(fallbackParams);
                     } catch (fallbackErr) {
-                        console.error('[RamN] Fallback to Bedrock failed:', fallbackErr);
+                        console.error('[RamN] Bedrock fallback also failed:', fallbackErr);
                     }
                 }
 
