@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Message, ChatSession, UserProfile } from '../types';
 import { AGENTS } from '../constants';
 import { dbService, STORES_ENUM } from '../services/db';
+import { useAppStore } from '../store/useAppStore';
 
 const PRISM_INTRO = `Prism is Active. I am your Meta Agent and Workspace Architect.
 
@@ -20,7 +21,11 @@ const getAgentIntro = (name: string, role: string) => `**${name}** is Online. I 
 const getTeamIntro = (name: string) => `**${name}** Squad is Synchronized. Mention an agent using **@Name** to trigger their specialized expertise. How can the team collaborate on your project today?`;
 
 export const useChatSessions = (currentUser: UserProfile | null) => {
-    const [chatHistory, setChatHistory] = useState<{ [key: string]: Message[] }>({});
+    const chatHistory = useAppStore(state => state.chatHistory);
+    const setChatHistory = useAppStore(state => state.setChatHistory);
+    const addMessageToHistory = useAppStore(state => state.addMessageToHistory);
+    const clearChatHistory = useAppStore(state => state.clearChatHistory);
+
     const [activeChatId, setActiveChatId] = useState<string>('prism-core');
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -115,12 +120,12 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
     }, [getInitialMessage]);
 
     const addMessage = useCallback((chatId: string, message: Message) => {
-        setChatHistory(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), message] }));
-    }, []);
+        addMessageToHistory(chatId, message);
+    }, [addMessageToHistory]);
 
     const clearChat = useCallback((chatId: string) => {
-        setChatHistory(prev => ({ ...prev, [chatId]: [] }));
-    }, []);
+        clearChatHistory(chatId);
+    }, [clearChatHistory]);
 
     const loadChatHistory = useCallback((chatId: string, messages: Message[]) => {
         setChatHistory(prev => ({ ...prev, [chatId]: messages }));

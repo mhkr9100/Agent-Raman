@@ -1,6 +1,8 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import * as crypto from 'crypto';
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -22,33 +24,103 @@ function apiSuccess(data: any): APIGatewayProxyResult {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(data) };
 }
 
+// ─── Decode Service Account Key ───
+const GCP_SERVICE_ACCOUNT_SECRET_ARN = process.env.GCP_SERVICE_ACCOUNT_SECRET_ARN || '';
+
+let cachedGcpKey: any = null;
+
+async function getServiceAccountKey(): Promise<any | null> {
+    if (cachedGcpKey) return cachedGcpKey;
+    if (!GCP_SERVICE_ACCOUNT_SECRET_ARN) return null;
+
+    try {
+        const client = new SecretsManagerClient({});
+        const response = await client.send(new GetSecretValueCommand({ SecretId: GCP_SERVICE_ACCOUNT_SECRET_ARN }));
+        if (response.SecretString) {
+            let secretString = response.SecretString;
+            try {
+                const parsed = JSON.parse(secretString);
+                if (parsed.private_key && parsed.client_email) {
+                    cachedGcpKey = parsed;
+                    return parsed;
+                }
+            } catch { /* not raw JSON */ }
+            try {
+                const decoded = Buffer.from(secretString, 'base64').toString('utf-8');
+                const parsed = JSON.parse(decoded);
+                if (parsed.private_key && parsed.client_email) {
+                    cachedGcpKey = parsed;
+                    return parsed;
+                }
+            } catch { /* base64 failed */ }
+        }
+    } catch (error) {
+        console.error('[AI Proxy] Failed to fetch GCP key from Secrets Manager', error);
+    }
+    return null;
+}
+
+let cachedToken: { token: string; expiresAt: number } | null = null;
+async function getAccessToken(): Promise<string> {
+    if (cachedToken && Date.now() < cachedToken.expiresAt - 60000) return cachedToken.token;
+    const sa = await getServiceAccountKey();
+    if (!sa) throw new Error('No valid GCP service account key available');
+
+    const { client_email, private_key } = sa;
+    const now = Math.floor(Date.now() / 1000);
+    const header = { alg: 'RS256', typ: 'JWT' };
+    const payload = {
+        iss: client_email, sub: client_email, aud: 'https://oauth2.googleapis.com/token',
+        iat: now, exp: now + 3600, scope: 'https://www.googleapis.com/auth/cloud-platform'
+    };
+
+    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const signatureInput = `${encodedHeader}.${encodedPayload}`;
+    const signer = crypto.createSign('RSA-SHA256');
+    signer.update(signatureInput);
+    const signature = signer.sign(private_key, 'base64url');
+    const jwt = `${signatureInput}.${signature}`;
+
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+    });
+
+    if (!res.ok) throw new Error(`OAuth2 token exchange failed: ${res.status}`);
+    const data = await res.json() as any;
+    cachedToken = { token: data.access_token, expiresAt: Date.now() + (data.expires_in || 3600) * 1000 };
+    return data.access_token;
+}
+
 /**
- * Generate text embedding using Vertex AI textembedding-gecko
+ * Generate text embedding using Vertex AI text-embedding-004
  * Uses the REST API directly (no SDK dependency needed)
  */
 async function getEmbedding(text: string): Promise<number[]> {
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-
-    // Use Gemini's embedding endpoint (simpler than Vertex for Beta)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`;
+    const accessToken = await getAccessToken();
+    const url = `https://${GCP_LOCATION}-aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${GCP_LOCATION}/publishers/google/models/text-embedding-004:predict`;
 
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify({
-            model: 'models/text-embedding-004',
-            content: { parts: [{ text }] }
+            instances: [{ content: text }]
         })
     });
 
     if (!response.ok) {
         const err = await response.text();
-        console.error('[Embedding Error]', err);
+        console.error('[Embedding Error - Vertex AI]', err);
         throw new Error(`Embedding API error: ${response.status}`);
     }
 
     const data = await response.json();
-    return data.embedding?.values || [];
+    return data.predictions?.[0]?.embeddings?.values || [];
 }
 
 /**

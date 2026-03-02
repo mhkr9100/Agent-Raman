@@ -7,7 +7,6 @@ import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedroc
 
 // ─── Platform-managed environment access ───
 const getPlatformConfig = () => ({
-    apiKey: import.meta.env.VITE_GEMINI_API_KEY as string,
     projectId: import.meta.env.VITE_GCP_PROJECT_ID as string,
     location: (import.meta.env.VITE_GCP_LOCATION as string) || 'us-central1'
 });
@@ -17,13 +16,6 @@ const getPlatformConfig = () => ({
  * No user API keys required.
  */
 export function resolvePrismModel(): { model: string; provider: 'google' | 'aws' } {
-    const { apiKey } = getPlatformConfig();
-    const { accessKeyId } = getAWSConfig();
-
-    // If Gemini key is missing but AWS is present, default Prism to Bedrock Claude
-    if (!apiKey && accessKeyId) {
-        return { model: 'anthropic.claude-3-5-sonnet-20240620-v1:0', provider: 'aws' };
-    }
     return { model: 'gemini-2.0-flash', provider: 'google' };
 }
 
@@ -130,8 +122,7 @@ export async function hybridGenerateContent(
             // ========== GOOGLE MODELS: Backend AI Proxy ==========
             // All Google model calls go through the backend Lambda which handles:
             //   Tier 1: Vertex AI (service account, highest quota)
-            //   Tier 2: AI Studio (API key)
-            //   Tier 3: Bedrock Claude (always available)
+            //   Tier 2: Bedrock Claude (fallback)
             // No VITE_GEMINI_API_KEY needed on the frontend for Prism/Agents!
 
             const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -439,21 +430,18 @@ export async function generateExpandedSolution(
 export async function executeInterceptedCommand(agent: Agent, toolCall: ToolCall): Promise<MessageContent | null> {
     try {
         if (toolCall.name === 'generateVisualAsset') {
-            const { apiKey } = getPlatformConfig();
-            if (apiKey) {
-                const response = await hybridGenerateContent({
-                    model: 'gemini-2.0-flash',
-                    contents: [{ role: 'user', parts: [{ text: toolCall.args.prompt }] }]
-                });
-                const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
-                if (part?.inlineData?.data) {
-                    return {
-                        type: 'image',
-                        imageUrl: `data:image/png;base64,${part.inlineData.data}`,
-                        mimeType: 'image/png',
-                        text: `Synthesis Resolved.`
-                    };
-                }
+            const response = await hybridGenerateContent({
+                model: 'gemini-2.0-flash',
+                contents: [{ role: 'user', parts: [{ text: toolCall.args.prompt }] }]
+            });
+            const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+            if (part?.inlineData?.data) {
+                return {
+                    type: 'image',
+                    imageUrl: `data:image/png;base64,${part.inlineData.data}`,
+                    mimeType: 'image/png',
+                    text: `Synthesis Resolved.`
+                };
             }
             return { type: 'text', text: '⚠️ Image generation requires a valid platform configuration.' };
         }

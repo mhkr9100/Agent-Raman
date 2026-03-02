@@ -12,6 +12,7 @@ import { UserMapView } from './components/UserMapView';
 import { useScatter } from './hooks/useScatter';
 import { useTasks } from './hooks/useTasks';
 import { useUserMap } from './hooks/useUserMap';
+import { useAppStore } from './store/useAppStore';
 import { Agent, GlobalTask, Message, UserProfile } from './types';
 import { AGENTS } from './constants';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -20,7 +21,7 @@ import { OnboardingModal } from './components/OnboardingModal';
 const App: React.FC = () => {
   const {
     currentUser, isInitializing, login, logout, userProfile, setUserProfile, agents, setAgents, teams, setTeams,
-    activeChatId, setActiveChatId, chatHistory, setChatHistory, isProcessing, typingAgent, typingAgents, prismStatus, orchestrationWeights, agentModes,
+    activeChatId, setActiveChatId, isProcessing, typingAgent, typingAgents, prismStatus, orchestrationWeights, agentModes,
     handleSendMessage, handleExecuteCommand, handleExpandMessage, injectOutputToChat, clearChat, loadChatHistory, recruitAgent, createTeam, deleteAgent, deleteTeam, processSilentDirective,
     rateLimitInfo,
     chatSessions, activeSessionId, startNewSession, resumeSession, getSessionsForEntity
@@ -51,8 +52,8 @@ const App: React.FC = () => {
 
   if (isInitializing) {
     return (
-      <div className="h-screen w-screen bg-[#1A1A1A] flex items-center justify-center">
-        <div className="text-white font-bold animate-pulse uppercase tracking-[0.5em] text-xs">
+      <div className="h-screen w-screen bg-[#F8F9FA] dark:bg-[#1A1A1A] flex items-center justify-center transition-colors duration-300">
+        <div className="text-gray-900 dark:text-white font-bold animate-pulse uppercase tracking-[0.5em] text-xs">
           Initializing RamN AI...
         </div>
       </div>
@@ -83,7 +84,7 @@ const App: React.FC = () => {
       type: 'agent',
       content: { type: 'text', text: `[SYSTEM_SIGNAL]: ${text}` }
     };
-    setChatHistory(prev => ({
+    useAppStore.getState().setChatHistory(prev => ({
       ...prev,
       [activeChatId]: [...(prev[activeChatId] || []), sysMsg]
     }));
@@ -106,8 +107,8 @@ const App: React.FC = () => {
 
         if (showBlankState) {
           return (
-            <div className="flex-1 flex flex-col items-center justify-center border-r border-white/5 bg-[#1A1A1A]">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6 border border-white/10">
+            <div className="flex-1 flex flex-col items-center justify-center border-r border-gray-200 dark:border-white/5 bg-[#F8F9FA] dark:bg-[#1A1A1A] transition-colors duration-300">
+              <div className="w-16 h-16 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center mb-6 border border-black/10 dark:border-white/10">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" className="w-8 h-8 text-white/20">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494 3.32 3.32 0 0 0 2.822-3.237V9.72m-3.22 8.4A3.32 3.32 0 0 0 21 14.885V5.115a3.32 3.32 0 0 0-2.822-3.236A48.282 48.282 0 0 0 12 1.535c-2.11 0-4.18.173-6.208.494A3.32 3.32 0 0 0 3 5.115v9.77M12 10.5h.008v.008H12V10.5Z" />
                 </svg>
@@ -121,22 +122,9 @@ const App: React.FC = () => {
         return (
           <div className="flex-1 flex overflow-hidden">
             <div className="flex-1 flex flex-col min-w-0 border-r border-white/5">
-              <header className="h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-6 bg-[#1A1A1A] z-10 flex-shrink-0">
-                <div className="ml-10 md:ml-0 flex items-center gap-4">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
-                    {activeTeam && prismStatus ? <span className="text-white animate-pulse">{prismStatus}</span> : (isPrism ? "Prism Chat" : "Synchronized")}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)} className={`p-2 rounded-lg border transition-all ${isProfileSidebarOpen ? 'bg-white border-white text-black' : 'text-white/40 border-white/10 hover:bg-white/5'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 1 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
-                  </button>
-                </div>
-              </header>
-
               <div className="flex-1 overflow-hidden relative">
                 <ChatView
-                  messages={chatHistory[activeChatId] || []} isLoading={isProcessing} typingAgent={typingAgent} typingAgents={typingAgents as any}
+                  isLoading={isProcessing} typingAgent={typingAgent} typingAgents={typingAgents as any}
                   onSubmit={handleSendMessage}
                   onAddAgent={recruitAgent} onCreateTeam={(data) => createTeam({ ...data, type: 'rouge' })}
                   onExecuteCommand={handleExecuteCommand}
@@ -152,6 +140,8 @@ const App: React.FC = () => {
                   activeSessionId={activeSessionId || ''}
                   onResumeSession={(sessionId) => { const s = chatSessions.find(x => x.id === sessionId); if (s) resumeSession(s); }}
                   onStartNewSession={() => startNewSession(activeChatId)}
+                  isProfileSidebarOpen={isProfileSidebarOpen}
+                  onToggleProfileSidebar={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)}
                 />
               </div>
             </div>
@@ -169,7 +159,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#1A1A1A] text-white font-sans selection:bg-white/10">
+    <div className="flex h-screen overflow-hidden bg-[#F8F9FA] text-gray-900 dark:bg-[#1A1A1A] dark:text-white font-sans selection:bg-black/10 dark:selection:bg-white/10 transition-colors duration-300">
       <SideBar
         activeView={activeView}
         onViewChange={(view) => {
@@ -186,9 +176,9 @@ const App: React.FC = () => {
         userProfile={userProfile}
       />
 
-      <main className="flex-1 flex flex-col relative min-w-0 bg-[#1A1A1A]">
+      <main className="flex-1 flex flex-col relative min-w-0 bg-[#F8F9FA] dark:bg-[#1A1A1A] transition-colors duration-300">
         <ErrorBoundary fallback={
-          <div className="flex-1 flex items-center justify-center p-8 text-center bg-[#1A1A1A]">
+          <div className="flex-1 flex items-center justify-center p-8 text-center bg-[#F8F9FA] dark:bg-[#1A1A1A] transition-colors duration-300">
             <div>
               <div className="w-16 h-16 bg-red-500/10 rounded-2xl mx-auto mb-4 flex items-center justify-center border border-red-500/20">⚠️</div>
               <h2 className="text-xl font-bold bg-gradient-to-r from-red-400 to-rose-400 bg-clip-text text-transparent mb-2">Workspace Render Error</h2>

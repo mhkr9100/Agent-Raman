@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import * as crypto from 'crypto';
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
 /**
  * AI Proxy Lambda — Server-Side AI Provider Gateway
@@ -12,8 +13,7 @@ import * as crypto from 'crypto';
 
 const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID || 'ramn-ai';
 const GCP_LOCATION = process.env.GCP_LOCATION || 'us-central1';
-const GCP_SERVICE_ACCOUNT_KEY_B64 = process.env.GCP_SERVICE_ACCOUNT_KEY || '';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GCP_SERVICE_ACCOUNT_SECRET_ARN = process.env.GCP_SERVICE_ACCOUNT_SECRET_ARN || '';
 const AWS_BEDROCK_REGION = process.env.AWS_BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
 
 const corsHeaders = {
@@ -25,23 +25,40 @@ const corsHeaders = {
 
 // ─── Decode Service Account Key ───
 
-function getServiceAccountKey(): any | null {
-    if (!GCP_SERVICE_ACCOUNT_KEY_B64) return null;
+let cachedGcpKey: any = null;
 
-    // Try direct JSON parse first
+async function getServiceAccountKey(): Promise<any | null> {
+    if (cachedGcpKey) return cachedGcpKey;
+    if (!GCP_SERVICE_ACCOUNT_SECRET_ARN) return null;
+
     try {
-        const parsed = JSON.parse(GCP_SERVICE_ACCOUNT_KEY_B64);
-        if (parsed.private_key && parsed.client_email) return parsed;
-    } catch { /* not raw JSON */ }
+        const client = new SecretsManagerClient({});
+        const response = await client.send(new GetSecretValueCommand({ SecretId: GCP_SERVICE_ACCOUNT_SECRET_ARN }));
+        if (response.SecretString) {
+            let secretString = response.SecretString;
+            // 1. Try directly parsing as JSON
+            try {
+                const parsed = JSON.parse(secretString);
+                if (parsed.private_key && parsed.client_email) {
+                    cachedGcpKey = parsed;
+                    return parsed;
+                }
+            } catch { /* not raw JSON */ }
+            // 2. Try Base64 string decoding
+            try {
+                const decoded = Buffer.from(secretString, 'base64').toString('utf-8');
+                const parsed = JSON.parse(decoded);
+                if (parsed.private_key && parsed.client_email) {
+                    cachedGcpKey = parsed;
+                    return parsed;
+                }
+            } catch { /* not valid base64 JSON either */ }
+        }
+    } catch (error) {
+        console.error('[AI Proxy] Failed to fetch GCP key from Secrets Manager', error);
+    }
 
-    // Try Base64 decode
-    try {
-        const decoded = Buffer.from(GCP_SERVICE_ACCOUNT_KEY_B64, 'base64').toString('utf-8');
-        const parsed = JSON.parse(decoded);
-        if (parsed.private_key && parsed.client_email) return parsed;
-    } catch { /* not valid base64 JSON either */ }
-
-    console.error('[AI Proxy] GCP_SERVICE_ACCOUNT_KEY could not be parsed as JSON or Base64-encoded JSON');
+    console.error('[AI Proxy] Could not parse a valid GCP_SERVICE_ACCOUNT_KEY from Secrets Manager');
     return null;
 }
 
@@ -54,7 +71,7 @@ async function getAccessToken(): Promise<string> {
         return cachedToken.token;
     }
 
-    const sa = getServiceAccountKey();
+    const sa = await getServiceAccountKey();
     if (!sa) throw new Error('No valid GCP service account key available');
 
     const { client_email, private_key } = sa;
@@ -171,7 +188,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 };
 
 async function handleHealth(): Promise<APIGatewayProxyResult> {
-    const saKey = getServiceAccountKey();
+    const saKey = await getServiceAccountKey();
     return {
         statusCode: 200,
         headers: corsHeaders,
@@ -179,7 +196,6 @@ async function handleHealth(): Promise<APIGatewayProxyResult> {
             status: 'operational',
             providers: {
                 vertexAI: !!saKey,
-                geminiStudio: !!GEMINI_API_KEY,
                 bedrock: true, // Always available via Lambda IAM role
                 projectId: GCP_PROJECT_ID,
                 location: GCP_LOCATION
@@ -193,8 +209,7 @@ async function handleHealth(): Promise<APIGatewayProxyResult> {
  * 
  * 3-Tier Strategy:
  * 1. Vertex AI (service account) — highest quota, enterprise
- * 2. AI Studio (API key) — free tier  
- * 3. AWS Bedrock (Claude 3.5) — pay-per-use, always available
+ * 2. AWS Bedrock (Claude 3.5) — pay-per-use, always available
  */
 async function handleGenerate(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
     const body = JSON.parse(event.body || '{}');
@@ -228,7 +243,7 @@ async function handleGenerate(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const errors: string[] = [];
 
     // ═══════════ TIER 1: Vertex AI ═══════════
-    const saKey = getServiceAccountKey();
+    const saKey = await getServiceAccountKey();
     if (saKey) {
         try {
             console.info(`[AI Proxy] TIER 1: Vertex AI — model: ${model}`);
@@ -267,42 +282,9 @@ async function handleGenerate(event: APIGatewayProxyEvent): Promise<APIGatewayPr
         errors.push('Vertex: no key');
     }
 
-    // ═══════════ TIER 2: AI Studio ═══════════
-    if (GEMINI_API_KEY) {
-        try {
-            console.info(`[AI Proxy] TIER 2: AI Studio — model: ${model}`);
-            const studioUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-
-            const response = await fetch(studioUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(geminiPayload)
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                console.info('[AI Proxy] ✅ AI Studio succeeded');
-                return {
-                    statusCode: 200,
-                    headers: corsHeaders,
-                    body: JSON.stringify({ source: 'studio', ...data as any })
-                };
-            }
-
-            const errText = await response.text();
-            console.warn(`[AI Proxy] ❌ AI Studio failed (${response.status}):`, errText.substring(0, 300));
-            errors.push(`Studio: ${response.status}`);
-        } catch (studioErr: any) {
-            console.error('[AI Proxy] ❌ AI Studio error:', studioErr.message);
-            errors.push(`Studio: ${studioErr.message}`);
-        }
-    } else {
-        errors.push('Studio: no key');
-    }
-
-    // ═══════════ TIER 3: AWS Bedrock (Claude 3.5) ═══════════
+    // ═══════════ TIER 2: AWS Bedrock (Claude 3.5) ═══════════
     try {
-        console.info('[AI Proxy] TIER 3: AWS Bedrock (Claude 3.5 Sonnet)');
+        console.info('[AI Proxy] TIER 2: AWS Bedrock (Claude 3.5 Sonnet)');
         const bedrockData = await callBedrock(contents, systemInstruction);
         console.info('[AI Proxy] ✅ Bedrock succeeded');
         return {

@@ -53,14 +53,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#1A1A1A] p-4 text-white font-sans selection:bg-white/10">
+        <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] dark:bg-[#1A1A1A] p-4 text-gray-900 dark:text-white font-sans selection:bg-black/10 dark:selection:bg-white/10 transition-colors duration-300">
             <div className="max-w-md w-full space-y-10">
                 <div className="flex flex-col items-center">
-                    <div className="mb-8 text-white">
+                    <div className="mb-8 text-gray-900 dark:text-white">
                         <PrismIcon size={64} />
                     </div>
-                    <h1 className="text-2xl font-black tracking-[0.3em] uppercase text-white">RamN AI</h1>
-                    <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
+                    <h1 className="text-2xl font-black tracking-[0.3em] uppercase text-gray-900 dark:text-white">RamN AI</h1>
+                    <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">
                         {isSignUp ? "Create a New Account" : "Enter Credentials to Access the Orchestrator"}
                     </p>
                 </div>
@@ -80,7 +80,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                     id="name"
                                     name="name"
                                     type="text"
-                                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm text-white focus:border-white outline-none transition-colors"
+                                    className="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-4 text-sm text-gray-900 dark:text-white focus:border-black dark:focus:border-white outline-none transition-colors"
                                     placeholder="Enter your name"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
@@ -95,7 +95,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                 type="email"
                                 autoComplete="email"
                                 required
-                                className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm text-white focus:border-white outline-none transition-colors"
+                                className="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-4 text-sm text-gray-900 dark:text-white focus:border-black dark:focus:border-white outline-none transition-colors"
                                 placeholder="Enter your email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -108,7 +108,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                 name="password"
                                 type="password"
                                 autoComplete="current-password"
-                                className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm text-white focus:border-white outline-none transition-colors"
+                                className="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-4 text-sm text-gray-900 dark:text-white focus:border-black dark:focus:border-white outline-none transition-colors"
                                 placeholder="Enter your password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -120,7 +120,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full py-4 bg-white text-black text-[11px] font-black uppercase tracking-[0.3em] rounded-xl transition-all shadow-xl active:scale-[0.98] hover:bg-slate-200 disabled:opacity-50"
+                            className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-black uppercase tracking-[0.3em] rounded-xl transition-all shadow-xl active:scale-[0.98] hover:bg-gray-800 dark:hover:bg-slate-200 disabled:opacity-50"
                         >
                             {isLoading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Initialize Session')}
                         </button>
@@ -130,13 +130,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                 <div className="text-center mt-4">
                     <button
                         onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
-                        className="text-[11px] font-bold text-white/50 hover:text-white uppercase tracking-[0.1em] transition-colors"
+                        className="text-[11px] font-bold text-gray-500 hover:text-gray-900 dark:text-white/50 dark:hover:text-white uppercase tracking-[0.1em] transition-colors"
                     >
                         {isSignUp ? "Already have an account? Log In" : "Need an account? Sign Up"}
                     </button>
                 </div>
 
-                <p className="text-center text-[9px] font-mono uppercase tracking-widest text-white/20 pt-8 border-t border-white/5">
+                <p className="text-center text-[9px] font-mono uppercase tracking-widest text-gray-400 dark:text-white/20 pt-8 border-t border-black/5 dark:border-white/5">
                     Secure Access • Encrypted Session
                 </p>
             </div>

@@ -14,6 +14,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
@@ -50,17 +51,17 @@
   </script>
   <style>
     :root {
-      color-scheme: dark;
+      /* Dynamic color scheme based on user preference or dark class */
+      color-scheme: light dark;
     }
 
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #1A1A1A;
-      color: #FFFFFF;
       -webkit-font-smoothing: antialiased;
       overflow: hidden;
     }
 
+    /* Target specific scrollbars based on theme */
     .custom-scrollbar::-webkit-scrollbar {
       width: 4px;
     }
@@ -70,14 +71,23 @@
     }
 
     .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(128, 128, 128, 0.5);
       border-radius: 10px;
+    }
+
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
     }
 
     .glass {
       background: rgba(255, 255, 255, 0.04);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .dark .glass {
+      background: rgba(0, 0, 0, 0.2);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
@@ -93,23 +103,23 @@
       font-size: 0.75rem;
     }
 
-    /* Enhanced visibility for text - Brightened by ~10% */
-    .text-slate-500 {
+    /* Enhanced visibility for text - Brightened by ~10% for dark mode */
+    .dark .text-slate-500 {
       color: #B4B4B4 !important;
     }
 
-    .text-slate-400 {
+    .dark .text-slate-400 {
       color: #E1E1E4 !important;
     }
 
-    .text-slate-300 {
+    .dark .text-slate-300 {
       color: #F2F2F5 !important;
     }
   </style>
   <link rel="stylesheet" href="/index.css">
 </head>
 
-<body class="bg-[#1A1A1A]">
+<body class="bg-[#F8F9FA] text-[#1A1A1A] dark:bg-[#1A1A1A] dark:text-[#FFFFFF] transition-colors duration-300">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

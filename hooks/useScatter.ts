@@ -4,6 +4,7 @@ import { AGENTS } from '../constants';
 import { generateSingleAgentResponse, generatePrismResponse } from '../services/aiService';
 import { dbService, STORES_ENUM } from '../services/db';
 import { canMakeRequest, recordRequest, getUsageInfo, formatResetTime } from '../services/rateLimiter';
+import { useAppStore } from '../store/useAppStore';
 
 // Composed Hooks
 import { useAuth } from './useAuth';
@@ -39,7 +40,7 @@ export const useScatter = () => {
     } = useEntities(currentUser);
 
     const {
-        chatHistory, setChatHistory, activeChatId, setActiveChatId,
+        activeChatId, setActiveChatId,
         chatSessions, activeSessionId,
         loadSessions, addMessage, clearChat, loadChatHistory,
         startNewSession, resumeSession, getSessionsForEntity
@@ -94,7 +95,7 @@ export const useScatter = () => {
         orchestrationWeights, setOrchestrationWeights,
         agentModes, setAgentModes,
         handleExpandMessage, handleExecuteCommand
-    } = useAgentExecution(currentUser, getUserKeys, addMessage, chatHistory, setChatHistory);
+    } = useAgentExecution(currentUser, getUserKeys, addMessage);
 
     // === Background Directives ===
     const processSilentDirective = useCallback(async (task: GlobalTask) => {
@@ -184,7 +185,7 @@ export const useScatter = () => {
         };
 
         addMessage(chatId, newMessage);
-        let currentSnapshot = [...(chatHistory[chatId] || []), newMessage];
+        let currentSnapshot = [...(useAppStore.getState().chatHistory[chatId] || []), newMessage];
 
         if (createEnabled && chatId === 'prism-core') {
             const lastMsg = currentSnapshot[currentSnapshot.length - 1];
@@ -242,13 +243,13 @@ export const useScatter = () => {
             setTypingAgent(null);
             setOrchestrationWeights({});
         }
-    }, [currentUser, activeChatId, agents, teams, chatHistory, addMessage, getUserKeys]);
+    }, [currentUser, activeChatId, agents, teams, addMessage, getUserKeys]);
 
     return {
         currentUser, isInitializing, userProfile: currentUser as UserProfile, setUserProfile: setCurrentUser,
         login, logout,
         agents, setAgents, teams, setTeams,
-        activeChatId, setActiveChatId, chatHistory, setChatHistory,
+        activeChatId, setActiveChatId,
         isProcessing, typingAgent, typingAgents, prismStatus, orchestrationWeights, agentModes,
         handleSendMessage, handleExecuteCommand: _executeCmdProxy, handleExpandMessage: _expandMsgProxy,
         processSilentDirective, injectOutputToChat,

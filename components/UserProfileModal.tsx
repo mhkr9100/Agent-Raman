@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { XMarkIcon } from './icons/XMarkIcon';
 import { authService } from '../services/auth';
+import { useTheme } from '../hooks/useTheme';
 
 interface UserProfileModalProps {
     user: UserProfile;
@@ -17,6 +18,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, isOpen
     const [avatar, setAvatar] = useState(user.avatar || '');
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const { theme, toggleTheme } = useTheme();
 
     if (!isOpen) return null;
 
@@ -88,6 +90,25 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, isOpen
                                         required
                                     />
                                 </div>
+                            </div>
+
+                            {/* Theme Toggle */}
+                            <div className="flex items-center justify-between p-4 bg-black/20 border border-white/5 rounded-xl">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">App Theme</span>
+                                    <span className="text-[10px] text-white/30">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={toggleTheme}
+                                    className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
+                                    style={{ backgroundColor: theme === 'dark' ? '#3B82F6' : '#E5E7EB' }}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                                            }`}
+                                    />
+                                </button>
                             </div>
 
                             {/* Actions */}

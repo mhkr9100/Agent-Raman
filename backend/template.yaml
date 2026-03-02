@@ -3,16 +3,10 @@ Transform: AWS::Serverless-2016-10-31
 Description: RamN AI Backend - Auth, DB, Proxy, Tools, Memory
 
 Parameters:
-  GeminiApiKey:
-    Type: String
-    Description: Gemini API Key for embedding and AI services
-    Default: ''
-    NoEcho: true
-
   GcpServiceAccountKey:
     Type: String
     Description: GCP Service Account JSON key for Vertex AI authentication
-    Default: ''
+    Default: '{"private_key":"","client_email":""}'
     NoEcho: true
 
 Globals:
@@ -46,6 +40,14 @@ Resources:
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
+
+  # ──── Secrets Manager ────
+  GcpServiceAccountSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "RamNGcpKey-${AWS::StackName}"
+      Description: "GCP Service Account Key for Vertex AI"
+      SecretString: !Ref GcpServiceAccountKey
 
   # ──── Lambda Functions ────
   AuthFunction:
@@ -153,10 +155,15 @@ Resources:
           TABLE_NAME: !Ref EntitiesTable
           GCP_PROJECT_ID: ramn-ai
           GCP_LOCATION: us-central1
-          GEMINI_API_KEY: !Ref GeminiApiKey
+          GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref EntitiesTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref GcpServiceAccountSecret
       Events:
         MemoryAdd:
           Type: Api
@@ -186,8 +193,7 @@ Resources:
         Variables:
           GCP_PROJECT_ID: ramn-ai
           GCP_LOCATION: us-central1
-          GCP_SERVICE_ACCOUNT_KEY: !Ref GcpServiceAccountKey
-          GEMINI_API_KEY: !Ref GeminiApiKey
+          GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
           AWS_BEDROCK_REGION: us-east-1
       Policies:
         - Statement:
@@ -195,6 +201,10 @@ Resources:
               Action:
                 - bedrock:InvokeModel
               Resource: '*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref GcpServiceAccountSecret
       Events:
         AIGenerate:
           Type: Api
@@ -211,6 +221,22 @@ Resources:
           Properties:
             Path: /api/ai/{proxy+}
             Method: OPTIONS
+
+  # ──── API Gateway Usage Plan (Cloud Protection) ────
+  RamNUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: !Sub "RamNUsagePlan-${AWS::StackName}"
+      Description: "Protect RamN Backend from DDOS loops or accidental infinite loops"
+      ApiStages:
+        - ApiId: !Ref ServerlessRestApi
+          Stage: Prod
+      Quota:
+        Limit: 100000
+        Period: MONTH
+      Throttle:
+        BurstLimit: 50
+        RateLimit: 20
 
 Outputs:
   ApiUrl:

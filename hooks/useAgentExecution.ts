@@ -2,13 +2,12 @@ import { useState, useCallback } from 'react';
 import { Agent, Message, UserProfile, ToolCall, Team } from '../types';
 import { AGENTS } from '../constants';
 import { generateSingleAgentResponse, generatePrismResponse, executeInterceptedCommand, generateExpandedSolution } from '../services/aiService';
+import { useAppStore } from '../store/useAppStore';
 
 export const useAgentExecution = (
     currentUser: UserProfile | null,
     getUserKeys: () => { openAiKey?: string, anthropicKey?: string, geminiKey?: string },
-    addMessage: (chatId: string, message: Message) => void,
-    chatHistory: { [key: string]: Message[] },
-    setChatHistory: React.Dispatch<React.SetStateAction<{ [key: string]: Message[] }>>
+    addMessage: (chatId: string, message: Message) => void
 ) => {
     const [activeRequests, setActiveRequests] = useState(0);
     const isProcessing = activeRequests > 0;
@@ -20,7 +19,7 @@ export const useAgentExecution = (
     const [agentModes, setAgentModes] = useState<{ [key: string]: 'CHAT' | 'SOLUTION' | 'TASK' | 'VOID' }>({});
 
     const handleExpandMessage = async (activeChatId: string, messageId: string) => {
-        const history = chatHistory[activeChatId] || [];
+        const history = useAppStore.getState().chatHistory[activeChatId] || [];
         const msgIndex = history.findIndex(m => m.id === messageId);
         if (msgIndex === -1) return;
 
@@ -32,11 +31,11 @@ export const useAgentExecution = (
             ...updatedHistory[msgIndex],
             content: { ...updatedHistory[msgIndex].content, isExpanding: true }
         };
-        setChatHistory(prev => ({ ...prev, [activeChatId]: updatedHistory }));
+        useAppStore.getState().setChatHistory(prev => ({ ...prev, [activeChatId]: updatedHistory }));
 
         const solutionText = await generateExpandedSolution(history.slice(0, msgIndex + 1), messageToExpand.agent);
 
-        setChatHistory(prev => {
+        useAppStore.getState().setChatHistory(prev => {
             const current = [...(prev[activeChatId] || [])];
             const idx = current.findIndex(m => m.id === messageId);
             if (idx !== -1) {
@@ -50,7 +49,7 @@ export const useAgentExecution = (
     };
 
     const handleExecuteCommand = async (activeChatId: string, messageId: string, toolCall: ToolCall, onCreateTeam: (team: Team) => void, onRecruitAgent: (agent: Agent) => void, setActiveChatId: (id: string) => void) => {
-        const history = chatHistory[activeChatId] || [];
+        const history = useAppStore.getState().chatHistory[activeChatId] || [];
         const msgIndex = history.findIndex(m => m.id === messageId);
         if (msgIndex === -1) return;
 
@@ -85,7 +84,7 @@ export const useAgentExecution = (
                 type: 'agent'
             };
 
-            setChatHistory(prev => ({
+            useAppStore.getState().setChatHistory(prev => ({
                 ...prev,
                 [activeChatId]: updatedHistory,
                 [newTeam.id]: [introMessage]
@@ -111,7 +110,7 @@ export const useAgentExecution = (
                 type: 'agent'
             };
 
-            setChatHistory(prev => ({
+            useAppStore.getState().setChatHistory(prev => ({
                 ...prev,
                 [activeChatId]: updatedHistory,
                 [agentParam.id]: [introMessage]
@@ -125,7 +124,7 @@ export const useAgentExecution = (
             ...updatedHistory[msgIndex],
             content: { ...updatedHistory[msgIndex].content, isExecuting: true }
         };
-        setChatHistory(prev => ({ ...prev, [activeChatId]: updatedHistory }));
+        useAppStore.getState().setChatHistory(prev => ({ ...prev, [activeChatId]: updatedHistory }));
 
         const result = await executeInterceptedCommand(updatedHistory[msgIndex].agent, toolCall);
 
@@ -137,11 +136,11 @@ export const useAgentExecution = (
                 content: result,
                 type: 'agent'
             });
-            const finalHistory = [...chatHistory[activeChatId]];
+            const finalHistory = [...useAppStore.getState().chatHistory[activeChatId]];
             const idx = finalHistory.findIndex(m => m.id === messageId);
             if (idx !== -1) {
                 finalHistory[idx] = { ...finalHistory[idx], content: { ...finalHistory[idx].content, isExecuting: false } };
-                setChatHistory(prev => ({ ...prev, [activeChatId]: finalHistory }));
+                useAppStore.getState().setChatHistory(prev => ({ ...prev, [activeChatId]: finalHistory }));
             }
         }
     };

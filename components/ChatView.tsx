@@ -5,6 +5,7 @@ import { InputBar } from './InputBar';
 import { ScatterBottleVisual } from './ScatterBottleVisual';
 import { Message, Agent as AgentType, CustomGroupSuggestion, ToolCall, Team, GlobalTask } from '../types';
 import { RateLimitInfo } from '../hooks/useScatter';
+import { useAppStore } from '../store/useAppStore';
 
 interface ChatSession {
   id: string;
@@ -13,7 +14,6 @@ interface ChatSession {
 }
 
 interface ChatViewProps {
-  messages: Message[];
   isLoading: boolean;
   typingAgent?: AgentType | null;
   typingAgents?: { agent: AgentType; tasks: any[] }[];
@@ -40,15 +40,21 @@ interface ChatViewProps {
   activeSessionId?: string;
   onResumeSession?: (sessionId: string) => void;
   onStartNewSession?: () => void;
+  // Profile sidebar controls
+  isProfileSidebarOpen?: boolean;
+  onToggleProfileSidebar?: () => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
-  messages, isLoading, typingAgent, typingAgents = [], onSubmit, onAddAgent, onCreateTeam, onExecuteCommand, onExpandMessage, onSaveToTasks, onInjectSystemMessage, mentionCandidates, onConfigureNewAgent, onDeployCustomTeam, prismStatus, isGroup = false, orchestrationWeights = {}, agentModes = {}, activeChatId, activeAgent, activeTeam,
+  isLoading, typingAgent, typingAgents = [], onSubmit, onAddAgent, onCreateTeam, onExecuteCommand, onExpandMessage, onSaveToTasks, onInjectSystemMessage, mentionCandidates, onConfigureNewAgent, onDeployCustomTeam, prismStatus, isGroup = false, orchestrationWeights = {}, agentModes = {}, activeChatId, activeAgent, activeTeam,
   rateLimitInfo,
-  sessions = [], activeSessionId = '', onResumeSession, onStartNewSession
+  sessions = [], activeSessionId = '', onResumeSession, onStartNewSession,
+  isProfileSidebarOpen, onToggleProfileSidebar
 }) => {
   const isDispatching = prismStatus !== "";
   const activatedIds = typingAgents.length > 0 ? typingAgents.map(a => a.agent.id) : (typingAgent ? [typingAgent.id] : []);
+
+  const messages = useAppStore(state => activeChatId ? (state.chatHistory[activeChatId] || []) : []);
 
   const canOpenLiveSpace = (activeAgent?.isLiveSpaceEnabled) || (activeTeam?.isLiveSpaceEnabled);
   const isPrism = activeChatId === 'prism-core';
@@ -57,16 +63,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
   return (
     <div className="flex flex-col h-full w-full relative">
       {/* HEADER: Moved session controls and + button here */}
-      <div className="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-[#1A1A1A]/80 backdrop-blur-xl z-30 flex-shrink-0">
+      <div className="h-16 flex items-center justify-between px-6 border-b border-black/10 dark:border-white/5 bg-white/80 dark:bg-[#1A1A1A]/80 backdrop-blur-xl z-30 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-sm">
+          <div className="w-8 h-8 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center text-sm">
             {isPrism ? '💎' : (activeAgent?.icon || (activeTeam ? '👥' : '🤖'))}
           </div>
           <div className="flex flex-col">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">
               {isPrism ? 'Prism Core' : activeAgent?.name || activeTeam?.name || 'Active Session'}
             </h2>
-            <span className="text-[8px] font-bold text-white/30 uppercase tracking-widest mt-0.5">
+            <span className="text-[8px] font-bold text-gray-500 dark:text-white/30 uppercase tracking-widest mt-0.5">
               {isPrism ? 'Meta Agent' : activeAgent?.role || 'Squad'}
             </span>
           </div>
@@ -77,10 +83,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <select
               value={activeSessionId}
               onChange={(e) => onResumeSession(e.target.value)}
-              className="bg-transparent border border-white/10 rounded-lg px-2 py-1.5 text-[9px] font-bold text-white/40 uppercase tracking-wider outline-none cursor-pointer hover:border-white/20 transition-all appearance-none"
+              className="bg-transparent border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 text-[9px] font-bold text-gray-600 dark:text-white/40 uppercase tracking-wider outline-none cursor-pointer hover:border-black/20 dark:hover:border-white/20 transition-all appearance-none"
             >
               {sessions.map((s, i) => (
-                <option key={s.id} value={s.id} className="bg-[#1A1A1A] text-white">
+                <option key={s.id} value={s.id} className="bg-white dark:bg-[#1A1A1A] text-gray-900 dark:text-white">
                   {s.title === 'New Chat' ? `Session ${sessions.length - i}` : s.title}
                 </option>
               ))}
@@ -92,7 +98,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <button
               onClick={onStartNewSession}
               title="Chat Interval / New Session"
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/10 text-white/40 hover:text-white hover:border-white/20 hover:bg-white/5 transition-all"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             </button>
@@ -100,7 +106,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
           {/* Info Button beside + button */}
           <button
-            className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/10 text-white/20 hover:text-white transition-all cursor-help"
+            onClick={onToggleProfileSidebar}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all cursor-help ${isProfileSidebarOpen
+              ? 'bg-gray-900 dark:bg-white border-transparent text-white dark:text-black'
+              : 'border-black/10 dark:border-white/10 text-gray-500 dark:text-white/20 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
             title="Agent Intelligence Details"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
@@ -108,7 +118,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex flex-col relative bg-[#1A1A1A]">
+      <div className="flex-1 overflow-hidden flex flex-col relative bg-[#F8F9FA] dark:bg-[#1A1A1A]">
         <ChatInterface
           messages={messages}
           isLoading={isLoading}
@@ -144,7 +154,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {/* Usage Counter */}
       {!isRateLimited && rateLimitInfo && rateLimitInfo.remaining < rateLimitInfo.limit && (
         <div className="flex justify-center pb-1">
-          <span className="text-[8px] font-bold text-white/10 uppercase tracking-widest">
+          <span className="text-[8px] font-bold text-gray-400 dark:text-white/10 uppercase tracking-widest">
             {rateLimitInfo.remaining}/{rateLimitInfo.limit} tokens remaining
           </span>
         </div>
