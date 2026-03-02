@@ -15,7 +15,6 @@ interface ChatInterfaceProps {
   onConfigureNewAgent?: (profileId?: string, role?: string, jd?: string) => void;
   onDeployCustomGroup?: (suggestion: CustomGroupSuggestion) => void;
   onExecuteCommand?: (messageId: string, toolCall: ToolCall) => void;
-  onExpandMessage?: (messageId: string) => void;
   isPrism?: boolean;
 }
 
@@ -29,19 +28,28 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onConfigureNewAgent,
   onDeployCustomGroup,
   onExecuteCommand,
-  onExpandMessage,
   isPrism
 }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!chatContainerRef.current) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
+
+    if (isNearBottom) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, isLoading, typingAgent, typingAgents]);
 
   const activeTypers = typingAgents.length > 0 ? typingAgents : (typingAgent ? [{ agent: typingAgent, tasks: [] }] : []);
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+    <div ref={chatContainerRef} className="flex-1 overflow-y-auto custom-scrollbar relative">
       {/* Static Background Brand Logo for Prism */}
       {isPrism && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04] overflow-hidden">
@@ -59,7 +67,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             onConfigureNewAgent={onConfigureNewAgent}
             onDeployCustomGroup={onDeployCustomGroup}
             onExecuteCommand={onExecuteCommand}
-            onExpandMessage={onExpandMessage}
           />
         ))}
 

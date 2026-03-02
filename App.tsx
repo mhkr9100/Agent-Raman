@@ -9,6 +9,7 @@ import { ProfileSidebar } from './components/ProfileSidebar';
 import { LoginScreen } from './components/LoginScreen';
 import { HomeView } from './components/HomeView';
 import { UserMapView } from './components/UserMapView';
+import { WelcomeGuideModal } from './components/WelcomeGuideModal';
 import { useScatter } from './hooks/useScatter';
 import { useTasks } from './hooks/useTasks';
 import { useUserMap } from './hooks/useUserMap';
@@ -16,13 +17,12 @@ import { useAppStore } from './store/useAppStore';
 import { Agent, GlobalTask, Message, UserProfile } from './types';
 import { AGENTS } from './constants';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { OnboardingModal } from './components/OnboardingModal';
 
 const App: React.FC = () => {
   const {
     currentUser, isInitializing, login, logout, userProfile, setUserProfile, agents, setAgents, teams, setTeams,
     activeChatId, setActiveChatId, isProcessing, typingAgent, typingAgents, prismStatus, orchestrationWeights, agentModes,
-    handleSendMessage, handleExecuteCommand, handleExpandMessage, injectOutputToChat, clearChat, loadChatHistory, recruitAgent, createTeam, deleteAgent, deleteTeam, processSilentDirective,
+    handleSendMessage, handleExecuteCommand, injectOutputToChat, clearChat, loadChatHistory, recruitAgent, createTeam, deleteAgent, deleteTeam, processSilentDirective,
     rateLimitInfo,
     chatSessions, activeSessionId, startNewSession, resumeSession, getSessionsForEntity
   } = useScatter();
@@ -36,19 +36,7 @@ const App: React.FC = () => {
 
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
   const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
-
-  // Show onboarding for first-time users (no API keys set)
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (typeof localStorage === 'undefined') return false;
-    const done = localStorage.getItem('onboarding_done');
-    if (done) return false;
-    const profile = localStorage.getItem('user_profile');
-    if (!profile) return true;
-    try {
-      const p = JSON.parse(profile);
-      return !p.geminiKey && !p.openAiKey && !p.anthropicKey;
-    } catch { return true; }
-  });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   if (isInitializing) {
     return (
@@ -128,7 +116,6 @@ const App: React.FC = () => {
                   onSubmit={handleSendMessage}
                   onAddAgent={recruitAgent} onCreateTeam={(data) => createTeam({ ...data, type: 'rouge' })}
                   onExecuteCommand={handleExecuteCommand}
-                  onExpandMessage={handleExpandMessage}
                   onSaveToTasks={handleAddGlobalTask}
                   onInjectSystemMessage={handleInjectSystemMessage}
                   mentionCandidates={activeTeam ? activeTeam.agents : []} prismStatus={prismStatus} isGroup={!!activeTeam} orchestrationWeights={orchestrationWeights} agentModes={agentModes}
@@ -160,23 +147,51 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8F9FA] text-gray-900 dark:bg-[#1A1A1A] dark:text-white font-sans selection:bg-black/10 dark:selection:bg-white/10 transition-colors duration-300">
-      <SideBar
-        activeView={activeView}
-        onViewChange={(view) => {
-          setActiveView(view);
-          if (view === 'prism') setActiveChatId('prism-core');
-        }}
-        onOpenProfile={() => setIsUserProfileOpen(true)}
-        agents={agents}
-        teams={teams}
-        activeChatId={activeChatId}
-        onSelectChat={(id) => { setActiveChatId(id); setActiveView('chats'); }}
-        onDeleteTeam={deleteTeam}
-        onDeleteAgent={deleteAgent}
-        userProfile={userProfile}
-      />
+
+      {/* Mobile menu overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Container */}
+      <div className={`fixed inset-y-0 left-0 z-50 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 flex h-full`}>
+        <SideBar
+          activeView={activeView}
+          onViewChange={(view) => {
+            setActiveView(view);
+            if (view === 'prism') setActiveChatId('prism-core');
+            setIsMobileMenuOpen(false);
+          }}
+          onOpenProfile={() => {
+            setIsUserProfileOpen(true);
+            setIsMobileMenuOpen(false);
+          }}
+          agents={agents}
+          teams={teams}
+          activeChatId={activeChatId}
+          onSelectChat={(id) => {
+            setActiveChatId(id);
+            setActiveView('chats');
+            setIsMobileMenuOpen(false);
+          }}
+          onDeleteTeam={deleteTeam}
+          onDeleteAgent={deleteAgent}
+          userProfile={userProfile}
+        />
+      </div>
 
       <main className="flex-1 flex flex-col relative min-w-0 bg-[#F8F9FA] dark:bg-[#1A1A1A] transition-colors duration-300">
+        {/* Mobile Hamburger Button */}
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="md:hidden absolute top-4 left-4 z-30 w-10 h-10 bg-white dark:bg-[#1A1A1A] border border-black/10 dark:border-white/10 rounded-xl flex items-center justify-center shadow-sm text-gray-900 dark:text-white"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+        </button>
+
         <ErrorBoundary fallback={
           <div className="flex-1 flex items-center justify-center p-8 text-center bg-[#F8F9FA] dark:bg-[#1A1A1A] transition-colors duration-300">
             <div>
@@ -199,11 +214,7 @@ const App: React.FC = () => {
         <UserProfileModal user={userProfile} isOpen={isUserProfileOpen} onClose={() => setIsUserProfileOpen(false)} onSave={setUserProfile} onLogout={logout} />
       )}
 
-      <OnboardingModal
-        isOpen={showOnboarding}
-        onClose={() => { setShowOnboarding(false); localStorage.setItem('onboarding_done', 'true'); }}
-        onOpenProfile={() => setIsUserProfileOpen(true)}
-      />
+      <WelcomeGuideModal onComplete={() => { }} />
     </div>
   );
 };

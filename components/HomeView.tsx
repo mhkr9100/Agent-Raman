@@ -42,8 +42,20 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                         </button>
                     </div>
 
-                    <div className="w-full pt-20 space-y-16">
-                        <div className="space-y-4">
+                    <div className="w-full pt-20 space-y-16 md:space-y-24">
+                        <div className="space-y-6">
+                            <h2 className="text-[10px] font-black text-gray-400 dark:text-white/30 uppercase tracking-[0.5em]">Core Philosophy</h2>
+                            <div className="max-w-3xl mx-auto text-sm md:text-base text-gray-600 dark:text-white/50 leading-relaxed space-y-6">
+                                <p>
+                                    RamN AI bridges the gap between isolated conversational bots and truly collaborative AI workflows. Rather than relying on a single monolithic intelligence, you orchestrate a <span className="text-gray-900 dark:text-white font-bold">Spectrum</span> of specialized agents.
+                                </p>
+                                <p>
+                                    Each agent possesses explicit directives, unique API tools, and a defined cognitive role. By grouping them into <span className="text-gray-900 dark:text-white font-bold">Squads</span>, they autonomously debate, delegate tasks, and synthesize sophisticated solutions to multi-step problems that basic prompts simply cannot solve.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
                             <h2 className="text-[10px] font-black text-gray-400 dark:text-white/30 uppercase tracking-[0.5em]">Quick Start Guide</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <motion.div

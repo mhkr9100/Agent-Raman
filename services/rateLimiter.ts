@@ -1,11 +1,11 @@
 /**
- * Strict Rate Limiter — 10 Requests per Hour per User
+ * Strict Rate Limiter — 15 Requests per Hour per User
  * Uses localStorage to persist request timestamps across page reloads.
- * Hard limit: once 10 requests are made within a rolling 60-minute window, 
+ * Hard limit: once 15 requests are made within a rolling 60-minute window, 
  * the user is blocked until the oldest request expires.
  */
 
-const MAX_REQUESTS = 10;
+const MAX_REQUESTS = 15;
 const WINDOW_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 const STORAGE_KEY_PREFIX = 'ramn_rate_';
 

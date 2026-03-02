@@ -48,7 +48,7 @@ export const useScatter = () => {
 
     // === Rate Limit State ===
     const [rateLimitInfo, setRateLimitInfo] = useState<RateLimitInfo>({
-        blocked: false, remaining: 10, limit: 10, resetTime: null, resetTimeFormatted: null
+        blocked: false, remaining: 15, limit: 15, resetTime: null, resetTimeFormatted: null
     });
 
     // Refresh rate limit info periodically
@@ -94,7 +94,7 @@ export const useScatter = () => {
         prismStatus, setPrismStatus,
         orchestrationWeights, setOrchestrationWeights,
         agentModes, setAgentModes,
-        handleExpandMessage, handleExecuteCommand
+        handleExecuteCommand
     } = useAgentExecution(currentUser, getUserKeys, addMessage);
 
     // === Background Directives ===
@@ -131,10 +131,6 @@ export const useScatter = () => {
         );
     };
 
-    const _expandMsgProxy = async (messageId: string) => {
-        return handleExpandMessage(activeChatId, messageId);
-    };
-
     // === Send Message (Core Orchestration) ===
     const handleSendMessage = useCallback(async (text: string, responseSteps: number = 1, file?: { data: string, mimeType: string }, searchEnabled?: boolean, createEnabled?: boolean) => {
         const chatId = activeChatId;
@@ -157,7 +153,7 @@ export const useScatter = () => {
                 agent: AGENTS.PRISM,
                 content: {
                     type: 'text',
-                    text: `⏳ **Rate Limit Reached.** You've used all 10 requests this hour. Your limit resets at **${usage.resetTime ? formatResetTime(usage.resetTime) : 'soon'}**. Please check back then.`
+                    text: `⏳ **Hourly Quota Reached.** You've used your limit of 15 requests per hour. Please come back after 1 hour (resets at **${usage.resetTime ? formatResetTime(usage.resetTime) : 'soon'}**).`
                 },
                 type: 'agent'
             });
@@ -251,7 +247,7 @@ export const useScatter = () => {
         agents, setAgents, teams, setTeams,
         activeChatId, setActiveChatId,
         isProcessing, typingAgent, typingAgents, prismStatus, orchestrationWeights, agentModes,
-        handleSendMessage, handleExecuteCommand: _executeCmdProxy, handleExpandMessage: _expandMsgProxy,
+        handleSendMessage, handleExecuteCommand: _executeCmdProxy,
         processSilentDirective, injectOutputToChat,
         clearChat, loadChatHistory, recruitAgent, deleteAgent, deleteTeam,
         createTeam: (data: any) => createTeam(data, setActiveChatId),

@@ -34,7 +34,7 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onFabricateA
 
     return (
         <div className="flex-1 flex flex-col h-full bg-[#F8F9FA] dark:bg-[#1A1A1A] animate-in fade-in duration-500 overflow-hidden">
-            <header className="h-24 border-b border-black/5 dark:border-white/5 flex flex-col justify-center px-8 bg-[#F8F9FA] dark:bg-[#1A1A1A] flex-shrink-0">
+            <header className="h-24 border-b border-black/5 dark:border-white/5 flex flex-col justify-center pl-16 md:pl-8 pr-8 bg-[#F8F9FA] dark:bg-[#1A1A1A] flex-shrink-0 relative z-20">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">Spectrum</span>
                 </div>
@@ -127,16 +127,25 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onFabricateA
 
                             {/* The condition for displaying "No Active Units Found" has been updated based on the instruction. */}
                             {userAgents.length === 0 && userTeams.length === 0 && (
-                                <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-12 bg-black/[0.02] dark:bg-white/[0.01] border border-black/5 dark:border-white/5 rounded-2xl">
-                                    <div className="w-16 h-16 bg-black/5 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-4 text-gray-400 dark:text-white/20">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" className="w-8 h-8">
+                                <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-16 bg-white dark:bg-[#1A1A1A] border border-black/10 dark:border-white/10 rounded-3xl shadow-xl shadow-black/5 dark:shadow-none relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent dark:from-indigo-500/10" />
+                                    <div className="w-20 h-20 bg-indigo-50 text-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-400 rounded-3xl flex items-center justify-center mb-6 border border-indigo-100 dark:border-indigo-500/20 shadow-inner z-10">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                                         </svg>
                                     </div>
-                                    <h4 className="text-gray-600 dark:text-white/60 font-medium text-sm mb-2">No Active Units Found</h4>
-                                    <p className="text-gray-400 dark:text-white/30 text-xs text-center max-w-sm">
-                                        Use the buttons above to create a Custom Agent or initialize a Group to begin populating your roster.
+                                    <h4 className="text-gray-900 dark:text-white font-black text-xl mb-3 z-10 uppercase tracking-tight">No Roster Discovered</h4>
+                                    <p className="text-gray-500 dark:text-white/50 text-sm text-center max-w-md mb-8 z-10 leading-relaxed">
+                                        Your Spectrum is currently empty. Fabricate a Custom Agent with tailored instructions or assemble a Group Command to start orchestrating workflows.
                                     </p>
+                                    <div className="flex gap-4 z-10">
+                                        <button onClick={onFabricateAgent} className="px-6 py-3 bg-indigo-600 dark:bg-indigo-500 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all shadow-lg hover:bg-indigo-700 dark:hover:bg-indigo-400">
+                                            Fabricate Custom Agent
+                                        </button>
+                                        <button onClick={onInitializeGroup} className="px-6 py-3 bg-black/5 dark:bg-white/5 text-gray-900 dark:text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all hover:bg-black/10 dark:hover:bg-white/10">
+                                            Create Squad
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>

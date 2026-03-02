@@ -320,7 +320,14 @@ export async function generateSingleAgentResponse(
 ): Promise<MessageContent | null> {
 
     const caps = agent.capabilities || [];
-    let systemPrompt = `You are ${agent.name}, ${agent.role}.\n\n[SYSTEM_INSTRUCTION]\n${agent.jobDescription}\n\n`;
+    let systemPrompt = `You are ${agent.name}, a specialized agent with the role: ${agent.role}.
+CRITICAL IMPERATIVE: You must strictly adhere to the following SYSTEM_INSTRUCTION. It dictates your persona, constraints, capabilities, and operational directives. Deviation is not permitted.
+
+[SYSTEM_INSTRUCTION]
+${agent.jobDescription}
+[END_SYSTEM_INSTRUCTION]
+
+`;
 
     // Inject UserMap context for stability and recall
     if (userId) {
@@ -445,7 +452,20 @@ export async function executeInterceptedCommand(agent: Agent, toolCall: ToolCall
             }
             return { type: 'text', text: '⚠️ Image generation requires a valid platform configuration.' };
         }
-        return { type: 'text', text: "Operation committed." };
+
+        const toolDescriptions: Record<string, string> = {
+            'read_file': `Analyzed file contents: ${toolCall.args.path || 'target document'}.`,
+            'list_dir': `Scanned directory structure: ${toolCall.args.path || 'workspace'}.`,
+            'web_search': `Retrieved search intelligence for: "${toolCall.args.query || 'target term'}".`,
+            'assign_task': `Delegated new operational directive.`,
+            'createAgent': `Fabricated new agent: ${toolCall.args.name || 'Custom Agent'} with role ${toolCall.args.role || 'Specialist'}.`,
+            'createGroup': `Initialized new squad: ${toolCall.args.name || 'Task Force'}.`,
+            'github_pr': `Generated Pull Request for repository.`,
+            'calculator': `Performed mathematical computation.`
+        };
+
+        const descriptiveText = toolDescriptions[toolCall.name] || `Successfully executed operation: ${toolCall.name}.`;
+        return { type: 'text', text: descriptiveText };
     } catch (e: any) {
         return { type: 'text', text: `⚠️ Command failed: ${e.message || 'Error'}` };
     }

@@ -11,7 +11,6 @@ interface MessageProps {
     onConfigureNewAgent?: (profileId?: string, role?: string, jd?: string) => void;
     onDeployCustomGroup?: (suggestion: CustomGroupSuggestion) => void;
     onExecuteCommand?: (messageId: string, toolCall: ToolCall) => void;
-    onExpandMessage?: (messageId: string) => void;
 }
 
 const CommandProposal: React.FC<{
@@ -170,45 +169,6 @@ const CommandProposal: React.FC<{
     );
 };
 
-const ThinkingBlock: React.FC<{ content: string }> = ({ content }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-
-    return (
-        <div className="my-3 border border-black/5 dark:border-white/5 rounded-xl overflow-hidden bg-black/[0.01] dark:bg-white/[0.01] transition-all duration-300">
-            <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center justify-between px-4 py-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors group"
-            >
-                <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full ${isExpanded ? 'bg-indigo-400 animate-pulse' : 'bg-slate-700'}`} />
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 group-hover:text-slate-400">
-                        Thinking Process
-                    </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <span className="text-[8px] font-bold text-slate-700 uppercase tracking-widest">{isExpanded ? 'Hide' : 'Show'}</span>
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        className={`w-3.5 h-3.5 text-slate-700 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                    >
-                        <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                    </svg>
-                </div>
-            </button>
-
-            {isExpanded && (
-                <div className="p-4 border-t border-black/5 dark:border-white/5 bg-gray-100 dark:bg-black/20">
-                    <pre className="font-mono text-[11px] text-indigo-300/40 whitespace-pre-wrap leading-relaxed italic">
-                        {content.trim()}
-                    </pre>
-                </div>
-            )}
-        </div>
-    );
-};
-
 const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
     const codeBlockRegex = /```(\w+)?\n?([\s\S]*?)```/g;
     const parts = [];
@@ -230,12 +190,6 @@ const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
         <div className="space-y-3">
             {parts.map((part, idx) => {
                 if (part.type === 'code') {
-                    const isThinking = part.language === 'thinking' || part.content.toLowerCase().includes('reasoning:');
-
-                    if (isThinking) {
-                        return <ThinkingBlock key={idx} content={part.content} />;
-                    }
-
                     return (
                         <div key={idx} className="border rounded-xl my-4 overflow-hidden bg-slate-50 dark:bg-slate-950 border-black/5 dark:border-white/5">
                             <div className="flex items-center justify-between px-4 py-2 border-b bg-black/[0.01] dark:bg-white/[0.01] border-black/5 dark:border-white/5">
@@ -283,11 +237,9 @@ const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
     )
 }
 
-const MessageComponent: React.FC<MessageProps> = ({ message, onExecuteCommand, onExpandMessage }) => {
+const MessageComponent: React.FC<MessageProps> = ({ message, onExecuteCommand }) => {
     const isUser = message.type === 'user';
     const mode = (message.content as any).mode || 'CHAT';
-    const isExpanding = (message.content as any).isExpanding;
-    const solution = (message.content as any).solution;
 
     const renderContent = () => {
         switch (message.content.type) {
@@ -302,38 +254,6 @@ const MessageComponent: React.FC<MessageProps> = ({ message, onExecuteCommand, o
                         )}
 
                         <SimpleMarkdown text={message.content.text} />
-
-                        {!isUser && message.agent.id !== 'prism-core' && !solution && !isExpanding && (
-                            <div className="mt-3">
-                                <button
-                                    onClick={() => onExpandMessage?.(message.id)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/10 dark:hover:bg-white/10 text-[9px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-[0.1em] rounded-md border border-black/5 dark:border-white/5 transition-all active:scale-95 group"
-                                >
-                                    <span>Expand</span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 group-hover:translate-y-0.5 transition-transform">
-                                        <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                                    </svg>
-                                </button>
-                            </div>
-                        )}
-
-                        {isExpanding && (
-                            <div className="mt-3 flex items-center gap-2 bg-indigo-500/5 p-3 rounded-lg border border-indigo-500/10 animate-pulse">
-                                <LoadingSpinner width={20} height={10} />
-                                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Synthesizing...</span>
-                            </div>
-                        )}
-
-                        {solution && (
-                            <div className="mt-4 pt-4 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-400">
-                                <div className="flex items-center gap-2 mb-4 opacity-30">
-                                    <div className="h-px flex-1 bg-white/20" />
-                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em]">Solution_Matrix</span>
-                                    <div className="h-px flex-1 bg-white/20" />
-                                </div>
-                                <SimpleMarkdown text={solution} />
-                            </div>
-                        )}
 
                         {message.content.groundingChunks && (
                             <div className="mt-6 pt-4 border-t border-white/5 flex flex-wrap gap-2">
@@ -411,7 +331,6 @@ export const Message = React.memo(MessageComponent, (prevProps, nextProps) => {
     const nextContent = nextProps.message.content as any;
 
     if (prevContent.text !== nextContent.text) return false;
-    if (prevContent.isExpanding !== nextContent.isExpanding) return false;
     if (prevContent.mode !== nextContent.mode) return false;
 
     return true;

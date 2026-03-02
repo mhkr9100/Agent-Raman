@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Agent, Message, UserProfile, ToolCall, Team } from '../types';
 import { AGENTS } from '../constants';
-import { generateSingleAgentResponse, generatePrismResponse, executeInterceptedCommand, generateExpandedSolution } from '../services/aiService';
+import { generateSingleAgentResponse, generatePrismResponse, executeInterceptedCommand } from '../services/aiService';
 import { useAppStore } from '../store/useAppStore';
 
 export const useAgentExecution = (
@@ -18,35 +18,7 @@ export const useAgentExecution = (
     const [orchestrationWeights, setOrchestrationWeights] = useState<{ [key: string]: number }>({});
     const [agentModes, setAgentModes] = useState<{ [key: string]: 'CHAT' | 'SOLUTION' | 'TASK' | 'VOID' }>({});
 
-    const handleExpandMessage = async (activeChatId: string, messageId: string) => {
-        const history = useAppStore.getState().chatHistory[activeChatId] || [];
-        const msgIndex = history.findIndex(m => m.id === messageId);
-        if (msgIndex === -1) return;
 
-        const messageToExpand = history[msgIndex];
-        if (messageToExpand.content.solution || messageToExpand.content.isExpanding) return;
-
-        const updatedHistory = [...history];
-        updatedHistory[msgIndex] = {
-            ...updatedHistory[msgIndex],
-            content: { ...updatedHistory[msgIndex].content, isExpanding: true }
-        };
-        useAppStore.getState().setChatHistory(prev => ({ ...prev, [activeChatId]: updatedHistory }));
-
-        const solutionText = await generateExpandedSolution(history.slice(0, msgIndex + 1), messageToExpand.agent);
-
-        useAppStore.getState().setChatHistory(prev => {
-            const current = [...(prev[activeChatId] || [])];
-            const idx = current.findIndex(m => m.id === messageId);
-            if (idx !== -1) {
-                current[idx] = {
-                    ...current[idx],
-                    content: { ...current[idx].content, isExpanding: false, solution: solutionText || "Unable to synthesize solution expansion." }
-                };
-            }
-            return { ...prev, [activeChatId]: current };
-        });
-    };
 
     const handleExecuteCommand = async (activeChatId: string, messageId: string, toolCall: ToolCall, onCreateTeam: (team: Team) => void, onRecruitAgent: (agent: Agent) => void, setActiveChatId: (id: string) => void) => {
         const history = useAppStore.getState().chatHistory[activeChatId] || [];
@@ -152,6 +124,6 @@ export const useAgentExecution = (
         prismStatus, setPrismStatus,
         orchestrationWeights, setOrchestrationWeights,
         agentModes, setAgentModes,
-        handleExpandMessage, handleExecuteCommand
+        handleExecuteCommand
     };
 };

@@ -164,7 +164,7 @@ export const UserMapView: React.FC<UserMapViewProps> = ({
     return (
         <div className="flex-1 flex flex-col bg-[#F8F9FA] dark:bg-[#1A1A1A] overflow-hidden">
             {/* Header */}
-            <header className="h-16 border-b border-black/5 dark:border-white/5 flex items-center justify-between px-6 flex-shrink-0">
+            <header className="h-16 border-b border-black/5 dark:border-white/5 flex items-center justify-between pl-16 md:pl-6 pr-6 flex-shrink-0 relative z-20">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center border border-black/10 dark:border-white/10">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-600 dark:text-white/60">
@@ -198,16 +198,32 @@ export const UserMapView: React.FC<UserMapViewProps> = ({
             {/* Tree Content */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                 {isEmpty ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center">
-                        <div className="w-16 h-16 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center mb-4 border border-black/5 dark:border-white/5">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" className="w-8 h-8 text-gray-400 dark:text-white/10">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6c0-3.313-2.687-6-6-6s-6 2.687-6 6a6 6 0 0 0 6 6Z" />
+                    <div className="flex flex-col items-center justify-center h-full text-center relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-500/5 via-transparent to-transparent pointer-events-none" />
+                        <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center mb-6 border border-indigo-100 dark:border-indigo-500/20 shadow-inner z-10">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
                             </svg>
                         </div>
-                        <h3 className="text-gray-500 dark:text-white/30 text-xs font-black uppercase tracking-widest mb-2">No Context Extracted</h3>
-                        <p className="text-gray-400 dark:text-white/15 text-[10px] max-w-xs leading-relaxed mb-6">
-                            Interact with agents to build your session history. Then use the "Consolidate" function to map your neural profile.
+                        <h3 className="text-gray-900 dark:text-white font-black text-xl mb-3 z-10 tracking-tight">Empty Context Matrix</h3>
+                        <p className="text-gray-500 dark:text-white/50 text-sm max-w-sm leading-relaxed mb-8 z-10">
+                            The UserMap builds a neural profile of your preferences over time. Chat with agents to generate context, then consolidate it here, or configure your profile manually.
                         </p>
+                        <div className="flex gap-4 z-10">
+                            <button
+                                onClick={onConsolidate}
+                                disabled={isConsolidating}
+                                className="px-6 py-3 bg-indigo-600 dark:bg-indigo-500 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all shadow-lg hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50"
+                            >
+                                {isConsolidating ? 'Consolidating...' : 'Force Consolidate'}
+                            </button>
+                            <button
+                                onClick={onOpenProfile}
+                                className="px-6 py-3 bg-black/5 dark:bg-white/5 text-gray-900 dark:text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all hover:bg-black/10 dark:hover:bg-white/10"
+                            >
+                                Manual Profile
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <TreeNode node={tree} depth={0} onUpdate={onUpdateNode} onDelete={onDeleteNode} onAdd={onAddNode} />
