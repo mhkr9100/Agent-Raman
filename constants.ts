@@ -214,7 +214,7 @@ Available Tools: googleSearch, thinking, fabricateAgent, fabricateTeam.
         model: 'gemini-2.0-flash',
         isDeletable: false,
         isSystem: true,
-        capabilities: ['googleSearch', 'thinking']
+        capabilities: ['googleSearch', 'thinking', 'fabricateAgent', 'fabricateTeam']
     },
 
 };

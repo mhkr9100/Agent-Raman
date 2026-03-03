@@ -12,10 +12,11 @@ interface LoginScreenProps {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister }) => {
     const [showAuthModal, setShowAuthModal] = useState(false);
-    const [isSignUp, setIsSignUp] = useState(false);
+    const [authMode, setAuthMode] = useState<'login' | 'signup' | 'otp'>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
+    const [otp, setOtp] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -23,20 +24,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
         e.preventDefault();
         setError(null);
 
-        if (!email || !email.includes('@')) {
-            setError("Please enter a valid email address.");
-            return;
-        }
+        if (authMode === 'login' || authMode === 'signup') {
+            if (!email || !email.includes('@')) {
+                setError("Please enter a valid email address.");
+                return;
+            }
 
-        if (isSignUp && (!name || !password)) {
-            setError("Please fill out all fields.");
-            return;
+            if (authMode === 'signup' && (!name || !password)) {
+                setError("Please fill out all fields.");
+                return;
+            }
+            if (authMode === 'login' && !password) {
+                setError("Please enter your password.");
+                return;
+            }
         }
 
         setIsLoading(true);
 
         try {
-            if (isSignUp) {
+            if (authMode === 'signup') {
+                // Mock OTP initiation. Normally we would call a backend endpoint here.
+                setAuthMode('otp');
+                setOtp('');
+                setIsLoading(false);
+                return;
+            } else if (authMode === 'otp') {
+                if (otp !== '123456') {
+                    throw new Error("Invalid verification code. Use 123456.");
+                }
+
+                // Actual registration after OTP success
                 await authService.register(email, password, name);
                 const user = await authService.getCurrentUser();
                 if (onRegister) {
@@ -44,7 +62,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                 } else {
                     onLogin(email, user?.name || name, password);
                 }
-            } else {
+            } else if (authMode === 'login') {
                 await authService.login(email, password);
                 const user = await authService.getCurrentUser();
                 onLogin(email, user?.name || 'Architect', password);
@@ -56,8 +74,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
         }
     };
 
-    const openAuth = (signup = false) => {
-        setIsSignUp(signup);
+    const openAuth = (mode: 'login' | 'signup') => {
+        setAuthMode(mode);
         setShowAuthModal(true);
         setError(null);
     };
@@ -72,10 +90,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                     <span className="font-black tracking-widest uppercase text-sm">RamN AI</span>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button onClick={() => openAuth(false)} className="text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 dark:text-white/60 dark:hover:text-white transition-colors">
+                    <button onClick={() => openAuth('login')} className="text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 dark:text-white/60 dark:hover:text-white transition-colors">
                         Log In
                     </button>
-                    <button onClick={() => openAuth(true)} className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-lg transition-all shadow-lg hover:bg-gray-800 dark:hover:bg-slate-200">
+                    <button onClick={() => openAuth('signup')} className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-lg transition-all shadow-lg hover:bg-gray-800 dark:hover:bg-slate-200">
                         Get Started
                     </button>
                 </div>
@@ -104,7 +122,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
 
                     <div className="flex flex-col md:flex-row gap-4 pt-4">
                         <button
-                            onClick={() => openAuth(true)}
+                            onClick={() => openAuth('signup')}
                             className="group flex items-center justify-center gap-3 px-10 py-5 bg-indigo-600 dark:bg-indigo-500 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl shadow-indigo-500/20 hover:bg-indigo-700 dark:hover:bg-indigo-400 active:scale-[0.98]"
                         >
                             Initialize Session
@@ -187,7 +205,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                     <PrismIcon size={48} />
                                 </div>
                                 <h2 className="text-xl font-black tracking-[0.2em] uppercase text-gray-900 dark:text-white">
-                                    {isSignUp ? 'Create Workspace' : 'Access Workspace'}
+                                    {authMode === 'signup' ? 'Create Workspace' : authMode === 'otp' ? 'Verification' : 'Access Workspace'}
                                 </h2>
                             </div>
 
@@ -199,12 +217,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                 )}
 
                                 <div className="space-y-4">
-                                    {isSignUp && (
+                                    {authMode === 'signup' && (
                                         <div>
                                             <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Full Name</label>
                                             <input
                                                 type="text"
-                                                required={isSignUp}
+                                                required={authMode === 'signup'}
                                                 className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
                                                 placeholder="Enter your name"
                                                 value={name}
@@ -212,28 +230,49 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                             />
                                         </div>
                                     )}
-                                    <div>
-                                        <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Email Address</label>
-                                        <input
-                                            type="email"
-                                            required
-                                            className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
-                                            placeholder="Enter your email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Password</label>
-                                        <input
-                                            type="password"
-                                            required
-                                            className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
-                                            placeholder="Enter your password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                        />
-                                    </div>
+
+                                    {authMode === 'otp' ? (
+                                        <div>
+                                            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs p-3 rounded-xl text-center font-bold mb-4">
+                                                TESTING MODE: Use code 123456
+                                            </div>
+                                            <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Verification Code (OTP)</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-center text-2xl tracking-[0.5em] font-mono text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
+                                                placeholder="000000"
+                                                maxLength={6}
+                                                value={otp}
+                                                onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Email Address</label>
+                                                <input
+                                                    type="email"
+                                                    required
+                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
+                                                    placeholder="Enter your email"
+                                                    value={email}
+                                                    onChange={(e) => setEmail(e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Password</label>
+                                                <input
+                                                    type="password"
+                                                    required
+                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
+                                                    placeholder="Enter your password"
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
 
                                 <div className="pt-2">
@@ -242,20 +281,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                         disabled={isLoading}
                                         className="w-full py-4 bg-indigo-600 dark:bg-indigo-500 text-white text-[11px] font-black uppercase tracking-[0.3em] rounded-xl transition-all shadow-xl hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50"
                                     >
-                                        {isLoading ? 'Processing...' : (isSignUp ? 'Initialize' : 'Authenticate')}
+                                        {isLoading ? 'Processing...' : (authMode === 'signup' ? 'Initialize' : authMode === 'otp' ? 'Verify Code' : 'Authenticate')}
                                     </button>
                                 </div>
                             </form>
 
-                            <div className="text-center mt-6">
-                                <button
-                                    type="button"
-                                    onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
-                                    className="text-[10px] font-bold text-gray-500 hover:text-gray-900 dark:text-white/40 dark:hover:text-white uppercase tracking-[0.1em] transition-colors"
-                                >
-                                    {isSignUp ? "Already have account? Log In" : "Need workspace? Create Account"}
-                                </button>
-                            </div>
+                            {authMode !== 'otp' && (
+                                <div className="text-center mt-6">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setError(null); }}
+                                        className="text-[10px] font-bold text-gray-500 hover:text-gray-900 dark:text-white/40 dark:hover:text-white uppercase tracking-[0.1em] transition-colors"
+                                    >
+                                        {authMode === 'signup' ? "Already have account? Log In" : "Need workspace? Create Account"}
+                                    </button>
+                                </div>
+                            )}
                         </motion.div>
                     </div>
                 )}

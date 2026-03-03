@@ -13,7 +13,9 @@ export type AgentCapability =
   | 'vision'
   | 'videoUnderstanding'
   | 'liveAudio'
-  | 'fileManipulation';
+  | 'fileManipulation'
+  | 'fabricateAgent'
+  | 'fabricateTeam';
 
 
 export interface UserProfile {

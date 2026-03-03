@@ -10,6 +10,8 @@ import { LoginScreen } from './components/LoginScreen';
 import { HomeView } from './components/HomeView';
 import { UserMapView } from './components/UserMapView';
 import { WelcomeGuideModal } from './components/WelcomeGuideModal';
+import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
+import { FeedbackModal } from './components/FeedbackModal';
 import { useScatter } from './hooks/useScatter';
 import { useTasks } from './hooks/useTasks';
 import { useUserMap } from './hooks/useUserMap';
@@ -37,6 +39,22 @@ const App: React.FC = () => {
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
   const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+
+  const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean, id: string, name: string, type: 'Agent' | 'Team' | null }>({ isOpen: false, id: '', name: '', type: null });
+
+  const triggerDelete = (id: string, name: string, type: 'Agent' | 'Team') => {
+    setDeleteModalState({ isOpen: true, id, name, type });
+  };
+
+  const confirmDelete = () => {
+    if (deleteModalState.type === 'Agent') {
+      deleteAgent(deleteModalState.id);
+    } else if (deleteModalState.type === 'Team') {
+      deleteTeam(deleteModalState.id);
+    }
+    setDeleteModalState({ isOpen: false, id: '', name: '', type: null });
+  };
 
   if (isInitializing) {
     return (
@@ -177,8 +195,9 @@ const App: React.FC = () => {
             setActiveView('chats');
             setIsMobileMenuOpen(false);
           }}
-          onDeleteTeam={deleteTeam}
-          onDeleteAgent={deleteAgent}
+          onDeleteTeam={(id) => triggerDelete(id, teams.find(t => t.id === id)?.name || 'Team', 'Team')}
+          onDeleteAgent={(id) => triggerDelete(id, agents.find(a => a.id === id)?.name || 'Agent', 'Agent')}
+          onOpenFeedback={() => setIsFeedbackModalOpen(true)}
           userProfile={userProfile}
         />
       </div>
@@ -213,6 +232,15 @@ const App: React.FC = () => {
       {isUserProfileOpen && (
         <UserProfileModal user={userProfile} isOpen={isUserProfileOpen} onClose={() => setIsUserProfileOpen(false)} onSave={setUserProfile} onLogout={logout} />
       )}
+
+      <FeedbackModal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} userProfile={userProfile} />
+      <DeleteConfirmationModal
+        isOpen={deleteModalState.isOpen}
+        itemName={deleteModalState.name}
+        itemType={deleteModalState.type as any}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+      />
 
       <WelcomeGuideModal onComplete={() => { }} />
     </div>

@@ -132,7 +132,7 @@ export const useScatter = () => {
     };
 
     // === Send Message (Core Orchestration) ===
-    const handleSendMessage = useCallback(async (text: string, responseSteps: number = 1, file?: { data: string, mimeType: string }, searchEnabled?: boolean, createEnabled?: boolean) => {
+    const handleSendMessage = useCallback(async (text: string, responseSteps: number = 1, file?: { data: string, mimeType: string }, searchEnabled?: boolean, createEnabled?: boolean, prismMode?: 'ask' | 'create') => {
         const chatId = activeChatId;
         if (!currentUser) return;
 
@@ -217,7 +217,7 @@ export const useScatter = () => {
                     }));
                 } else {
                     setPrismStatus("No mention detected. Consulting Core...");
-                    const response = await generatePrismResponse(currentSnapshot, AGENTS.PRISM, setPrismStatus, undefined, undefined, currentUser?.id);
+                    const response = await generatePrismResponse(currentSnapshot, AGENTS.PRISM, setPrismStatus, undefined, undefined, currentUser?.id, prismMode);
                     if (response) addMessage(chatId, { id: `msg-${Date.now()}`, userId: currentUser.id, agent: AGENTS.PRISM, content: response, type: 'agent' });
                 }
             } else if (agent || chatId === 'prism-core') {
@@ -225,7 +225,7 @@ export const useScatter = () => {
                 setTypingAgent(target);
                 let response;
                 if (target.id === 'prism-core') {
-                    response = await generatePrismResponse(currentSnapshot, target, setPrismStatus, undefined, undefined, currentUser?.id);
+                    response = await generatePrismResponse(currentSnapshot, target, setPrismStatus, undefined, undefined, currentUser?.id, prismMode);
                 } else {
                     response = await generateSingleAgentResponse(currentSnapshot, target, [], [], 'CHAT', undefined, currentUser?.id);
                 }

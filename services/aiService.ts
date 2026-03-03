@@ -306,6 +306,32 @@ const CAPABILITY_TOOLS: Record<string, FunctionDeclaration> = {
             properties: { prompt: { type: Type.STRING } },
             required: ['prompt']
         }
+    },
+    fabricateAgent: {
+        name: 'fabricateAgent',
+        description: 'Create a new AI Agent with specific persona, role, and capabilities based on user objective.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                name: { type: Type.STRING, description: 'The custom name for the new agent.' },
+                role: { type: Type.STRING, description: 'The 2-4 word role title (e.g. Senior Software Engineer).' },
+                jobDescription: { type: Type.STRING, description: 'The deep system prompt defining instructions, boundaries, and formats.' },
+                icon: { type: Type.STRING, description: 'A single visually appropriate emoji for this agent.' },
+                modelId: { type: Type.STRING, description: 'The suggested AI model ID (e.g. gemini-2.0-flash, gemini-2.0-pro)' },
+            },
+            required: ['name', 'role', 'jobDescription', 'icon', 'modelId']
+        }
+    },
+    fabricateTeam: {
+        name: 'fabricateTeam',
+        description: 'Initialize a new squad/team by grouping several agents together for a multi-agent workflow.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                name: { type: Type.STRING, description: 'The name of the new squad.' }
+            },
+            required: ['name']
+        }
     }
 };
 
@@ -390,11 +416,17 @@ export async function generatePrismResponse(
     setStatus: (s: string) => void,
     _userKeys?: any, // kept for signature compat — ignored, platform managed
     _availableProviders?: string,
-    userId?: string
+    userId?: string,
+    prismMode?: 'ask' | 'create'
 ) {
     setStatus("Refracting...");
     const { model, provider } = resolvePrismModel();
     let modifiedPrism = { ...prismAgent, model, provider };
+
+    // Strict Mode Enforcement: Remove creation tools if not in 'create' mode
+    if (prismMode !== 'create') {
+        modifiedPrism.capabilities = modifiedPrism.capabilities?.filter(c => c !== 'fabricateAgent' && c !== 'fabricateTeam');
+    }
 
     // Inject tool catalog context if available
     try {

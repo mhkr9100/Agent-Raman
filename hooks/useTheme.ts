@@ -15,10 +15,6 @@ export const useTheme = () => {
             } else {
                 document.documentElement.classList.add('dark');
             }
-        } else {
-            // Default RamN AI Beta is dark mode
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
         }
     }, []);
 

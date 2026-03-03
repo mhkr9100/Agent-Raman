@@ -13,6 +13,16 @@
     rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    // Blocking script to prevent FOUC
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark'); // Set default if null
+    }
+  </script>
+  <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
