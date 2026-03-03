@@ -76,7 +76,7 @@ export const useUserMap = (currentUser: UserProfile | null) => {
         saveTree(updated);
     }, [userMapTree, saveTree]);
 
-    // Consolidate: pull chat memories from IndexedDB, structure into tree client-side
+    // Consolidate: pull chat memories from IndexedDB, structure into tree via API
     const consolidate = useCallback(async () => {
         if (!currentUser) {
             throw new Error('Not logged in.');
@@ -91,38 +91,33 @@ export const useUserMap = (currentUser: UserProfile | null) => {
                 throw new Error('No memories to consolidate. Chat with agents first to build your memory.');
             }
 
-            // Use pageIndexService to structure into tree
-            const { pageIndexService } = await import('../services/pageIndexService');
-            const tree = await pageIndexService.consolidate(memoryStrings, userMapTree.children.length > 0 ? userMapTree : undefined);
+            const { consolidateUserMap } = await import('../services/apiV2');
+            const tree = await consolidateUserMap({
+                memories: memoryStrings,
+                existingTree: userMapTree.children.length > 0 ? userMapTree : undefined
+            });
+
             await saveTree(tree);
+
         } finally {
             setIsConsolidating(false);
         }
     }, [currentUser, userMapTree, saveTree]);
 
-    // Ingest current chat session into memory — extract facts client-side, store in IndexedDB
+    // Ingest current chat session into memory — extract facts via API, store in IndexedDB
     const ingestSession = useCallback(async (messages: Array<{ role: string; content: string }>, agentId?: string) => {
         if (!currentUser) return;
         if (messages.length < 2) return; // Need at least a user+agent exchange
         try {
-            const { hybridGenerateContent, resolvePrismModel } = await import('../services/aiService');
-            const { model } = resolvePrismModel();
+            const { extractMemory } = await import('../services/apiV2');
 
-            const chatText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
-            const res = await hybridGenerateContent({
-                model,
-                contents: [{ role: 'user', parts: [{ text: chatText }] }],
-                config: {
-                    systemInstruction: `Extract key facts about the user from this conversation. Return a JSON array of short fact strings. Example: ["User works on a startup called RamN AI", "User prefers React over Vue"]. Extract ONLY user-specific facts. Output ONLY the JSON array.`
-                }
-            });
+            // Send messages to backend to extract facts
+            const res = await extractMemory({ messages });
+            const facts: string[] = res.facts || [];
 
-            const text = res.text || '';
-            const match = text.match(/\[[\s\S]*\]/);
-            if (match) {
-                const facts: string[] = JSON.parse(match[0]);
+            if (facts.length > 0) {
                 const timestamp = Date.now();
-                const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+                const BACKEND_URL = import.meta.env.VITE_API_V2_URL || import.meta.env.VITE_BACKEND_URL || '';
 
                 for (const fact of facts) {
                     const id = `mem_${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
@@ -137,11 +132,14 @@ export const useUserMap = (currentUser: UserProfile | null) => {
                     });
 
                     // 2. Push to AWS Long-Term Memory (vector DB)
+                    // Note: This matches the old behavior where the frontend directly pushed things into long-term memory
                     if (BACKEND_URL) {
                         const token = localStorage.getItem('auth_token');
                         const headers: any = { 'Content-Type': 'application/json' };
                         if (token) headers['Authorization'] = `Bearer ${token}`;
 
+                        // Warning: this path /api/memory/add is currently from V1
+                        // Consider migrating to V2 if /api/memory/add hasn't been migrated
                         fetch(`${BACKEND_URL}/api/memory/add`, {
                             method: 'POST',
                             headers,

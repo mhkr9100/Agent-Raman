@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Agent, Team, Message, UserProfile, MessageContent, Task, ToolCall, GlobalTask } from '../types';
 import { AGENTS } from '../constants';
-import { generateSingleAgentResponse, generatePrismResponse } from '../services/aiService';
+import { prismChat, agentChat } from '../services/apiV2';
 import { dbService, STORES_ENUM } from '../services/db';
 import { canMakeRequest, recordRequest, getUsageInfo, formatResetTime } from '../services/rateLimiter';
 import { useAppStore } from '../store/useAppStore';
@@ -102,11 +102,12 @@ export const useScatter = () => {
         const agent = agents.find(a => a.id === task.agentId);
         if (!agent) return "Error: Agent not found.";
         const userKeys = getUserKeys();
-        const response = await generateSingleAgentResponse(
-            [{ id: 'task-trigger', agent: { ...AGENTS.PRISM, name: currentUser?.name || 'User', type: 'user' } as Agent, content: { type: 'text', text: task.label }, type: 'user' }],
-            agent, [], [], 'SOLUTION', userKeys, currentUser?.id
-        );
-        return response && response.type === 'text' ? response.text : undefined;
+        const response = await agentChat({
+            agentId: agent.id,
+            message: task.label,
+            conversationId: task.teamId // Or appropriate conversation ID
+        });
+        return response ? response.response : undefined;
     }, [agents, currentUser, getUserKeys]);
 
     const injectOutputToChat = useCallback((task: GlobalTask) => {
@@ -212,16 +213,38 @@ export const useScatter = () => {
                     setTypingAgents(mentionedAgents.map(a => ({ agent: a, tasks: [], mode: 'CHAT' as const })));
 
                     await Promise.all(mentionedAgents.map(async (targetAgent) => {
-                        const response = await generateSingleAgentResponse(currentSnapshot, targetAgent, team.agents, [], 'CHAT', undefined, currentUser?.id);
-                        if (response) addMessage(chatId, { id: `msg-${Date.now()}-${targetAgent.id}`, userId: currentUser.id, agent: targetAgent, content: response, type: 'agent' });
+                        const response = await agentChat({
+                            agentId: targetAgent.id,
+                            message: text,
+                            conversationId: activeSessionId || undefined
+                        });
+                        const responseContent = { type: 'text', text: response.response } as any;
+                        if (responseContent) addMessage(chatId, { id: `msg-${Date.now()}-${targetAgent.id}`, userId: currentUser.id, agent: targetAgent, content: responseContent, type: 'agent' });
                     }));
                 } else {
                     setPrismStatus("No mention detected. Consulting Core...");
-                    const response = await generatePrismResponse(currentSnapshot, AGENTS.PRISM, setPrismStatus, undefined, undefined, currentUser?.id, prismMode);
+                    const response = await prismChat({
+                        message: text,
+                        mode: prismMode || 'ask',
+                        conversationId: activeSessionId || undefined
+                    });
+
                     if (response) {
                         const msgId = `msg-${Date.now()}`;
-                        addMessage(chatId, { id: msgId, userId: currentUser.id, agent: AGENTS.PRISM, content: response, type: 'agent' });
-                        // Auto-execute READ_ONLY tool calls silently (e.g., web search)
+
+                        addMessage(chatId, {
+                            id: msgId,
+                            userId: currentUser.id,
+                            agent: AGENTS.PRISM,
+                            content: {
+                                type: 'text',
+                                text: response.text || '',
+                                toolCall: response.toolCall
+                            },
+                            type: 'agent'
+                        });
+
+                        // Auto-execute READ_ONLY tool calls silently (e.g., search)
                         if (response.toolCall && response.toolCall.safetyType === 'READ_ONLY') {
                             await handleExecuteCommand(chatId, msgId, response.toolCall,
                                 (team) => { setTeams(prev => [...prev, team]); dbService.put(STORES_ENUM.GROUPS, team); },
@@ -233,25 +256,59 @@ export const useScatter = () => {
             } else if (agent || chatId === 'prism-core') {
                 const target = agent || AGENTS.PRISM;
                 setTypingAgent(target);
-                let response;
+
+                let responseContent: any;
+
                 if (target.id === 'prism-core') {
-                    response = await generatePrismResponse(currentSnapshot, target, setPrismStatus, undefined, undefined, currentUser?.id, prismMode);
+                    const prismRes = await prismChat({
+                        message: text,
+                        mode: prismMode || 'ask',
+                        conversationId: activeSessionId || undefined
+                    });
+                    responseContent = {
+                        type: 'text',
+                        text: prismRes.text,
+                        toolCall: prismRes.toolCall
+                    };
                 } else {
-                    response = await generateSingleAgentResponse(currentSnapshot, target, [], [], 'CHAT', undefined, currentUser?.id);
+                    const agentRes = await agentChat({
+                        agentId: target.id,
+                        message: text,
+                        conversationId: activeSessionId || undefined
+                    });
+                    // For now map string response to content interface
+                    responseContent = { type: 'text', text: agentRes.response };
                 }
 
-                if (response) {
+                if (responseContent) {
                     const msgId = `msg-${Date.now()}`;
-                    addMessage(chatId, { id: msgId, userId: currentUser.id, agent: target, content: response, type: 'agent' });
-                    // Auto-execute READ_ONLY tool calls silently (e.g., web search)
-                    if (response.toolCall && response.toolCall.safetyType === 'READ_ONLY') {
-                        await handleExecuteCommand(chatId, msgId, response.toolCall,
+                    const toolCallInfo = responseContent.toolCall ? { toolCall: responseContent.toolCall } : {};
+
+                    addMessage(chatId, {
+                        id: msgId,
+                        userId: currentUser.id,
+                        agent: target,
+                        content: { type: 'text', text: responseContent.text || '', ...toolCallInfo },
+                        type: 'agent'
+                    });
+
+                    if (responseContent.toolCall && responseContent.toolCall.safetyType === 'READ_ONLY') {
+                        await handleExecuteCommand(chatId, msgId, responseContent.toolCall,
                             (team) => { setTeams(prev => [...prev, team]); dbService.put(STORES_ENUM.GROUPS, team); },
                             recruitAgent, setActiveChatId
                         );
                     }
                 }
             }
+        } catch (e: any) {
+            console.error("Chat Error:", e);
+            addMessage(chatId, {
+                id: `error-${Date.now()}`,
+                userId: currentUser.id,
+                agent: chatId === 'prism-core' ? AGENTS.PRISM : (agents.find(a => a.id === chatId) || AGENTS.PRISM),
+                content: { type: 'text', text: `⚠️ Error connecting to AI: ${e.message}` },
+                type: 'agent'
+            });
         } finally {
             setActiveRequests(prev => prev - 1);
             setPrismStatus("");

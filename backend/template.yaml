@@ -222,6 +222,292 @@ Resources:
             Path: /api/ai/{proxy+}
             Method: OPTIONS
 
+  # ══════════════════════════════════════════════════════════════
+  #  V2 API — New Backend Architecture (Phase 1)
+  #  All routes use /api/v2/ prefix for safe migration
+  # ══════════════════════════════════════════════════════════════
+
+  # ──── Prism Chat (Meta Agent Brain) ────
+  PrismChatFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/prism-chat/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          GCP_PROJECT_ID: ramn-ai
+          GCP_LOCATION: us-central1
+          GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:UpdateItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref GcpServiceAccountSecret
+      Events:
+        PrismChat:
+          Type: Api
+          Properties:
+            Path: /api/v2/prism/chat
+            Method: POST
+        PrismChatOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/prism/chat
+            Method: OPTIONS
+
+  # ──── Agent Create (Blueprint Saver) ────
+  AgentCreateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/agent-create/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:UpdateItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+      Events:
+        AgentCreate:
+          Type: Api
+          Properties:
+            Path: /api/v2/agents/create
+            Method: POST
+        AgentCreateOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/agents/create
+            Method: OPTIONS
+
+  # ──── Agent Run (Agent Runtime) ────
+  AgentRunFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/agent-run/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          GCP_PROJECT_ID: ramn-ai
+          GCP_LOCATION: us-central1
+          GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref GcpServiceAccountSecret
+      Events:
+        AgentRun:
+          Type: Api
+          Properties:
+            Path: /api/v2/agents/{agentId}/chat
+            Method: POST
+        AgentRunOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/agents/{agentId}/chat
+            Method: OPTIONS
+
+  # ──── Agent List (Read-Only) ────
+  AgentListFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/agent-list/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+      Events:
+        AgentList:
+          Type: Api
+          Properties:
+            Path: /api/v2/agents
+            Method: GET
+        AgentListOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/agents
+            Method: OPTIONS
+
+  # ──── Tool Registry V2 (Read-Only) ────
+  ToolRegistryV2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/tool-registry/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+      Events:
+        ToolRegistryV2:
+          Type: Api
+          Properties:
+            Path: /api/v2/tools
+            Method: GET
+        ToolRegistryV2Options:
+          Type: Api
+          Properties:
+            Path: /api/v2/tools
+            Method: OPTIONS
+
+  # ──── Special Agents (Read-Only) ────
+  SpecialAgentsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/special-agents/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+      Events:
+        SpecialAgents:
+          Type: Api
+          Properties:
+            Path: /api/v2/special-agents
+            Method: GET
+        SpecialAgentsOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/special-agents
+            Method: OPTIONS
+
+  # ──── UserMap Consolidate ────
+  UserMapConsolidateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/usermap-consolidate/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          GCP_PROJECT_ID: ramn-ai
+          GCP_LOCATION: us-central1
+          GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref GcpServiceAccountSecret
+      Events:
+        Consolidate:
+          Type: Api
+          Properties:
+            Path: /api/v2/usermap/consolidate
+            Method: POST
+        ConsolidateOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/usermap/consolidate
+            Method: OPTIONS
+
+  MemoryExtractFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/memory-extract/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          GCP_PROJECT_ID: ramn-ai
+          GCP_LOCATION: us-central1
+          GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref GcpServiceAccountSecret
+      Events:
+        Extract:
+          Type: Api
+          Properties:
+            Path: /api/v2/memory/extract
+            Method: POST
+        ExtractOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/memory/extract
+            Method: OPTIONS
+
   # ──── API Gateway Usage Plan (Cloud Protection) ────
   RamNUsagePlan:
     Type: AWS::ApiGateway::UsagePlan
@@ -245,4 +531,6 @@ Outputs:
   TableName:
     Description: DynamoDB Table
     Value: !Ref EntitiesTable
-
+  PrismChatUrl:
+    Description: Prism Chat V2 API Endpoint
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v2/prism/chat"
