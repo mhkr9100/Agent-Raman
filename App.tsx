@@ -9,6 +9,7 @@ import { ProfileSidebar } from './components/ProfileSidebar';
 import { LoginScreen } from './components/LoginScreen';
 import { HomeView } from './components/HomeView';
 import { UserMapView } from './components/UserMapView';
+import { WelcomeGuideModal } from './components/WelcomeGuideModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { useScatter } from './hooks/useScatter';
@@ -240,7 +241,7 @@ const App: React.FC = () => {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
       />
-
+      <WelcomeGuideModal onComplete={() => { }} />
     </div>
   );
 };
