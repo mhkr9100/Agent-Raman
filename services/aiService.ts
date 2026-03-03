@@ -384,7 +384,7 @@ ${agent.jobDescription}
             const call = response.functionCalls[0];
             return {
                 type: 'text',
-                text: response.text || "Initiating tool sequence...",
+                text: response.text || '',
                 mode: 'TASK_PROPOSAL',
                 toolCall: {
                     id: call.id || `call-${Date.now()}`,
@@ -397,8 +397,8 @@ ${agent.jobDescription}
 
         return {
             type: 'text',
-            text: response.text || "Operational.",
-            mode: responseMode === 'CHAT' ? 'CHAT' : 'SOLUTION'
+            text: response.text || '',
+            mode: 'CHAT'
         };
 
     } catch (error: any) {

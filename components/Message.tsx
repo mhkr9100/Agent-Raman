@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Message as MessageType, ToolCall, CustomGroupSuggestion } from '../types';
 import { LoadingSpinner } from './LoadingSpinner';
 import { AI_RESUMES } from '../constants';
+import { PrismIcon } from './icons/PrismIcon';
 
 interface MessageProps {
     message: MessageType;
@@ -304,7 +305,9 @@ const MessageComponent: React.FC<MessageProps> = ({ message, onExecuteCommand })
                 {!isUser && (
                     <div className="flex items-center gap-2.5 mb-2 ml-1">
                         <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-white/[0.04] flex items-center justify-center opacity-60 group-hover:opacity-100 transition-all duration-300 text-gray-900 dark:text-white">
-                            {message.agent.profileImage ? (
+                            {message.agent.id === 'prism-core' ? (
+                                <PrismIcon size={16} className="text-gray-900 dark:text-white" />
+                            ) : message.agent.profileImage ? (
                                 <img src={message.agent.profileImage} alt="" className="w-full h-full object-cover" />
                             ) : (
                                 <div className="text-xs">{message.agent.icon}</div>

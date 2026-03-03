@@ -6,6 +6,7 @@ import { ScatterBottleVisual } from './ScatterBottleVisual';
 import { Message, Agent as AgentType, CustomGroupSuggestion, ToolCall, Team, GlobalTask } from '../types';
 import { RateLimitInfo } from '../hooks/useScatter';
 import { useAppStore } from '../store/useAppStore';
+import { PrismIcon } from './icons/PrismIcon';
 
 interface ChatSession {
   id: string;
@@ -66,7 +67,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       <div className="h-16 flex items-center justify-between pl-16 md:pl-6 pr-6 border-b border-black/10 dark:border-white/5 bg-white/80 dark:bg-[#1A1A1A]/80 backdrop-blur-xl z-20 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center text-sm">
-            {isPrism ? '💎' : (activeAgent?.icon || (activeTeam ? '👥' : '🤖'))}
+            {isPrism ? <PrismIcon size={18} className="text-gray-900 dark:text-white" /> : (activeAgent?.icon || (activeTeam ? '👥' : '🤖'))}
           </div>
           <div className="flex flex-col">
             <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 dark:text-white">

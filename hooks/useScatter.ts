@@ -218,7 +218,17 @@ export const useScatter = () => {
                 } else {
                     setPrismStatus("No mention detected. Consulting Core...");
                     const response = await generatePrismResponse(currentSnapshot, AGENTS.PRISM, setPrismStatus, undefined, undefined, currentUser?.id, prismMode);
-                    if (response) addMessage(chatId, { id: `msg-${Date.now()}`, userId: currentUser.id, agent: AGENTS.PRISM, content: response, type: 'agent' });
+                    if (response) {
+                        const msgId = `msg-${Date.now()}`;
+                        addMessage(chatId, { id: msgId, userId: currentUser.id, agent: AGENTS.PRISM, content: response, type: 'agent' });
+                        // Auto-execute READ_ONLY tool calls silently (e.g., web search)
+                        if (response.toolCall && response.toolCall.safetyType === 'READ_ONLY') {
+                            await handleExecuteCommand(chatId, msgId, response.toolCall,
+                                (team) => { setTeams(prev => [...prev, team]); dbService.put(STORES_ENUM.GROUPS, team); },
+                                recruitAgent, setActiveChatId
+                            );
+                        }
+                    }
                 }
             } else if (agent || chatId === 'prism-core') {
                 const target = agent || AGENTS.PRISM;
@@ -230,7 +240,17 @@ export const useScatter = () => {
                     response = await generateSingleAgentResponse(currentSnapshot, target, [], [], 'CHAT', undefined, currentUser?.id);
                 }
 
-                if (response) addMessage(chatId, { id: `msg-${Date.now()}`, userId: currentUser.id, agent: target, content: response, type: 'agent' });
+                if (response) {
+                    const msgId = `msg-${Date.now()}`;
+                    addMessage(chatId, { id: msgId, userId: currentUser.id, agent: target, content: response, type: 'agent' });
+                    // Auto-execute READ_ONLY tool calls silently (e.g., web search)
+                    if (response.toolCall && response.toolCall.safetyType === 'READ_ONLY') {
+                        await handleExecuteCommand(chatId, msgId, response.toolCall,
+                            (team) => { setTeams(prev => [...prev, team]); dbService.put(STORES_ENUM.GROUPS, team); },
+                            recruitAgent, setActiveChatId
+                        );
+                    }
+                }
             }
         } finally {
             setActiveRequests(prev => prev - 1);
