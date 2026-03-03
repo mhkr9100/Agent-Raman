@@ -441,30 +441,7 @@ export async function generatePrismResponse(
     return generateSingleAgentResponse(history, modifiedPrism, [], [], 'CHAT', undefined, userId);
 }
 
-export async function generateExpandedSolution(
-    history: Message[],
-    agent: Agent
-): Promise<string | null> {
-    const systemPrompt = `You are ${agent.name}.\n[DOMAINS OF AUTHORITY]\n${agent.jobDescription}\nProvide an exhaustive expanded solution for the previous interaction.`;
 
-    try {
-        const contents = history.map(msg => ({
-            role: msg.type === 'user' ? 'user' : 'model',
-            parts: [{ text: (msg.content as any).text || "" }]
-        }));
-        contents.push({ role: 'user', parts: [{ text: "Expand previous solution with maximum detail." }] });
-
-        const response = await hybridGenerateContent({
-            model: agent.model,
-            contents: contents as any,
-            config: { systemInstruction: systemPrompt }
-        });
-
-        return response.text || null;
-    } catch (e) {
-        return null;
-    }
-}
 
 export async function executeInterceptedCommand(agent: Agent, toolCall: ToolCall): Promise<MessageContent | null> {
     try {

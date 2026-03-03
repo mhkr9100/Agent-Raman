@@ -242,7 +242,6 @@ const App: React.FC = () => {
         onCancel={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
       />
 
-      <WelcomeGuideModal onComplete={() => { }} />
     </div>
   );
 };
