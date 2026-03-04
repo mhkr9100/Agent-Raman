@@ -42,16 +42,13 @@ export const handler = async (event) => {
     try {
         // 1. Auth check
         const authHeader = event.headers?.Authorization || event.headers?.authorization;
-        if (!authHeader) return respond(401, { error: 'Unauthorized' });
-
-        // (Optional: validateToken if we want to be strict, but keeping it simple for now as per prism-chat)
-        // const auth = await validateToken(authHeader);
+        const auth = await validateToken(authHeader);
+        const userId = auth.userId;
 
         // 2. Parse body
         const body = JSON.parse(event.body || '{}');
-        const { userId, messages } = body;
+        const { messages } = body;
 
-        if (!userId) return respond(400, { error: 'Missing userId' });
         if (!messages || !Array.isArray(messages)) return respond(400, { error: 'Missing messages array' });
 
         console.log(`MEMORY-EXTRACT: userId=${userId}, messages=${messages.length}`);

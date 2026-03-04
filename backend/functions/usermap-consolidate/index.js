@@ -8,6 +8,7 @@
  */
 
 import { callAI } from '../../shared/vertex-ai.js';
+import { validateToken } from '../../shared/auth.js';
 
 const STRUCTURING_PROMPT = `You are a Context Structurer. Given a list of raw memory facts about a user, organize them into a clean hierarchical JSON tree for the UserMap.
 
@@ -57,10 +58,13 @@ export const handler = async (event) => {
     }
 
     try {
-        const body = JSON.parse(event.body || '{}');
-        const { userId, memories, existingTree } = body;
+        const authHeader = event.headers?.Authorization || event.headers?.authorization;
+        const auth = await validateToken(authHeader);
+        const userId = auth.userId;
 
-        if (!userId) return respond(400, { error: 'Missing userId' });
+        const body = JSON.parse(event.body || '{}');
+        const { memories, existingTree } = body;
+
         if (!memories || !Array.isArray(memories)) return respond(400, { error: 'Missing memories array' });
 
         console.log(`USERMAP-CONSOLIDATE: userId=${userId}, memories=${memories.length}`);

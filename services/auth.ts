@@ -1,115 +1,144 @@
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+import {
+    CognitoUserPool,
+    CognitoUser,
+    AuthenticationDetails,
+    CognitoUserAttribute
+} from 'amazon-cognito-identity-js';
+
+// Load from environment, fallback to known deployment values for safety
+const POOL_DATA = {
+    UserPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || 'us-east-1_R2j2oAqLJ',
+    ClientId: import.meta.env.VITE_COGNITO_CLIENT_ID || '77205lmtu8fg6t1s3sgcidf7p9'
+};
+
+const userPool = new CognitoUserPool(POOL_DATA);
 
 export interface UserSession {
     email: string;
-    id: string;
+    id: string; // The sub claim
     name?: string;
 }
 
 export const authService = {
-    async register(emailRaw: string, password: string, name: string): Promise<UserSession> {
-        const email = emailRaw.toLowerCase().trim();
-        if (!BACKEND_URL) {
-            // Dev-only fallback (no backend deployed yet)
-            const id = `user-${Date.now()}`;
-            const stored = JSON.parse(localStorage.getItem('mock_registry') || '[]');
-            const exists = stored.find((u: any) => u.email === email);
-            if (exists) throw new Error('User already exists');
+    /**
+     * Initializes signup. Will trigger OTP to email.
+     */
+    async register(emailRaw: string, password: string, name: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const email = emailRaw.toLowerCase().trim();
 
-            const user = { email, password, name, id };
-            stored.push(user);
-            localStorage.setItem('mock_registry', JSON.stringify(stored));
+            const attributeList = [
+                new CognitoUserAttribute({ Name: 'email', Value: email }),
+                new CognitoUserAttribute({ Name: 'name', Value: name })
+            ];
 
-            const session: UserSession = { email, id, name };
-            localStorage.setItem('currentUser', JSON.stringify(session));
-            localStorage.setItem('auth_token', `mock-jwt-${id}`);
-            return session;
-        }
-
-        const res = await fetch(`${BACKEND_URL}/api/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, name })
+            userPool.signUp(email, password, attributeList, [], (err, result) => {
+                if (err) {
+                    console.error("SignUp Error:", err);
+                    reject(new Error(err.message || JSON.stringify(err)));
+                    return;
+                }
+                resolve();
+            });
         });
-
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-            throw new Error(data.error || 'Registration failed');
-        }
-
-        const session: UserSession = data.user;
-        localStorage.setItem('currentUser', JSON.stringify(session));
-        localStorage.setItem('auth_token', data.token);
-
-        return session;
     },
 
-    async login(emailRaw: string, password?: string): Promise<UserSession> {
-        const email = emailRaw.toLowerCase().trim();
-        if (!BACKEND_URL) {
-            // Dev-only fallback — strict password check
-            const storedUsers = JSON.parse(localStorage.getItem('mock_registry') || '[]');
-            const user = storedUsers.find((u: any) => u.email === email && u.password === password);
+    /**
+     * Verifies the OTP sent to email after register()
+     */
+    async verifyOtp(emailRaw: string, otp: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const email = emailRaw.toLowerCase().trim();
+            const userData = { Username: email, Pool: userPool };
+            const cognitoUser = new CognitoUser(userData);
 
-            if (!user) {
-                throw new Error('Invalid email or password');
+            cognitoUser.confirmRegistration(otp, true, (err, result) => {
+                if (err) {
+                    console.error("OTP Error:", err);
+                    reject(new Error(err.message || JSON.stringify(err)));
+                    return;
+                }
+                resolve();
+            });
+        });
+    },
+
+    /**
+     * Authenticates user via SRP and stores session
+     */
+    async login(emailRaw: string, password?: string): Promise<UserSession> {
+        return new Promise((resolve, reject) => {
+            const email = emailRaw.toLowerCase().trim();
+
+            if (!password) {
+                reject(new Error("Password is required for login."));
+                return;
             }
 
-            const session: UserSession = {
-                email,
-                id: user.id,
-                name: user.name || email.split('@')[0]
-            };
-            localStorage.setItem('currentUser', JSON.stringify(session));
-            localStorage.setItem('auth_token', `mock-jwt-${session.id}`);
-            return session;
-        }
+            const authenticationDetails = new AuthenticationDetails({
+                Username: email,
+                Password: password
+            });
 
-        const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            const userData = { Username: email, Pool: userPool };
+            const cognitoUser = new CognitoUser(userData);
+
+            cognitoUser.authenticateUser(authenticationDetails, {
+                onSuccess: (result) => {
+                    // Extract Tokens
+                    const accessToken = result.getAccessToken().getJwtToken();
+                    const idToken = result.getIdToken().getJwtToken();
+
+                    // Decode IdToken to get attributes
+                    const payload = result.getIdToken().payload;
+                    const session: UserSession = {
+                        email: payload.email,
+                        id: payload.sub,
+                        name: payload.name || payload.email.split('@')[0]
+                    };
+
+                    // Securely store for apiV2
+                    localStorage.setItem('currentUser', JSON.stringify(session));
+                    // We use ID Token for authorization in API Gateway / Lambda
+                    localStorage.setItem('auth_token', idToken);
+
+                    resolve(session);
+                },
+                onFailure: (err) => {
+                    console.error("Login Error:", err);
+                    reject(new Error(err.message || JSON.stringify(err)));
+                },
+                newPasswordRequired: (userAttributes, requiredAttributes) => {
+                    // Handled if admin creates user, usually not needed for self signup
+                    reject(new Error("New password required. Flow not implemented."));
+                }
+            });
         });
-
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-            throw new Error(data.error || 'Login failed');
-        }
-
-        const session: UserSession = data.user;
-        localStorage.setItem('currentUser', JSON.stringify(session));
-        localStorage.setItem('auth_token', data.token);
-
-        return session;
     },
 
+    /**
+     * Gets token directly from localStorage for apiV2.ts
+     */
     getToken(): string | null {
         return localStorage.getItem('auth_token');
     },
 
+    /**
+     * Logs the user out locally and cleanly from Cognito
+     */
     async logout() {
+        const cognitoUser = userPool.getCurrentUser();
+        if (cognitoUser != null) {
+            cognitoUser.signOut();
+        }
         localStorage.removeItem('currentUser');
         localStorage.removeItem('auth_token');
     },
 
-    async deleteAccount(emailRaw: string) {
-        const email = emailRaw.toLowerCase().trim();
-        if (BACKEND_URL) {
-            const res = await fetch(`${BACKEND_URL}/api/auth/delete`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-            if (!res.ok) throw new Error('Failed to delete account from cloud');
-        } else {
-            const stored = JSON.parse(localStorage.getItem('mock_registry') || '[]');
-            const filtered = stored.filter((u: any) => u.email !== email);
-            localStorage.setItem('mock_registry', JSON.stringify(filtered));
-        }
-        await this.logout();
-    },
-
-    async getCurrentUser() {
+    /**
+     * Synchronous check of current local storage session
+     */
+    async getCurrentUser(): Promise<{ id: string, username: string, email: string, name: string } | null> {
         try {
             const data = localStorage.getItem('currentUser');
             if (data) {

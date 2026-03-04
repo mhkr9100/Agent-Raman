@@ -16,6 +16,7 @@ import {
     getToolById,
     getModelById
 } from '../../shared/dynamo.js';
+import { validateToken } from '../../shared/auth.js';
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
@@ -64,11 +65,14 @@ export const handler = async (event) => {
     }
 
     try {
+        const authHeader = event.headers?.Authorization || event.headers?.authorization;
+        const auth = await validateToken(authHeader);
+        const userId = auth.userId;
+
         const body = JSON.parse(event.body || '{}');
-        const { userId, blueprint } = body;
+        const { blueprint } = body;
 
         // Validate input
-        if (!userId) return respond(400, { error: 'Missing userId' });
         if (!blueprint) return respond(400, { error: 'Missing blueprint' });
 
         const validationError = validateBlueprint(blueprint);

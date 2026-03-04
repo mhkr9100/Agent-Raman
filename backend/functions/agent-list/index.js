@@ -6,6 +6,7 @@
  */
 
 import { listAgentsByUser } from '../../shared/dynamo.js';
+import { validateToken } from '../../shared/auth.js';
 
 const CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -22,8 +23,9 @@ export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') return respond(200, {});
 
     try {
-        const userId = event.queryStringParameters?.userId;
-        if (!userId) return respond(400, { error: 'Missing userId query parameter' });
+        const authHeader = event.headers?.Authorization || event.headers?.authorization;
+        const auth = await validateToken(authHeader);
+        const userId = auth.userId;
 
         console.log(`AGENT-LIST: Listing agents for userId=${userId}`);
         const agents = await listAgentsByUser(userId);

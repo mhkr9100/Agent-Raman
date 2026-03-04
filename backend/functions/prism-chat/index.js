@@ -18,6 +18,7 @@ import {
     listModels,
     getUserMap
 } from '../../shared/dynamo.js';
+import { validateToken } from '../../shared/auth.js';
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
@@ -327,12 +328,16 @@ export const handler = async (event) => {
     }
 
     try {
-        // Parse body
+        // 1. Auth check
+        const authHeader = event.headers?.Authorization || event.headers?.authorization;
+        const auth = await validateToken(authHeader);
+        const userId = auth.userId;
+
+        // 2. Parse body
         const body = JSON.parse(event.body || '{}');
-        const { userId, message, mode, conversationId } = body;
+        const { message, mode, conversationId } = body;
 
         // Validate required fields
-        if (!userId) return respond(400, { error: 'Missing userId' });
         if (!message) return respond(400, { error: 'Missing message' });
         if (!mode) return respond(400, { error: 'Missing mode. Must be: ask, route, or create' });
 

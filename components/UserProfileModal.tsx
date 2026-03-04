@@ -31,8 +31,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, isOpen
     const handleDeleteAccount = async () => {
         setIsDeleting(true);
         try {
-            await authService.deleteAccount(user.email);
-            window.location.reload(); // Force reload to clear state and show login
+            // Future: Implement Cognito Admin Delete User via secure backend lambda
+            alert("Account deletion must be performed by a RamN Administrator. Please contact support.");
+            setIsDeleting(false);
+            setIsConfirmingDelete(false);
         } catch (error) {
             console.error("Failed to delete account", error);
             setIsDeleting(false);

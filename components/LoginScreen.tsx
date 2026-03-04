@@ -113,10 +113,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
 
                     <div className="space-y-6 max-w-4xl">
                         <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter text-gray-900 dark:text-white uppercase leading-[0.9]">
-                            Orchestrate <br /><span className="text-indigo-500 dark:text-indigo-400">Intelligence</span>
+                            RamN <br /><span className="text-indigo-500 dark:text-indigo-400">AI</span>
                         </h1>
                         <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 font-medium max-w-2xl mx-auto leading-relaxed">
-                            A unified platform for multi-agent collaboration. Deploy specialized AI units, build autonomous squads, and orchestrate complex workflows across industry-leading models.
+                            AI Agents Made Simple. Stop managing AI. Let AI manage your work.
                         </p>
                     </div>
 
@@ -201,8 +201,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                             </button>
 
                             <div className="flex flex-col items-center mb-8 relative">
-                                <div className="mb-6 text-indigo-500 dark:text-indigo-400">
-                                    <PrismIcon size={48} />
+                                <div className="mb-6 text-gray-900 dark:text-white">
+                                    <RamanIcon size={48} />
                                 </div>
                                 <h2 className="text-xl font-black tracking-[0.2em] uppercase text-gray-900 dark:text-white">
                                     {authMode === 'signup' ? 'Create Workspace' : authMode === 'otp' ? 'Verification' : 'Access Workspace'}

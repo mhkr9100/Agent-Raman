@@ -17,6 +17,7 @@ import {
     saveMessage,
     getConversation
 } from '../../shared/dynamo.js';
+import { validateToken } from '../../shared/auth.js';
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
@@ -40,12 +41,15 @@ export const handler = async (event) => {
     }
 
     try {
+        const authHeader = event.headers?.Authorization || event.headers?.authorization;
+        const auth = await validateToken(authHeader);
+        const userId = auth.userId;
+
         const body = JSON.parse(event.body || '{}');
-        const { agentId, userId, message, conversationId } = body;
+        const { agentId, message, conversationId } = body;
 
         // Validate input
         if (!agentId) return respond(400, { error: 'Missing agentId' });
-        if (!userId) return respond(400, { error: 'Missing userId' });
         if (!message) return respond(400, { error: 'Missing message' });
 
         console.log(`AGENT-RUN: agentId=${agentId}, userId=${userId}, conversationId=${conversationId || 'new'}`);

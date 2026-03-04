@@ -48,14 +48,9 @@ export const useAuth = () => {
 
     const register = useCallback(async (email: string, name: string, password?: string) => {
         try {
-            const user = await authService.register(email, password || 'password', name);
-            const profile: UserProfile = {
-                id: user.id,
-                email: user.email,
-                name: user.name || name,
-                avatar: ''
-            };
-            setCurrentUser(profile);
+            await authService.register(email, password || 'password', name);
+            // We do not set currentUser here because Cognito requires OTP verification first.
+            // The UI handles the transition to OTP screen.
         } catch (e) {
             console.error(e);
             throw e;
