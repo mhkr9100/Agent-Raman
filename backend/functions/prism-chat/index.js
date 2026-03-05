@@ -296,12 +296,22 @@ Wrap your entire response in \`\`\`json code block.`;
     // 7. Parse AI response JSON
     const parsed = extractJSON(aiResult.text);
 
-    // 8. Save messages
+    // Extract nicely formatted text to show to the user (fallback to raw if error)
+    let conversationalText = aiResult.text;
+    if (parsed) {
+        if (parsed.blueprintReady === false && parsed.message) {
+            conversationalText = parsed.message;
+        } else if (parsed.blueprintReady === true && parsed.explanation) {
+            conversationalText = parsed.explanation;
+        }
+    }
+
+    // 8. Save messages using the extracted conversational text
     await saveMessage({ conversationId: convId, role: 'user', content: message, agentId: null, userId });
     await saveMessage({
         conversationId: convId,
         role: 'assistant',
-        content: aiResult.text,
+        content: conversationalText,
         agentId: null,
         userId
     });
@@ -310,7 +320,7 @@ Wrap your entire response in \`\`\`json code block.`;
 
     // 9. Return
     return respond(200, {
-        text: aiResult.text,
+        text: conversationalText,
         toolCall: aiResult.toolCalls?.[0] || (parsed?.blueprintReady ? { name: 'fabricateAgent', args: parsed } : null),
         conversationId: convId,
         mode: 'create'
