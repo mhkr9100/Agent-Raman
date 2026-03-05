@@ -64,6 +64,66 @@ export const authService = {
     },
 
     /**
+     * Resends the verification code for signup
+     */
+    async resendVerificationCode(emailRaw: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const email = emailRaw.toLowerCase().trim();
+            const userData = { Username: email, Pool: userPool };
+            const cognitoUser = new CognitoUser(userData);
+
+            cognitoUser.resendConfirmationCode((err, result) => {
+                if (err) {
+                    console.error("Resend OTP Error:", err);
+                    reject(new Error(err.message || JSON.stringify(err)));
+                    return;
+                }
+                resolve();
+            });
+        });
+    },
+
+    /**
+     * Initiates the forgot password flow
+     */
+    async forgotPassword(emailRaw: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const email = emailRaw.toLowerCase().trim();
+            const userData = { Username: email, Pool: userPool };
+            const cognitoUser = new CognitoUser(userData);
+
+            cognitoUser.forgotPassword({
+                onSuccess: function (data) {
+                    resolve();
+                },
+                onFailure: function (err) {
+                    reject(new Error(err.message || JSON.stringify(err)));
+                }
+            });
+        });
+    },
+
+    /**
+     * Confirms the new password
+     */
+    async confirmPassword(emailRaw: string, code: string, newPassword: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const email = emailRaw.toLowerCase().trim();
+            const userData = { Username: email, Pool: userPool };
+            const cognitoUser = new CognitoUser(userData);
+
+            cognitoUser.confirmPassword(code, newPassword, {
+                onSuccess: function () {
+                    resolve();
+                },
+                onFailure: function (err) {
+                    reject(new Error(err.message || JSON.stringify(err)));
+                }
+            });
+        });
+    },
+
+    /**
      * Authenticates user via SRP and stores session
      */
     async login(emailRaw: string, password?: string): Promise<UserSession> {
