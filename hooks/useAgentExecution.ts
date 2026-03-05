@@ -72,13 +72,16 @@ export const useAgentExecution = (
                 // Call actual V2 API to handle saving to DB
                 console.log('API: POST /api/v2/agents/create (fabricateAgent UI intercept)');
                 const res = await createAgent({
-                    agentName: toolCall.args.name,
+                    agentName: toolCall.args.name || toolCall.args.agentName,
                     role: toolCall.args.role,
-                    agentDescription: toolCall.args.description || `A specialized ${toolCall.args.role} agent.`,
-                    systemPrompt: toolCall.args.jobDescription,
+                    agentDescription: toolCall.args.description || toolCall.args.agentDescription || `A specialized ${toolCall.args.role || 'AI'} agent.`,
+                    systemPrompt: toolCall.args.jobDescription || toolCall.args.systemPrompt,
                     icon: toolCall.args.icon,
-                    modelId: toolCall.args.modelId,
-                    capabilities: toolCall.args.capabilities || []
+                    model: {
+                        modelId: toolCall.args.modelId || 'gemini-2.5-flash',
+                        temperature: 0.3
+                    },
+                    tools: toolCall.args.capabilities || toolCall.args.tools || []
                 });
 
                 const agentParam = {
