@@ -10,7 +10,8 @@ const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
 // ─── Auth Helper ─────────────────────────────────────────────
 
 function getAuthToken(): string {
-    const token = localStorage.getItem('auth_token');
+    // We need the ID token so the backend validateToken verifier can extract the user's email and details securely.
+    const token = localStorage.getItem('id_token') || localStorage.getItem('auth_token');
     if (!token) throw new Error('Not authenticated. Please log in.');
     return token;
 }
