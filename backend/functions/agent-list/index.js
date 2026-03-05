@@ -34,6 +34,11 @@ export const handler = async (event) => {
         return respond(200, { agents });
     } catch (error) {
         console.error('AGENT-LIST: ❌ Error:', error);
+
+        if (error.message && error.message.startsWith('Unauthorized')) {
+            return respond(401, { error: 'Unauthorized', message: error.message });
+        }
+
         return respond(500, { error: 'Failed to list agents', message: error.message });
     }
 };

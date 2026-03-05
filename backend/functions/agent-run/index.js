@@ -137,6 +137,11 @@ export const handler = async (event) => {
 
     } catch (error) {
         console.error('AGENT-RUN: ❌ Error:', error);
+
+        if (error.message && error.message.startsWith('Unauthorized')) {
+            return respond(401, { error: 'Unauthorized', message: error.message });
+        }
+
         return respond(500, {
             error: 'Failed to run agent',
             message: error.message || 'Unknown error'

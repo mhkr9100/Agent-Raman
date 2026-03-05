@@ -1,0 +1,1 @@
+{"statusCode":500,"headers":{"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"Content-Type,Authorization","Access-Control-Allow-Methods":"OPTIONS,POST","Content-Type":"application/json"},"body":"{\"error\":\"Internal server error\",\"message\":\"Unauthorized: Missing token\"}"}

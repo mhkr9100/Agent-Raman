@@ -29,6 +29,11 @@ export const handler = async (event) => {
         return respond(200, { tools });
     } catch (error) {
         console.error('TOOL-REGISTRY: ❌ Error:', error);
+
+        if (error.message && error.message.startsWith('Unauthorized')) {
+            return respond(401, { error: 'Unauthorized', message: error.message });
+        }
+
         return respond(500, { error: 'Failed to list tools', message: error.message });
     }
 };

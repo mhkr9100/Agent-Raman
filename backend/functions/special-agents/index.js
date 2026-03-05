@@ -29,6 +29,11 @@ export const handler = async (event) => {
         return respond(200, { templates });
     } catch (error) {
         console.error('SPECIAL-AGENTS: ❌ Error:', error);
+
+        if (error.message && error.message.startsWith('Unauthorized')) {
+            return respond(401, { error: 'Unauthorized', message: error.message });
+        }
+
         return respond(500, { error: 'Failed to list special agents', message: error.message });
     }
 };

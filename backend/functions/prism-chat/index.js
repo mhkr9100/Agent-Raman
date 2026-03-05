@@ -357,6 +357,11 @@ export const handler = async (event) => {
 
     } catch (error) {
         console.error('PRISM: ❌ Fatal error:', error);
+
+        if (error.message && error.message.startsWith('Unauthorized')) {
+            return respond(401, { error: 'Unauthorized', message: error.message });
+        }
+
         return respond(500, {
             error: 'Internal server error',
             message: error.message || 'Unknown error'

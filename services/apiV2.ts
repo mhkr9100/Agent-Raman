@@ -50,6 +50,15 @@ async function apiRequest<T>(
     const response = await fetch(url, options);
 
     if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+            console.warn('API: ⚠️ Unauthorized token detected. Forcing logout clearing state...');
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('id_token');
+            localStorage.removeItem('currentUser');
+            window.location.reload();
+            return {} as T; // Return empty to prevent downstream crashes during reload
+        }
+
         const errorData = await response.json().catch(() => ({ error: response.statusText }));
         const message = errorData.error || errorData.message || `Request failed: ${response.status}`;
         console.error(`API: ❌ ${method} ${path} → ${response.status}: ${message}`);
