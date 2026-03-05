@@ -40,7 +40,7 @@ export async function getToolCatalog(category?: string): Promise<ToolEntry[]> {
   try {
     const params = new URLSearchParams();
     if (category) params.append('category', category);
-    const res = await fetch(`${BACKEND_URL}/api/tools${params.toString() ? '?' + params.toString() : ''}`);
+    const res = await fetch(`${BACKEND_URL}/api/v2/tools${params.toString() ? '?' + params.toString() : ''}`);
     if (!res.ok) throw new Error('Failed to fetch tool catalog');
     const data = await res.json();
     if (!category) cachedCatalog = data.tools;

@@ -183,25 +183,29 @@ export async function listAgents(): Promise<ListAgentsResponse> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Tool Registry
+//  Special Agents (Templates from DynamoDB)
 // ═══════════════════════════════════════════════════════════════
 
-export interface GetToolsResponse {
-    tools: Array<{
-        toolId: string;
-        name: string;
-        type: string;
-        category: string;
-        description: string;
-        capabilities: string[];
-    }>;
+export interface SpecialAgentTemplate {
+    templateId: string;
+    name: string;
+    role: string;
+    icon: string;
+    description: string;
+    predefinedPrompt: string;
+    defaultTools: string[];
+    suggestedModel: string;
 }
 
-export async function getTools(): Promise<GetToolsResponse> {
+export interface ListSpecialAgentsResponse {
+    templates: SpecialAgentTemplate[];
+}
+
+export async function listSpecialAgents(): Promise<ListSpecialAgentsResponse> {
     try {
-        return await apiRequest<GetToolsResponse>('GET', '/api/v2/tools');
+        return await apiRequest<ListSpecialAgentsResponse>('GET', '/api/v2/special-agents');
     } catch (error: any) {
-        console.error('API: getTools failed:', error.message);
+        console.error('API: listSpecialAgents failed:', error.message);
         throw error;
     }
 }

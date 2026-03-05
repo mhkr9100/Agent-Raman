@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Agent, Team, Message, UserProfile, MessageContent, Task, ToolCall, GlobalTask } from '../types';
 import { AGENTS } from '../constants';
-import { prismChat, agentChat } from '../services/apiV2';
-import { dbService, STORES_ENUM } from '../services/db';
-import { createAgent } from '../services/apiV2';
+import { prismChat, agentChat, createAgent } from '../services/apiV2';
 import { canMakeRequest, recordRequest, getUsageInfo, formatResetTime } from '../services/rateLimiter';
 import { useAppStore } from '../store/useAppStore';
 

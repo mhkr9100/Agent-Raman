@@ -1,7 +1,8 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AIModelProfile, AgentTemplate, Agent, Team, UserProfile } from '../types';
 import { SPECIAL_AGENT_TEMPLATES } from '../constants';
+import { listSpecialAgents, SpecialAgentTemplate } from '../services/apiV2';
 import { ToolsView } from './ToolsView';
 import { ModelsView } from './ModelsView';
 
@@ -18,6 +19,20 @@ interface SpectrumViewProps {
 export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onFabricateAgent, onInitializeGroup, onOpenChat, agents, teams, userProfile }) => {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [specialAgents, setSpecialAgents] = useState<any[]>(SPECIAL_AGENT_TEMPLATES);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await listSpecialAgents();
+                if (res.templates && res.templates.length > 0) {
+                    setSpecialAgents(res.templates);
+                }
+            } catch (err) {
+                console.warn('[SpectrumView] Failed to load special agents from API, using fallback:', err);
+            }
+        })();
+    }, []);
 
     const userAgents = agents.filter(a => !a.isSystem);
     const userTeams = teams.filter(t => !t.isSystem);
@@ -158,10 +173,10 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onFabricateA
                         <div className="mb-8 flex items-center gap-4">
                             <h3 className="text-xs font-black text-gray-500 dark:text-white/40 uppercase tracking-[0.3em]">Special Agents</h3>
                             <div className="h-px flex-1 bg-black/10 dark:bg-white/5" />
-                            <span className="text-[9px] text-gray-400 dark:text-white/20 font-mono tracking-widest">{SPECIAL_AGENT_TEMPLATES.length} BLUEPRINTS</span>
+                            <span className="text-[9px] text-gray-400 dark:text-white/20 font-mono tracking-widest">{specialAgents.length} BLUEPRINTS</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {SPECIAL_AGENT_TEMPLATES.map(template => (
+                            {specialAgents.map(template => (
                                 <div key={template.id} className="group bg-white dark:bg-black/40 border border-black/5 dark:border-white/5 rounded-2xl p-5 hover:border-black/20 dark:hover:border-white/20 transition-all duration-300 flex flex-col shadow-sm dark:shadow-none">
                                     <div className="flex items-center gap-3 mb-3">
                                         <div className="w-10 h-10 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl flex items-center justify-center text-xl group-hover:scale-105 transition-transform">
@@ -174,24 +189,14 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onFabricateA
                                     </div>
                                     <p className="text-[11px] text-gray-500 dark:text-white/30 leading-relaxed mb-3 flex-1">{template.description}</p>
                                     <div className="flex flex-wrap gap-1.5 mb-4">
-                                        {template.defaultTools.map(tool => (
+                                        {(template.defaultTools || []).map((tool: string) => (
                                             <span key={tool} className="text-[8px] px-2 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300/60 rounded border border-indigo-500/20 uppercase tracking-wider font-bold">
                                                 {tool}
                                             </span>
                                         ))}
                                     </div>
                                     <button
-                                        onClick={() => {
-                                            // Navigate to Prism chat and inject context request
-                                            onOpenChat('prism-core');
-                                            // Small delay to let navigation happen, then inject
-                                            setTimeout(() => {
-                                                const event = new CustomEvent('prism-special-agent', {
-                                                    detail: { templateId: template.id, templateName: template.name, templateRole: template.role }
-                                                });
-                                                window.dispatchEvent(event);
-                                            }, 300);
-                                        }}
+                                        onClick={() => onHire(template as any)}
                                         className="w-full py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white text-[9px] font-black uppercase tracking-widest rounded-lg border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 transition-all active:scale-[0.98]"
                                     >
                                         + Add via Prism

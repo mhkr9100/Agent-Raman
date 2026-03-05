@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Message, ChatSession, UserProfile } from '../types';
 import { AGENTS } from '../constants';
-import { dbService, STORES_ENUM } from '../services/db';
 import { useAppStore } from '../store/useAppStore';
 
 const PRISM_INTRO = `Prism is Active. I am your Meta Agent and Workspace Architect.
@@ -41,7 +40,7 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
             };
         }
 
-        // Search for agent
+        // Search for agent in constants
         const agent = Object.values(AGENTS).find(a => a.id === entityId);
         if (agent && !agent.isSystem) {
             return {
@@ -52,7 +51,7 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
             };
         }
 
-        // For teams or other agents, have a helpful fallback
+        // For custom agents or teams, have a helpful fallback
         if (entityId.startsWith('agent-') || entityId.indexOf('-') > -1) {
             return {
                 id: `msg-gen-init-${Date.now()}`,
@@ -72,51 +71,25 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
         };
     }, []);
 
-    // Auto-save chat history when it changes
-    useEffect(() => {
-        if (currentUser && activeSessionId) {
-            const chatKey = `chat_${activeSessionId}`;
-            const messages = chatHistory[activeChatId] || [];
-            dbService.put(STORES_ENUM.CHATS, messages, chatKey);
-
-            setChatSessions(prev => prev.map(s =>
-                s.id === activeSessionId ? { ...s, updatedAt: Date.now(), messageCount: messages.length } : s
-            ));
-        }
-    }, [chatHistory, currentUser, activeSessionId, activeChatId]);
-
+    // Initialize sessions — pure in-memory (backend Lambda saves conversations to DynamoDB)
     const loadSessions = useCallback(async (userId: string) => {
-        const allSessions = await dbService.getAll<ChatSession>(STORES_ENUM.SESSIONS);
-        const userSessions = allSessions.filter(s => s.userId === userId);
-        setChatSessions(userSessions);
-
-        const prismSessions = userSessions.filter(s => s.entityId === 'prism-core').sort((a, b) => b.updatedAt - a.updatedAt);
-        const latestSession = prismSessions.find(s => s.isActive) || prismSessions[0];
-
-        if (latestSession) {
-            const sessionChatKey = `chat_${latestSession.id}`;
-            const msgs = await dbService.get<Message[]>(STORES_ENUM.CHATS, sessionChatKey) || [];
-            setChatHistory({ 'prism-core': msgs });
-            setActiveSessionId(latestSession.id);
-        } else {
-            const newSession: ChatSession = {
-                id: `session-${Date.now()}`,
-                entityId: 'prism-core',
-                userId,
-                title: 'New Chat',
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                messageCount: 1,
-                isActive: true
-            };
-            setChatSessions([newSession]);
-            setActiveSessionId(newSession.id);
-            dbService.put(STORES_ENUM.SESSIONS, newSession);
-            const initMsg = getInitialMessage('prism-core');
-            setChatHistory({
-                'prism-core': initMsg ? [initMsg] : []
-            });
-        }
+        // Start with a fresh Prism session on each page load
+        const newSession: ChatSession = {
+            id: `session-${Date.now()}`,
+            entityId: 'prism-core',
+            userId,
+            title: 'New Chat',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            messageCount: 1,
+            isActive: true
+        };
+        setChatSessions([newSession]);
+        setActiveSessionId(newSession.id);
+        const initMsg = getInitialMessage('prism-core');
+        setChatHistory({
+            'prism-core': initMsg ? [initMsg] : []
+        });
     }, [getInitialMessage]);
 
     const addMessage = useCallback((chatId: string, message: Message) => {
@@ -133,13 +106,13 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
 
     const startNewSession = useCallback(async (entityId: string) => {
         if (!currentUser) return;
-        setChatSessions(prev => {
-            const updated = prev.map(s =>
+
+        // Deactivate existing sessions for this entity
+        setChatSessions(prev =>
+            prev.map(s =>
                 s.entityId === entityId && s.isActive ? { ...s, isActive: false } : s
-            );
-            updated.filter(s => s.entityId === entityId && !s.isActive).forEach(s => dbService.put(STORES_ENUM.SESSIONS, s));
-            return updated;
-        });
+            )
+        );
 
         const newSession: ChatSession = {
             id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -153,16 +126,13 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
         };
         setChatSessions(prev => [...prev, newSession]);
         setActiveSessionId(newSession.id);
-        dbService.put(STORES_ENUM.SESSIONS, newSession);
         const initMsg = getInitialMessage(entityId);
         setChatHistory(prev => ({ ...prev, [entityId]: initMsg ? [initMsg] : [] }));
     }, [currentUser, getInitialMessage]);
 
     const resumeSession = useCallback(async (session: ChatSession) => {
-        const chatKey = `chat_${session.id}`;
-        const msgs = await dbService.get<Message[]>(STORES_ENUM.CHATS, chatKey) || [];
+        // In-memory: just switch to the entity's existing chat history
         setActiveSessionId(session.id);
-        setChatHistory(prev => ({ ...prev, [session.entityId]: msgs }));
         setActiveChatId(session.entityId);
     }, []);
 
@@ -178,11 +148,9 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
         const activeSession = entitySessions.find(s => s.isActive) || entitySessions[0];
 
         if (activeSession) {
-            const chatKey = `chat_${activeSession.id}`;
-            const msgs = await dbService.get<Message[]>(STORES_ENUM.CHATS, chatKey) || [];
-            setChatHistory(prev => ({ ...prev, [entityId]: prev[entityId]?.length ? prev[entityId] : msgs }));
             setActiveSessionId(activeSession.id);
         } else {
+            // Create new session for this entity
             const newSession: ChatSession = {
                 id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                 entityId,
@@ -195,7 +163,6 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
             };
             setChatSessions(prev => [...prev, newSession]);
             setActiveSessionId(newSession.id);
-            dbService.put(STORES_ENUM.SESSIONS, newSession);
             const initMsg = getInitialMessage(entityId);
             setChatHistory(prev => ({ ...prev, [entityId]: initMsg ? [initMsg] : [] }));
         }
