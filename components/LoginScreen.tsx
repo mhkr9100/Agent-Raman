@@ -44,19 +44,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
 
         try {
             if (authMode === 'signup') {
-                // Mock OTP initiation. Normally we would call a backend endpoint here.
+                // Real Cognito registration (triggers OTP)
+                await authService.register(email, password, name);
                 setAuthMode('otp');
                 setOtp('');
                 setIsLoading(false);
                 return;
             } else if (authMode === 'otp') {
-                if (otp !== '123456') {
-                    throw new Error("Invalid verification code. Use 123456.");
-                }
+                // Real Cognito OTP verification
+                await authService.verifyOtp(email, otp);
 
-                // Actual registration after OTP success
-                await authService.register(email, password, name);
+                // After verification, we auto-login
+                await authService.login(email, password);
                 const user = await authService.getCurrentUser();
+
                 if (onRegister) {
                     onRegister(email, user?.name || name, password);
                 } else {
@@ -219,9 +220,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                 <div className="space-y-4">
                                     {authMode === 'signup' && (
                                         <div>
-                                            <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Full Name</label>
+                                            <label htmlFor="fullName" className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Full Name</label>
                                             <input
+                                                id="fullName"
+                                                name="name"
                                                 type="text"
+                                                autoComplete="name"
                                                 required={authMode === 'signup'}
                                                 className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
                                                 placeholder="Enter your name"
@@ -234,11 +238,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                     {authMode === 'otp' ? (
                                         <div>
                                             <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs p-3 rounded-xl text-center font-bold mb-4">
-                                                TESTING MODE: Use code 123456
+                                                Check your email for the verification code.
                                             </div>
-                                            <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Verification Code (OTP)</label>
+                                            <label htmlFor="otp" className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Verification Code (OTP)</label>
                                             <input
+                                                id="otp"
+                                                name="otp"
                                                 type="text"
+                                                autoComplete="one-time-code"
                                                 required
                                                 className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-center text-2xl tracking-[0.5em] font-mono text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
                                                 placeholder="000000"
@@ -250,9 +257,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                     ) : (
                                         <>
                                             <div>
-                                                <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Email Address</label>
+                                                <label htmlFor="email" className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Email Address</label>
                                                 <input
+                                                    id="email"
+                                                    name="email"
                                                     type="email"
+                                                    autoComplete="email"
                                                     required
                                                     className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
                                                     placeholder="Enter your email"
@@ -261,9 +271,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Password</label>
+                                                <label htmlFor="password" className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Password</label>
                                                 <input
+                                                    id="password"
+                                                    name="password"
                                                     type="password"
+                                                    autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
                                                     required
                                                     className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
                                                     placeholder="Enter your password"

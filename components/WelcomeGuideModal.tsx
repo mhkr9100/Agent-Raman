@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PrismIcon } from './icons/PrismIcon';
+import { RamanIcon } from './icons/RamanIcon';
 import { SpectrumIcon } from './icons/SpectrumIcon';
 import { ChatIcon } from './icons/ChatIcon';
 import { UserMapIcon } from './icons/UserMapIcon';
@@ -31,10 +32,10 @@ export const WelcomeGuideModal: React.FC<WelcomeGuideModalProps> = ({ onComplete
 
     const steps = [
         {
-            title: "Welcome to RamN AI",
-            subtitle: "The Multi-Agent Orchestrator",
-            description: "You've successfully initialized your session. RamN isn't just a chatbot—it's a workspace where you fabricate, deploy, and orchestrate specialized AI agents to solve complex problems.",
-            icon: <PrismIcon size={64} className="text-indigo-500" />
+            title: "RamN AI",
+            subtitle: "AI Agents Made Simple",
+            description: "Stop managing AI. Let AI manage your work. RamN isn't just a chatbot—it's a workspace where you fabricate, deploy, and orchestrate specialized AI agents to solve complex problems.",
+            icon: <RamanIcon size={64} className="text-gray-900 dark:text-white" />
         },
         {
             title: "1. Prism Core",

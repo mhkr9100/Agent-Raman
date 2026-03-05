@@ -5,10 +5,10 @@ import {
     CognitoUserAttribute
 } from 'amazon-cognito-identity-js';
 
-// Load from environment, fallback to known deployment values for safety
+// Load from environment with robust fallbacks
 const POOL_DATA = {
-    UserPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID || 'us-east-1_R2j2oAqLJ',
-    ClientId: import.meta.env.VITE_COGNITO_CLIENT_ID || '77205lmtu8fg6t1s3sgcidf7p9'
+    UserPoolId: import.meta.env.VITE_AWS_USER_POOL_ID || import.meta.env.VITE_COGNITO_USER_POOL_ID || 'us-east-1_R2j2oAqLJ',
+    ClientId: import.meta.env.VITE_AWS_CLIENT_ID || import.meta.env.VITE_COGNITO_CLIENT_ID || '77205lmtu8fg6t1s3sgcidf7p9'
 };
 
 const userPool = new CognitoUserPool(POOL_DATA);
