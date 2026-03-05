@@ -132,31 +132,61 @@ const MODELS = [
         modelId: 'gemini-2.0-flash',
         provider: 'google',
         name: 'Gemini 2.0 Flash',
-        strengths: 'Fast responses, good for general tasks, cost efficient, large context window',
+        strengths: 'Speed, Directness',
         contextWindow: 1000000,
         costTier: 'low',
-        bestFor: ['general', 'chat', 'quick-tasks', 'summarization'],
+        bestFor: ['Interactions', 'Tool Use'],
         temperature_default: 0.3
     },
     {
-        modelId: 'gemini-2.5-pro',
+        modelId: 'gemini-2.0-pro-exp-02-05',
         provider: 'google',
-        name: 'Gemini 2.5 Pro',
-        strengths: 'Deep reasoning, code generation, complex analysis, large context for document processing',
+        name: 'Gemini 2.0 Pro',
+        strengths: 'Logic, Coding, Math',
         contextWindow: 1000000,
         costTier: 'high',
-        bestFor: ['reasoning', 'code', 'analysis', 'research', 'complex-tasks'],
+        bestFor: ['Architecture', 'Logic'],
         temperature_default: 0.2
     },
     {
-        modelId: 'gemini-2.0-flash-lite',
-        provider: 'google',
-        name: 'Gemini 2.0 Flash Lite',
-        strengths: 'Fastest, cheapest, simple tasks only',
-        contextWindow: 500000,
-        costTier: 'lowest',
-        bestFor: ['simple-chat', 'classification', 'short-answers'],
+        modelId: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
+        provider: 'anthropic',
+        name: 'Claude 3.5 Sonnet',
+        strengths: 'Nuance, Human-like',
+        contextWindow: 200000,
+        costTier: 'medium',
+        bestFor: ['Architecture', 'Logic'],
+        temperature_default: 0.3
+    },
+    {
+        modelId: 'meta.llama3-1-405b-instruct-v1:0',
+        provider: 'meta',
+        name: 'Llama 3.1 405B',
+        strengths: 'Reasoning, Vast data',
+        contextWindow: 128000,
+        costTier: 'high',
+        bestFor: ['Research'],
+        temperature_default: 0.4
+    },
+    {
+        modelId: 'gpt-4o',
+        provider: 'openai',
+        name: 'GPT-4o',
+        strengths: 'Nuance, Human-like',
+        contextWindow: 128000,
+        costTier: 'high',
+        bestFor: ['Interaction'],
         temperature_default: 0.5
+    },
+    {
+        modelId: 'o1',
+        provider: 'openai',
+        name: 'OpenAI o1',
+        strengths: 'Reasoning, Complex logic',
+        contextWindow: 128000,
+        costTier: 'highest',
+        bestFor: ['Math', 'Coding'],
+        temperature_default: 1.0
     }
 ];
 

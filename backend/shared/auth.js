@@ -8,8 +8,8 @@
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 
 // Configure these from env if available
-const USER_POOL_ID = process.env.USER_POOL_ID || 'us-east-1_example';
-const CLIENT_ID = process.env.CLIENT_ID || 'exampleClientId';
+const USER_POOL_ID = process.env.USER_POOL_ID || 'us-east-1_R2j2oAqLJ';
+const CLIENT_ID = process.env.CLIENT_ID || '77205lmtu8fg6t1s3sgcidf7p9';
 
 // Create the verifier
 const verifier = CognitoJwtVerifier.create({
