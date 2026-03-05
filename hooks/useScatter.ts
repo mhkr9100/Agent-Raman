@@ -3,6 +3,7 @@ import { Agent, Team, Message, UserProfile, MessageContent, Task, ToolCall, Glob
 import { AGENTS } from '../constants';
 import { prismChat, agentChat } from '../services/apiV2';
 import { dbService, STORES_ENUM } from '../services/db';
+import { createAgent } from '../services/apiV2';
 import { canMakeRequest, recordRequest, getUsageInfo, formatResetTime } from '../services/rateLimiter';
 import { useAppStore } from '../store/useAppStore';
 
@@ -36,7 +37,7 @@ export const useScatter = () => {
 
     const {
         agents, setAgents, teams, setTeams,
-        loadEntities, recruitAgent, deleteAgent, deleteTeam, createTeam
+        loadEntities, addDynamoAgent, deleteAgent, deleteTeam, createTeam
     } = useEntities(currentUser);
 
     const {
@@ -126,8 +127,8 @@ export const useScatter = () => {
     // === Proxy Functions ===
     const _executeCmdProxy = async (messageId: string, toolCall: ToolCall) => {
         return handleExecuteCommand(activeChatId, messageId, toolCall,
-            (team) => { setTeams(prev => [...prev, team]); dbService.put(STORES_ENUM.GROUPS, team); },
-            recruitAgent,
+            (team) => { setTeams(prev => [...prev, team]); },
+            addDynamoAgent,
             setActiveChatId
         );
     };
@@ -247,8 +248,8 @@ export const useScatter = () => {
                         // Auto-execute READ_ONLY tool calls silently (e.g., search)
                         if (response.toolCall && response.toolCall.safetyType === 'READ_ONLY') {
                             await handleExecuteCommand(chatId, msgId, response.toolCall,
-                                (team) => { setTeams(prev => [...prev, team]); dbService.put(STORES_ENUM.GROUPS, team); },
-                                recruitAgent, setActiveChatId
+                                (team) => { setTeams(prev => [...prev, team]); },
+                                addDynamoAgent, setActiveChatId
                             );
                         }
                     }
@@ -294,8 +295,8 @@ export const useScatter = () => {
 
                     if (responseContent.toolCall && responseContent.toolCall.safetyType === 'READ_ONLY') {
                         await handleExecuteCommand(chatId, msgId, responseContent.toolCall,
-                            (team) => { setTeams(prev => [...prev, team]); dbService.put(STORES_ENUM.GROUPS, team); },
-                            recruitAgent, setActiveChatId
+                            (team) => { setTeams(prev => [...prev, team]); },
+                            addDynamoAgent, setActiveChatId
                         );
                     }
                 }
@@ -326,7 +327,7 @@ export const useScatter = () => {
         isProcessing, typingAgent, typingAgents, prismStatus, orchestrationWeights, agentModes,
         handleSendMessage, handleExecuteCommand: _executeCmdProxy,
         processSilentDirective, injectOutputToChat,
-        clearChat, loadChatHistory, recruitAgent, deleteAgent, deleteTeam,
+        clearChat, loadChatHistory, recruitAgent: addDynamoAgent, deleteAgent, deleteTeam,
         createTeam: (data: any) => createTeam(data, setActiveChatId),
         rateLimitInfo,
         // Session Management

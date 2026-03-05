@@ -58,7 +58,7 @@ export interface Agent {
   name: string;
   type: AgentType;
   role: string;
-  jobDescription: string;
+  jobDescription?: string;
   icon: string;
   provider: 'google' | 'openai' | 'anthropic' | 'aws' | 'auto';
   model: string;
@@ -89,6 +89,10 @@ export interface Agent {
     toolId: string;
     endpoints: string[];
   }[];
+  // Backend-sourced fields
+  systemPrompt?: string;
+  blueprint?: any;
+  status?: string;
 }
 
 export interface ToolCall {

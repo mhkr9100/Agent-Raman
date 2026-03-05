@@ -19,6 +19,7 @@ import { useAppStore } from './store/useAppStore';
 import { Agent, GlobalTask, Message, UserProfile } from './types';
 import { AGENTS } from './constants';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { createAgent } from './services/apiV2';
 
 const App: React.FC = () => {
   const {
@@ -54,6 +55,28 @@ const App: React.FC = () => {
       deleteTeam(deleteModalState.id);
     }
     setDeleteModalState({ isOpen: false, id: '', name: '', type: null });
+  };
+
+  // Creates an agent via real backend API, then adds to local state
+  const handleCreateAgentFromModal = async (data: any) => {
+    try {
+      const res = await createAgent({
+        agentName: data.name,
+        agentDescription: data.jobDescription || data.description || `A specialized ${data.role} agent.`,
+        role: data.role,
+        systemPrompt: data.jobDescription || `You are a specialized ${data.role} AI agent. ${data.description || ''}`,
+        icon: data.icon || '🤖',
+        model: {
+          modelId: data.model || 'gemini-2.0-flash',
+          temperature: 0.3
+        },
+        tools: data.capabilities || []
+      });
+      recruitAgent({ ...data, id: res.agentId, name: res.name });
+    } catch (err: any) {
+      console.error('Failed to create agent:', err);
+      alert(`Agent creation failed: ${err.message}`);
+    }
   };
 
   if (isInitializing) {
@@ -132,7 +155,7 @@ const App: React.FC = () => {
                 <ChatView
                   isLoading={isProcessing} typingAgent={typingAgent} typingAgents={typingAgents as any}
                   onSubmit={handleSendMessage}
-                  onAddAgent={recruitAgent} onCreateTeam={(data) => createTeam({ ...data, type: 'rouge' })}
+                  onAddAgent={handleCreateAgentFromModal} onCreateTeam={(data) => createTeam({ ...data, type: 'rouge' })}
                   onExecuteCommand={handleExecuteCommand}
                   onSaveToTasks={handleAddGlobalTask}
                   onInjectSystemMessage={handleInjectSystemMessage}
@@ -226,7 +249,7 @@ const App: React.FC = () => {
       </main>
 
       {createModalType && (
-        <CreateEntityModal isOpen={!!createModalType} type={createModalType === 'agent' ? 'employee' : 'project'} employees={agents} initialValues={createModalInitialValues} onClose={() => { setCreateModalType(null); setCreateModalInitialValues(undefined); }} onCreateEmployee={recruitAgent} onCreateGroup={createTeam} />
+        <CreateEntityModal isOpen={!!createModalType} type={createModalType === 'agent' ? 'employee' : 'project'} employees={agents} initialValues={createModalInitialValues} onClose={() => { setCreateModalType(null); setCreateModalInitialValues(undefined); }} onCreateEmployee={handleCreateAgentFromModal} onCreateGroup={createTeam} />
       )}
 
       {isUserProfileOpen && (
