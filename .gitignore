@@ -32,3 +32,9 @@ dist-ssr
 .npm_cache/
 .aws-sam/
 backend/.aws-sam/
+
+# Secrets — never commit these
+samconfig.toml
+**/samconfig.toml
+*.json.key
+*-service-account*.json
