@@ -94,16 +94,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </select>
           )}
 
-          {/* Chat Interval (+) Button moved to top */}
-          {onStartNewSession && (
-            <button
-              onClick={onStartNewSession}
-              title="Chat Interval / New Session"
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            </button>
-          )}
+
 
           {/* Info Button beside + button */}
           <button

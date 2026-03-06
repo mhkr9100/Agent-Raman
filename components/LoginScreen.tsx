@@ -11,7 +11,7 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister }) => {
-    const [showAuthModal, setShowAuthModal] = useState(false);
+    const [showAuthModal, setShowAuthModal] = useState(true);
     const [authMode, setAuthMode] = useState<'login' | 'signup' | 'otp' | 'forgot_pass_email' | 'forgot_pass_reset'>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');

@@ -132,7 +132,7 @@ export const useScatter = () => {
     };
 
     // === Send Message (Core Orchestration) ===
-    const handleSendMessage = useCallback(async (text: string, responseSteps: number = 1, file?: { data: string, mimeType: string }, searchEnabled?: boolean, createEnabled?: boolean, prismMode?: 'ask' | 'create') => {
+    const handleSendMessage = useCallback(async (text: string, responseSteps: number = 1, file?: { data: string, mimeType: string }, searchEnabled?: boolean, createEnabled?: boolean, prismMode?: 'ask' | 'create', specialAgentContext?: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string }) => {
         const chatId = activeChatId;
         if (!currentUser) return;
 
@@ -225,7 +225,8 @@ export const useScatter = () => {
                     const response = await prismChat({
                         message: text,
                         mode: prismMode || 'ask',
-                        conversationId: activeSessionId || undefined
+                        conversationId: activeSessionId || undefined,
+                        ...(specialAgentContext ? { specialAgentContext } : {})
                     });
 
                     if (response) {
@@ -262,7 +263,8 @@ export const useScatter = () => {
                     const prismRes = await prismChat({
                         message: text,
                         mode: prismMode || 'ask',
-                        conversationId: activeSessionId || undefined
+                        conversationId: activeSessionId || undefined,
+                        ...(specialAgentContext ? { specialAgentContext } : {})
                     });
                     responseContent = {
                         type: 'text',
@@ -317,6 +319,18 @@ export const useScatter = () => {
         }
     }, [currentUser, activeChatId, agents, teams, addMessage, getUserKeys]);
 
+    // === Special Agent → Prism Flow ===
+    const sendSpecialAgentToPrism = useCallback((template: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string }) => {
+        // Switch to Prism chat
+        setActiveChatId('prism-core');
+        // Auto-send create-mode message with special agent context
+        const message = `Personalize and deploy the "${template.name}" agent for me.`;
+        // Small delay to ensure chat switch is rendered
+        setTimeout(() => {
+            handleSendMessage(message, 1, undefined, false, false, 'create', template);
+        }, 100);
+    }, [setActiveChatId, handleSendMessage]);
+
     return {
         currentUser, isInitializing, userProfile: currentUser as UserProfile, setUserProfile: setCurrentUser,
         login, logout,
@@ -329,6 +343,8 @@ export const useScatter = () => {
         createTeam: (data: any) => createTeam(data, setActiveChatId),
         rateLimitInfo,
         // Session Management
-        chatSessions, activeSessionId, startNewSession, resumeSession, getSessionsForEntity
+        chatSessions, activeSessionId, startNewSession, resumeSession, getSessionsForEntity,
+        // Special Agent Flow
+        sendSpecialAgentToPrism
     };
 };

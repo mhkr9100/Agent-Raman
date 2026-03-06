@@ -78,6 +78,13 @@ export interface PrismChatRequest {
     message: string;
     mode: 'ask' | 'route' | 'create';
     conversationId?: string;
+    specialAgentContext?: {
+        name: string;
+        role: string;
+        predefinedPrompt: string;
+        defaultTools: string[];
+        suggestedModel: string;
+    };
 }
 
 export interface PrismChatResponse {
@@ -95,7 +102,8 @@ export async function prismChat(params: PrismChatRequest): Promise<PrismChatResp
             userId: getUserId(),
             message: params.message,
             mode: params.mode,
-            conversationId: params.conversationId || null
+            conversationId: params.conversationId || null,
+            ...(params.specialAgentContext ? { specialAgentContext: params.specialAgentContext } : {})
         });
     } catch (error: any) {
         console.error('API: prismChat failed:', error.message);
