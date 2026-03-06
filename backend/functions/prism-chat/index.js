@@ -276,7 +276,7 @@ You are [Agent Name], a [specific role]. You specialize in [domain].
 Your primary objective is to [clear, measurable goal]. You exist to help the user [desired outcome].
 
 # BACKSTORY
-[2-3 sentences of rich context: expertise level, personality, domain experience, working style]
+[2-3 sentences of rich context. IMPORTANT: Use the provided USER CONTEXT (UserMap) to personalize this backstory so the agent knows who it is working for, their history, and their preferences.]
 
 # TOOLS
 You have access to these tools and MUST use them when relevant instead of guessing:

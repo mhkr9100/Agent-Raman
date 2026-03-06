@@ -18,7 +18,8 @@ import {
     getAgent,
     saveMessage,
     getConversation,
-    getToolById
+    getToolById,
+    getUserMap
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 
@@ -209,14 +210,27 @@ export const handler = async (event) => {
             console.log(`AGENT-RUN: Loaded ${history.length} history messages`);
         }
 
-        // 3. Extract blueprint config
+        // 3. Extract blueprint config & dynamic User Context (UserMap)
         const blueprint = agent.blueprint;
-        const systemPrompt = blueprint.systemPrompt;
+        const baseSystemPrompt = blueprint.systemPrompt;
         const modelId = blueprint.model?.modelId || 'gemini-2.0-flash';
         const temperature = blueprint.model?.temperature ?? 0.3;
 
+        // Fetch LATEST user context (UserMap) to ensure agent stays grounded in current state
+        const userMap = await getUserMap(userId);
+        const userContextString = JSON.stringify(userMap?.context || {}, null, 2);
+
+        // Merge static blueprint prompt with dynamic live user context
+        const systemPrompt = `
+${baseSystemPrompt}
+
+# UPDATED USER CONTEXT (UserMap)
+The following is the current, up-to-date context about the user you are assisting. Use this to personalize your response and stay aligned with their latest goals/preferences:
+${userContextString}
+`.trim();
+
         console.log(`AGENT-RUN: Using model=${modelId}, temperature=${temperature}`);
-        console.log(`AGENT-RUN: System prompt length: ${systemPrompt.length} chars`);
+        console.log(`AGENT-RUN: System prompt length: ${systemPrompt.length} chars (includes dynamic UserMap context)`);
 
         // 4. Resolve tools from ToolRegistry → Gemini functionDeclarations
         const blueprintToolIds = blueprint.tools || [];
@@ -244,87 +258,93 @@ export const handler = async (event) => {
         });
 
         // ═══════════════════════════════════════════════════════════
-        //  ReAct Loop: Thought → Action → Observation → repeat
-        //  (CrewAI / LangGraph / Agno pattern)
+        //  Agent Execution
         // ═══════════════════════════════════════════════════════════
 
         let finalText = '';
         let allToolCalls = [];
         let iteration = 0;
-        let currentMessage = message;
 
-        while (iteration < MAX_REACT_ITERATIONS) {
-            iteration++;
-            console.log(`AGENT-RUN: ═══ ReAct iteration ${iteration}/${MAX_REACT_ITERATIONS} ═══`);
+        if (!hasTools) {
+            // ─── Simple Path: No tools, single AI call (no ReAct loop needed) ───
+            console.log('AGENT-RUN: No tools — single AI call (no ReAct loop)');
+            const aiResult = await callAI({
+                systemPrompt,
+                userMessage: message,
+                history,
+                modelName: modelId,
+                temperature
+            });
+            finalText = aiResult.text;
+            iteration = 1;
+            console.log(`AGENT-RUN: ✅ Response — ${finalText.length} chars`);
+        } else {
+            // ─── ReAct Loop: Thought → Action → Observation → repeat ───
+            //     (CrewAI / LangGraph / Agno pattern)
+            while (iteration < MAX_REACT_ITERATIONS) {
+                iteration++;
+                console.log(`AGENT-RUN: ═══ ReAct iteration ${iteration}/${MAX_REACT_ITERATIONS} ═══`);
 
-            // Call Vertex AI (with or without tools)
-            const aiResult = hasTools
-                ? await callAIWithTools({
+                const aiResult = await callAIWithTools({
                     systemPrompt,
-                    userMessage: iteration === 1 ? currentMessage : null,
+                    userMessage: iteration === 1 ? message : null,
                     history,
                     tools: functionDeclarations,
                     modelName: modelId,
                     temperature
-                })
-                : await callAI({
-                    systemPrompt,
-                    userMessage: currentMessage,
-                    history,
-                    modelName: modelId,
-                    temperature
                 });
 
-            console.log(`AGENT-RUN: AI response — ${aiResult.text.length} chars, ${aiResult.toolCalls.length} tool calls`);
+                const toolCalls = aiResult.toolCalls || [];
+                console.log(`AGENT-RUN: AI response — ${aiResult.text.length} chars, ${toolCalls.length} tool calls`);
 
-            // If no tool calls → this is the final answer
-            if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {
-                finalText = aiResult.text;
-                console.log(`AGENT-RUN: ✅ Final answer received at iteration ${iteration}`);
-                break;
+                // If no tool calls → this is the final answer
+                if (toolCalls.length === 0) {
+                    finalText = aiResult.text;
+                    console.log(`AGENT-RUN: ✅ Final answer received at iteration ${iteration}`);
+                    break;
+                }
+
+                // Tool calls detected → execute each one
+                for (const tc of toolCalls) {
+                    console.log(`AGENT-RUN: 🔧 Tool call: ${tc.name}(${JSON.stringify(tc.args)})`);
+                    allToolCalls.push(tc);
+
+                    const observation = await executeTool(tc.name, tc.args);
+                    console.log(`AGENT-RUN: 📋 Observation: ${observation.substring(0, 200)}...`);
+
+                    // Append the model's response (with tool call) to history
+                    history.push({
+                        role: 'model',
+                        content: aiResult.text || `[Calling tool: ${tc.name}]`
+                    });
+
+                    // Append tool result as "user" message (Observation)
+                    history.push({
+                        role: 'user',
+                        content: `[Tool Result for ${tc.name}]: ${observation}`
+                    });
+
+                    // Save tool observation to conversation for audit trail
+                    await saveMessage({
+                        conversationId: convId,
+                        role: 'user',
+                        content: `[Tool: ${tc.name}] ${observation}`,
+                        agentId,
+                        userId
+                    });
+                }
+
+                // If we also got text alongside tool calls, accumulate it
+                if (aiResult.text) {
+                    finalText += aiResult.text + '\n';
+                }
             }
 
-            // Tool calls detected → execute each one
-            for (const tc of aiResult.toolCalls) {
-                console.log(`AGENT-RUN: 🔧 Tool call: ${tc.name}(${JSON.stringify(tc.args)})`);
-                allToolCalls.push(tc);
-
-                // Execute the tool
-                const observation = await executeTool(tc.name, tc.args);
-                console.log(`AGENT-RUN: 📋 Observation: ${observation.substring(0, 200)}...`);
-
-                // Append the model's response (with tool call) to history
-                history.push({
-                    role: 'model',
-                    content: aiResult.text || `[Calling tool: ${tc.name}]`
-                });
-
-                // Append tool result as user message (Observation)
-                history.push({
-                    role: 'user',
-                    content: `[Tool Result for ${tc.name}]: ${observation}`
-                });
-
-                // Save tool observation to conversation for audit trail
-                await saveMessage({
-                    conversationId: convId,
-                    role: 'user',
-                    content: `[Tool: ${tc.name}] ${observation}`,
-                    agentId,
-                    userId
-                });
+            // Safety: if we ran out of iterations, use whatever text we have
+            if (iteration >= MAX_REACT_ITERATIONS && !finalText) {
+                finalText = `I attempted to use my tools but reached the maximum reasoning depth (${MAX_REACT_ITERATIONS} steps). Here is what I gathered so far:\n\n` +
+                    allToolCalls.map(tc => `- Called **${tc.name}** with ${JSON.stringify(tc.args)}`).join('\n');
             }
-
-            // If we also got text alongside tool calls, accumulate it
-            if (aiResult.text) {
-                finalText += aiResult.text + '\n';
-            }
-        }
-
-        // Safety: if we ran out of iterations, use whatever text we have
-        if (iteration >= MAX_REACT_ITERATIONS && !finalText) {
-            finalText = `I attempted to use my tools but reached the maximum reasoning depth (${MAX_REACT_ITERATIONS} steps). Here is what I gathered so far:\n\n` +
-                allToolCalls.map(tc => `- Called **${tc.name}** with ${JSON.stringify(tc.args)}`).join('\n');
         }
 
         // 6. Save final assistant response
