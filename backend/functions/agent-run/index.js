@@ -216,21 +216,24 @@ export const handler = async (event) => {
         const modelId = blueprint.model?.modelId || 'gemini-2.0-flash';
         const temperature = blueprint.model?.temperature ?? 0.3;
 
-        // Fetch LATEST user context (UserMap) to ensure agent stays grounded in current state
-        const userMap = await getUserMap(userId);
-        const userContextString = JSON.stringify(userMap?.context || {}, null, 2);
-
-        // Merge static blueprint prompt with dynamic live user context
-        const systemPrompt = `
-${baseSystemPrompt}
-
-# UPDATED USER CONTEXT (UserMap)
-The following is the current, up-to-date context about the user you are assisting. Use this to personalize your response and stay aligned with their latest goals/preferences:
-${userContextString}
-`.trim();
+        // Fetch LATEST user context (UserMap) — FAIL-SAFE: if this fails, agent still works
+        let systemPrompt = baseSystemPrompt;
+        try {
+            const userMap = await getUserMap(userId);
+            if (userMap && (userMap.preferences || userMap.orgContext || userMap.agentHistory)) {
+                const contextSnippet = JSON.stringify({
+                    preferences: userMap.preferences || {},
+                    orgContext: userMap.orgContext || {},
+                    agentHistory: userMap.agentHistory || []
+                }, null, 2);
+                systemPrompt = `${baseSystemPrompt}\n\n# UPDATED USER CONTEXT (UserMap)\nThe following is the current, up-to-date context about the user you are assisting. Use this to personalize your response:\n${contextSnippet}`;
+            }
+        } catch (mapErr) {
+            console.warn('AGENT-RUN: ⚠️ UserMap fetch failed (non-fatal, using blueprint prompt only):', mapErr.message);
+        }
 
         console.log(`AGENT-RUN: Using model=${modelId}, temperature=${temperature}`);
-        console.log(`AGENT-RUN: System prompt length: ${systemPrompt.length} chars (includes dynamic UserMap context)`);
+        console.log(`AGENT-RUN: System prompt length: ${systemPrompt.length} chars`);
 
         // 4. Resolve tools from ToolRegistry → Gemini functionDeclarations
         const blueprintToolIds = blueprint.tools || [];
