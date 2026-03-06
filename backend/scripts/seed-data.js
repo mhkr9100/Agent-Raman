@@ -60,38 +60,11 @@ async function putIfNotExists(tableName, keyFields, item) {
 const TOOLS = [
     {
         toolId: 'web-search',
-        name: 'Web Search',
+        name: 'Google Search API',
         type: 'plugin',
         category: 'research',
-        description: 'Search the internet for current info',
+        description: 'Live internet search powered by Google Custom Search API',
         capabilities: ['search', 'fetch_url'],
-        status: 'active'
-    },
-    {
-        toolId: 'slack-notify',
-        name: 'Slack Notifications',
-        type: 'api',
-        category: 'communication',
-        description: 'Send messages to Slack channels',
-        capabilities: ['send_message', 'create_channel'],
-        status: 'active'
-    },
-    {
-        toolId: 'email-sender',
-        name: 'Email Sender',
-        type: 'api',
-        category: 'communication',
-        description: 'Send emails via AWS SES',
-        capabilities: ['send_email', 'send_template'],
-        status: 'active'
-    },
-    {
-        toolId: 'doc-reader',
-        name: 'Document Reader',
-        type: 'plugin',
-        category: 'data',
-        description: 'Read and parse PDF, DOCX, TXT files',
-        capabilities: ['parse_pdf', 'parse_docx', 'extract_text'],
         status: 'active'
     },
     {
@@ -101,24 +74,6 @@ const TOOLS = [
         category: 'analysis',
         description: 'Analyze CSV and JSON data sets',
         capabilities: ['csv_analysis', 'statistics', 'charting'],
-        status: 'active'
-    },
-    {
-        toolId: 'calendar-api',
-        name: 'Calendar Manager',
-        type: 'api',
-        category: 'productivity',
-        description: 'Manage Google Calendar events',
-        capabilities: ['create_event', 'list_events', 'update'],
-        status: 'active'
-    },
-    {
-        toolId: 'code-executor',
-        name: 'Code Executor',
-        type: 'plugin',
-        category: 'development',
-        description: 'Execute Python and JavaScript code safely',
-        capabilities: ['run_python', 'run_javascript'],
         status: 'active'
     }
 ];
@@ -252,34 +207,6 @@ Structured report with: Summary, Key Findings, Details, Sources, Recommendations
         model: { provider: 'google', modelId: 'gemini-2.0-flash', temperature: 0.7 },
         contextSlots: ['CONTENT_TYPE', 'AUDIENCE', 'FORMAT'],
         category: 'content'
-    },
-    {
-        templateId: 'code-assistant',
-        name: 'Code Assistant',
-        description: 'Expert coding agent that writes, reviews, debugs, and explains code in any language',
-        icon: '💻',
-        systemPromptTemplate: `You are a Code Assistant Agent expert in {{LANGUAGES}}.
-
-Your goal is to help with {{TASK_TYPE}} tasks.
-
-## RULES
-### YOU MUST:
-- Write clean, well-commented code
-- Follow best practices for the language
-- Explain your approach before writing code
-- Handle edge cases
-
-### YOU MUST NOT:
-- Write code without explaining it
-- Ignore security best practices
-- Use deprecated functions or libraries
-
-### OUTPUT FORMAT:
-Explanation → Code block → Usage example`,
-        tools: ['code-executor', 'web-search'],
-        model: { provider: 'google', modelId: 'gemini-2.5-pro', temperature: 0.2 },
-        contextSlots: ['LANGUAGES', 'TASK_TYPE'],
-        category: 'development'
     }
 ];
 

@@ -179,7 +179,7 @@ Wrap JSON in \`\`\`json code block.`;
 //  MODE: CREATE — Agent Factory (Blueprint Designer)
 // ═══════════════════════════════════════════════════════════════════
 
-async function handleCreate({ userId, message, conversationId }) {
+async function handleCreate({ userId, message, conversationId, specialAgentContext }) {
     console.log(`PRISM: mode=create, userId=${userId}, conversationId=${conversationId}`);
 
     const convId = conversationId || crypto.randomUUID();
@@ -229,6 +229,23 @@ async function handleCreate({ userId, message, conversationId }) {
     })), null, 2);
 
     // 5. Build system prompt (Tier 1: Structured Persona — CrewAI/Agno pattern)
+    // If specialAgentContext is present, inject it so Prism skips questions
+    const specialAgentBlock = specialAgentContext ? `
+SPECIAL AGENT TEMPLATE (PRE-BUILT BY RAMNAI):
+Name: ${specialAgentContext.name}
+Role: ${specialAgentContext.role}
+Predefined System Prompt:
+${specialAgentContext.predefinedPrompt}
+Default Tools: ${(specialAgentContext.defaultTools || []).join(', ')}
+Suggested Model: ${specialAgentContext.suggestedModel || 'gemini-2.0-flash'}
+
+IMPORTANT: This is a pre-built Special Agent template. The user clicked "Add via Prism" to personalize it. You MUST:
+1. Set blueprintReady: true immediately — do NOT ask clarifying questions.
+2. Use the predefined prompt as the BASE, but ENRICH the BACKSTORY section with the USER CONTEXT below.
+3. Keep the same tools and model from the template unless there is a strong reason to change.
+4. Keep explanation to 2-3 SHORT sentences.
+` : '';
+
     const systemPrompt = `You are Prism, the Meta Agent of RamN AI platform.
 You are an expert AI architect, prompt engineer, and tool strategist.
 
@@ -244,6 +261,7 @@ USER CONTEXT (from their history):
 ${userContext}
 
 ${conversationContext ? `CONVERSATION SO FAR:\n${conversationContext}` : ''}
+${specialAgentBlock}
 
 YOUR PROCESS:
 A. If the objective is vague, ask 1-3 clarifying questions. Do NOT generate a blueprint yet.
@@ -264,7 +282,7 @@ When generating a blueprint, respond with JSON:
     "modelId": "selected model",
     "temperature": number
   },
-  "explanation": "2-3 paragraphs explaining WHY you designed it this way, what tools were chosen and why, what the agent will do step by step, and how it helps the user"
+  "explanation": "2-3 SHORT sentences: what this agent does and why it fits the user. Be concise."
 }
 
 MANDATORY SYSTEM PROMPT FORMAT (the systemPrompt field MUST use this exact structure):
@@ -318,7 +336,7 @@ RULES FOR DESIGNING AGENTS:
 - The systemPrompt MUST follow the structured format above — no exceptions
 - Choose the cheapest model that can handle the task
 - Always include all sections: ROLE, GOAL, BACKSTORY, TOOLS, RULES, OUTPUT FORMAT, SAFETY
-- Explain your choices to convince the user
+- Keep explanations SHORT (2-3 sentences max) — be concise, not verbose
 
 Wrap your entire response in \`\`\`json code block.`;
 
@@ -383,13 +401,13 @@ export const handler = async (event) => {
 
         // 2. Parse body
         const body = JSON.parse(event.body || '{}');
-        const { message, mode, conversationId } = body;
+        const { message, mode, conversationId, specialAgentContext } = body;
 
         // Validate required fields
         if (!message) return respond(400, { error: 'Missing message' });
         if (!mode) return respond(400, { error: 'Missing mode. Must be: ask, route, or create' });
 
-        console.log(`PRISM: ═══ Incoming request ═══ mode=${mode}, userId=${userId}, conversationId=${conversationId || 'new'}`);
+        console.log(`PRISM: ═══ Incoming request ═══ mode=${mode}, userId=${userId}, conversationId=${conversationId || 'new'}, specialAgent=${specialAgentContext?.name || 'none'}`);
 
         // Route to mode handler
         switch (mode) {
@@ -398,7 +416,7 @@ export const handler = async (event) => {
             case 'route':
                 return await handleRoute({ userId, message, conversationId });
             case 'create':
-                return await handleCreate({ userId, message, conversationId });
+                return await handleCreate({ userId, message, conversationId, specialAgentContext });
             default:
                 return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, or create` });
         }

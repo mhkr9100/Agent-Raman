@@ -16,6 +16,13 @@ Parameters:
     Type: String
     Description: Cognito App Client ID
     Default: '77205lmtu8fg6t1s3sgcidf7p9'
+  GoogleSearchApiKey:
+    Type: String
+    Description: Google Custom Search API Key for agent searching
+    NoEcho: true
+  GoogleCseId:
+    Type: String
+    Description: Google Custom Search Engine ID
 
 Globals:
   Function:
@@ -303,6 +310,8 @@ Resources:
           GCP_LOCATION: us-central1
           GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
           TABLE_PREFIX: 'RamN_'
+          GOOGLE_SEARCH_API_KEY: !Ref GoogleSearchApiKey
+          GOOGLE_CSE_ID: !Ref GoogleCseId
       Policies:
         - Statement:
             - Effect: Allow
