@@ -200,7 +200,7 @@ class PgVectorStore {
 async function extractFacts(messages: Array<{ role: string; content: string }>, geminiKey: string): Promise<string[]> {
     const conversationText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
 
-    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${geminiKey}`;
+    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
     const res = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

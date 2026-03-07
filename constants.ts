@@ -239,7 +239,7 @@ Available Tools: googleSearch, thinking, fabricateAgent, fabricateTeam.
 - Use 'fabricateTeam' when the objective requires multiple coordinated agents.`,
         icon: '💎',
         provider: 'google',
-        model: 'gemini-3.0-flash',
+        model: 'gemini-2.5-flash',
         isDeletable: false,
         isSystem: true,
         capabilities: ['googleSearch', 'thinking', 'fabricateAgent', 'fabricateTeam']
@@ -272,7 +272,7 @@ You are a Content Strategist. Your goal is to help users plan, create, and optim
 - Structured content plans with timelines
 - Ready-to-publish copy when requested`,
         defaultTools: ['googleSearch'],
-        suggestedModel: 'gemini-3.0-flash'
+        suggestedModel: 'gemini-2.5-flash'
     },
     {
         id: 'sa-market-analyst',
@@ -298,7 +298,7 @@ You are a Market Analyst. Your goal is to provide actionable business intelligen
 - Data tables and comparisons
 - Strategic recommendations with confidence levels`,
         defaultTools: ['googleSearch'],
-        suggestedModel: 'gemini-3.0-flash'
+        suggestedModel: 'gemini-2.5-flash'
     },
     {
         id: 'sa-data-scientist',
@@ -323,7 +323,7 @@ You are a Data Scientist. Your goal is to analyze data, build predictive models,
 - Python code for data processing or modeling.
 - Statistical breakdowns.`,
         defaultTools: ['googleSearch'],
-        suggestedModel: 'gemini-3.0-pro'
+        suggestedModel: 'gemini-2.5-pro'
     },
     {
         id: 'sa-ui-ux-designer',
@@ -374,7 +374,7 @@ You are a Cyber Security Analyst. Your goal is to identify vulnerabilities, audi
 - Threat models and risk levels (Low/Medium/High/Critical).
 - Remediation steps and secure code snippets.`,
         defaultTools: ['googleSearch'],
-        suggestedModel: 'gemini-3.0-pro'
+        suggestedModel: 'gemini-2.5-pro'
     }
 ];
 
