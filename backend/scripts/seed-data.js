@@ -59,7 +59,7 @@ async function putIfNotExists(tableName, keyFields, item) {
 
 const TOOLS = [
     {
-        toolId: 'web-search',
+        toolId: 'webSearch',
         name: 'Google Search API',
         type: 'plugin',
         category: 'research',
@@ -84,9 +84,9 @@ const TOOLS = [
 
 const MODELS = [
     {
-        modelId: 'gemini-2.0-flash',
+        modelId: 'gemini-2.5-flash',
         provider: 'google',
-        name: 'Gemini 2.0 Flash',
+        name: 'Gemini 2.5 Flash',
         strengths: 'Speed, Directness',
         contextWindow: 1000000,
         costTier: 'low',
@@ -94,9 +94,9 @@ const MODELS = [
         temperature_default: 0.3
     },
     {
-        modelId: 'gemini-2.0-pro-exp-02-05',
+        modelId: 'gemini-2.5-pro',
         provider: 'google',
-        name: 'Gemini 2.0 Pro',
+        name: 'Gemini 2.5 Pro',
         strengths: 'Logic, Coding, Math',
         contextWindow: 1000000,
         costTier: 'high',
@@ -177,7 +177,7 @@ Your goal is to provide comprehensive, accurate research on {{TOPIC}}.
 
 ### OUTPUT FORMAT:
 Structured report with: Summary, Key Findings, Details, Sources, Recommendations`,
-        tools: ['web-search', 'doc-reader'],
+        tools: ['webSearch', 'doc-reader'],
         model: { provider: 'google', modelId: 'gemini-2.5-pro', temperature: 0.3 },
         contextSlots: ['DOMAIN', 'TOPIC'],
         category: 'research'
@@ -203,8 +203,8 @@ Structured report with: Summary, Key Findings, Details, Sources, Recommendations
 
 ### OUTPUT FORMAT:
 {{FORMAT}}`,
-        tools: ['web-search'],
-        model: { provider: 'google', modelId: 'gemini-2.0-flash', temperature: 0.7 },
+        tools: ['webSearch'],
+        model: { provider: 'google', modelId: 'gemini-2.5-flash', temperature: 0.7 },
         contextSlots: ['CONTENT_TYPE', 'AUDIENCE', 'FORMAT'],
         category: 'content'
     }

@@ -63,7 +63,7 @@ export const handler = async (event) => {
         const aiResult = await callAI({
             systemPrompt: EXTRACTION_PROMPT,
             userMessage: `Analyze this conversation and extract facts:\n\n${chatText}`,
-            modelName: 'gemini-2.0-flash-lite',
+            modelName: 'gemini-2.5-flash-lite',
             temperature: 0.1
         });
 

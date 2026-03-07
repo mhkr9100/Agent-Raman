@@ -68,7 +68,7 @@ const App: React.FC = () => {
         systemPrompt: data.jobDescription || `You are a specialized ${data.role} AI agent. ${data.description || ''}`,
         icon: data.icon || '🤖',
         model: {
-          modelId: data.model || 'gemini-2.0-flash',
+          modelId: data.model || 'gemini-3.0-flash',
           temperature: 0.3
         },
         tools: data.capabilities || []
@@ -118,7 +118,7 @@ const App: React.FC = () => {
       role: template.role,
       predefinedPrompt: template.predefinedPrompt,
       defaultTools: template.defaultTools || [],
-      suggestedModel: template.suggestedModel || 'gemini-2.0-flash'
+      suggestedModel: template.suggestedModel || 'gemini-3.0-flash'
     });
   };
 

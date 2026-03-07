@@ -29,7 +29,7 @@ export const useAgentExecution = (
 
         if (toolCall.name === 'fabricateTeam') {
             const squad = toolCall.args.specialists.map((spec: any) => {
-                const newAgent = { ...spec, id: `agent-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, type: 'agent', userId: currentUser?.id, model: spec.modelId || 'gemini-2.5-flash', provider: 'google', isDeletable: true, isSystem: false };
+                const newAgent = { ...spec, id: `agent-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, type: 'agent', userId: currentUser?.id, model: spec.modelId || 'gemini-3.0-flash', provider: 'google', isDeletable: true, isSystem: false };
                 onRecruitAgent(newAgent);
                 return newAgent;
             });
@@ -78,7 +78,7 @@ export const useAgentExecution = (
                     systemPrompt: toolCall.args.jobDescription || toolCall.args.systemPrompt,
                     icon: toolCall.args.icon,
                     model: {
-                        modelId: toolCall.args.modelId || 'gemini-2.5-flash',
+                        modelId: toolCall.args.modelId || 'gemini-3.0-flash',
                         temperature: 0.3
                     },
                     tools: toolCall.args.capabilities || toolCall.args.tools || []
@@ -90,7 +90,7 @@ export const useAgentExecution = (
                     name: res.name,
                     type: 'agent',
                     userId: currentUser?.id,
-                    model: toolCall.args.modelId || 'gemini-2.5-flash',
+                    model: toolCall.args.modelId || 'gemini-3.0-flash',
                     provider: 'google',
                     isDeletable: true,
                     isSystem: false

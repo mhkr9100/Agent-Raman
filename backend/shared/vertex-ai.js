@@ -25,7 +25,7 @@ const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID || 'ramn-ai';
 const GCP_LOCATION = process.env.GCP_LOCATION || 'us-central1';
 const GCP_SERVICE_ACCOUNT_SECRET_ARN = process.env.GCP_SERVICE_ACCOUNT_SECRET_ARN || '';
 
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_TEMPERATURE = 0.3;
 const MAX_RETRIES = 3;
 
@@ -289,9 +289,9 @@ async function sendVertexRequest(payload, modelName) {
                 }
 
                 // If it's 429 and we're out of retries, and we're NOT already on the lite model, try the lite model ONCE
-                if (status === 429 && model !== 'gemini-2.0-flash-lite' && model !== 'gemini-1.5-flash-8b') {
-                    console.warn(`[vertex-ai] 🚨 429 Quota Exhausted for ${model}. Attempting EMERGENCY FALLBACK to gemini-2.0-flash-lite...`);
-                    const fallbackModel = 'gemini-2.0-flash-lite';
+                if (status === 429 && model !== 'gemini-2.5-flash-lite') {
+                    console.warn(`[vertex-ai] 🚨 429 Quota Exhausted for ${model}. Attempting EMERGENCY FALLBACK to gemini-2.5-flash-lite...`);
+                    const fallbackModel = 'gemini-2.5-flash-lite';
                     let fallbackUrl = url;
                     if (sa.apiKey) {
                         fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${sa.apiKey}`;
@@ -352,7 +352,7 @@ async function sendVertexRequest(payload, modelName) {
  * @param {string} params.userMessage - Current user message
  * @param {Array}  [params.history=[]] - Previous messages [{role: 'user'|'model', content: string}]
  * @param {Array}  [params.tools] - Tool definitions for function calling (optional)
- * @param {string} [params.modelName='gemini-2.0-flash'] - Vertex AI model name
+ * @param {string} [params.modelName='gemini-2.5-flash'] - Vertex AI model name
  * @param {number} [params.temperature=0.3] - Temperature for generation
  * 
  * @returns {Promise<{text: string, toolCalls: Array, usage: Object|null}>}
@@ -384,7 +384,7 @@ export async function callAI({
  * @param {string} params.userMessage - Current user message
  * @param {Array}  [params.history=[]] - Previous messages
  * @param {Array}  params.tools - REQUIRED: Tool/function declarations
- * @param {string} [params.modelName='gemini-2.0-flash'] - Model name
+ * @param {string} [params.modelName='gemini-2.5-flash'] - Model name
  * @param {number} [params.temperature=0.3] - Temperature
  * 
  * @returns {Promise<{text: string, toolCalls: Array, usage: Object|null}>}

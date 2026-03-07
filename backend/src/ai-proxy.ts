@@ -214,7 +214,7 @@ async function handleHealth(): Promise<APIGatewayProxyResult> {
 async function handleGenerate(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
     const body = JSON.parse(event.body || '{}');
     const {
-        model = 'gemini-2.0-flash',
+        model = 'gemini-2.5-flash',
         contents,
         systemInstruction,
         tools,

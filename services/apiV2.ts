@@ -59,10 +59,13 @@ async function apiRequest<T>(
             return {} as T; // Return empty to prevent downstream crashes during reload
         }
 
-        const errorData = await response.json().catch(() => ({ error: response.statusText }));
-        const message = errorData.error || errorData.message || `Request failed: ${response.status}`;
-        console.error(`API: ❌ ${method} ${path} → ${response.status}: ${message}`);
-        throw new Error(message);
+        const errorData = await response.json().catch(() => ({ error: response.statusText, message: '' }));
+        const error = errorData.error || `Request failed: ${response.status}`;
+        const detail = errorData.message ? ` — ${errorData.message}` : '';
+        const finalMessage = `${error}${detail}`;
+
+        console.error(`API: ❌ ${method} ${path} → ${response.status}: ${finalMessage}`);
+        throw new Error(finalMessage);
     }
 
     const data = await response.json();

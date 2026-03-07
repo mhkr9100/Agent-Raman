@@ -77,11 +77,11 @@ export const handler = async (event) => {
             userMessage += `\n\nPlease merge the new facts into this existing structure.`;
         }
 
-        // Use gemini-2.0-flash-lite for structuring to save quota
+        // Use gemini-2.5-flash-lite for structuring to save quota
         const aiResult = await callAI({
             systemPrompt: STRUCTURING_PROMPT,
             userMessage,
-            modelName: 'gemini-2.0-flash-lite',
+            modelName: 'gemini-2.5-flash-lite',
             temperature: 0.1
         });
 

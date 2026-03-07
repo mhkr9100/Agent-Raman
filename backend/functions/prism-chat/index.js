@@ -84,7 +84,7 @@ async function handleAsk({ userId, message, conversationId }) {
         systemPrompt,
         userMessage: message,
         history,
-        modelName: 'gemini-2.0-flash',
+        modelName: 'gemini-2.5-flash',
         temperature: 0.3
     });
 
@@ -152,7 +152,7 @@ Wrap JSON in \`\`\`json code block.`;
     const aiResult = await callAI({
         systemPrompt,
         userMessage: message,
-        modelName: 'gemini-2.0-flash',
+        modelName: 'gemini-2.5-flash',
         temperature: 0.3
     });
 
@@ -237,7 +237,7 @@ Role: ${specialAgentContext.role}
 Predefined System Prompt:
 ${specialAgentContext.predefinedPrompt}
 Default Tools: ${(specialAgentContext.defaultTools || []).join(', ')}
-Suggested Model: ${specialAgentContext.suggestedModel || 'gemini-2.0-flash'}
+Suggested Model: ${specialAgentContext.suggestedModel || 'gemini-2.5-flash'}
 
 IMPORTANT: This is a pre-built Special Agent template. The user clicked "Add via Prism" to personalize it. You MUST:
 1. Set blueprintReady: true immediately — do NOT ask clarifying questions.

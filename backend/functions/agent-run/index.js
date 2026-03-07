@@ -92,12 +92,18 @@ async function executeGetCurrentTime(args) {
 
 // Tool executor registry — maps toolId to function
 const TOOL_EXECUTORS = {
+    // Search Tool Aliases
     'googleSearch': executeGoogleSearch,
     'google_search': executeGoogleSearch,
     'webSearch': executeGoogleSearch,
     'web_search': executeGoogleSearch,
+    'web-search': executeGoogleSearch,
+
+    // Calculator Aliases
     'calculator': executeCalculator,
     'math': executeCalculator,
+
+    // Time Tool Aliases
     'getCurrentTime': executeGetCurrentTime,
     'get_current_time': executeGetCurrentTime,
     'datetime': executeGetCurrentTime,
@@ -121,7 +127,7 @@ function toolToFunctionDeclaration(tool) {
     };
 
     // Build parameters schema based on tool type
-    if (tool.toolId === 'googleSearch' || tool.toolId === 'webSearch' || tool.toolId === 'web_search') {
+    if (['googleSearch', 'webSearch', 'web_search', 'web-search'].includes(tool.toolId)) {
         decl.parameters = {
             type: 'OBJECT',
             properties: {
@@ -129,7 +135,7 @@ function toolToFunctionDeclaration(tool) {
             },
             required: ['query']
         };
-    } else if (tool.toolId === 'calculator' || tool.toolId === 'math') {
+    } else if (['calculator', 'math'].includes(tool.toolId)) {
         decl.parameters = {
             type: 'OBJECT',
             properties: {
@@ -137,7 +143,7 @@ function toolToFunctionDeclaration(tool) {
             },
             required: ['expression']
         };
-    } else if (tool.toolId === 'getCurrentTime' || tool.toolId === 'datetime') {
+    } else if (['getCurrentTime', 'datetime', 'get_current_time'].includes(tool.toolId)) {
         decl.parameters = {
             type: 'OBJECT',
             properties: {
@@ -213,7 +219,14 @@ export const handler = async (event) => {
         // 3. Extract blueprint config & dynamic User Context (UserMap)
         const blueprint = agent.blueprint;
         const baseSystemPrompt = blueprint.systemPrompt;
-        const modelId = blueprint.model?.modelId || 'gemini-2.0-flash';
+
+        // Model validation: ensure we don't use invalid placeholder names like gemini-3.0 or gemini-2.0
+        let modelId = blueprint.model?.modelId || 'gemini-2.5-flash';
+        if (modelId.startsWith('gemini-3.0') || modelId.startsWith('gemini-2.0')) {
+            console.warn(`AGENT-RUN: ⚠️ Detected deprecated or invalid model name ${modelId}. Falling back to gemini-2.5-flash`);
+            modelId = 'gemini-2.5-flash';
+        }
+
         const temperature = blueprint.model?.temperature ?? 0.3;
 
         // Fetch LATEST user context (UserMap) — FAIL-SAFE: if this fails, agent still works
@@ -236,18 +249,31 @@ export const handler = async (event) => {
         console.log(`AGENT-RUN: System prompt length: ${systemPrompt.length} chars`);
 
         // 4. Resolve tools from ToolRegistry → Gemini functionDeclarations
-        const blueprintToolIds = blueprint.tools || [];
+        // We handle both legacy agents (tools = array of IDs) and V2 agents (pre-resolved tools or toolIds array)
+        const blueprintTools = blueprint.tools || [];
+        const blueprintToolIds = blueprint.toolIds || [];
         let functionDeclarations = [];
 
-        if (blueprintToolIds.length > 0) {
-            console.log(`AGENT-RUN: Resolving ${blueprintToolIds.length} tools: [${blueprintToolIds.join(', ')}]`);
-            const toolPromises = blueprintToolIds.map(tid => getToolById(tid));
-            const toolRecords = await Promise.all(toolPromises);
-            functionDeclarations = toolRecords
-                .filter(t => t !== null)
-                .map(toolToFunctionDeclaration);
-            console.log(`AGENT-RUN: Resolved ${functionDeclarations.length} function declarations`);
+        console.log(`AGENT-RUN: Resolving tools...`);
+
+        if (blueprintTools.length > 0 && typeof blueprintTools[0] === 'object') {
+            // Case 1: Tools are already resolved objects in the blueprint
+            console.log(`AGENT-RUN: Using ${blueprintTools.length} pre-resolved tool objects from blueprint`);
+            functionDeclarations = blueprintTools.map(toolToFunctionDeclaration);
+        } else {
+            // Case 2: We have IDs, need to fetch from DB
+            const idsToResolve = blueprintToolIds.length > 0 ? blueprintToolIds : blueprintTools;
+            if (idsToResolve.length > 0 && typeof idsToResolve[0] === 'string') {
+                console.log(`AGENT-RUN: Fetching ${idsToResolve.length} tools from registry by ID: [${idsToResolve.join(', ')}]`);
+                const toolPromises = idsToResolve.map(tid => getToolById(tid));
+                const toolRecords = await Promise.all(toolPromises);
+                functionDeclarations = toolRecords
+                    .filter(t => t !== null)
+                    .map(toolToFunctionDeclaration);
+            }
         }
+
+        console.log(`AGENT-RUN: Resolved ${functionDeclarations.length} function declarations`);
 
         const hasTools = functionDeclarations.length > 0;
 

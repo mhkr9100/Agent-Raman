@@ -33,13 +33,15 @@ const docClient = DynamoDBDocumentClient.from(client, {
 
 // ─── Table Names ─────────────────────────────────────────────────
 
+const PREFIX = process.env.TABLE_PREFIX || '';
+
 const TABLES = {
-    AGENTS: 'RamN_Agents',
-    CONVERSATIONS: 'RamN_Conversations',
-    TOOL_REGISTRY: 'RamN_ToolRegistry',
-    SPECIAL_AGENTS: 'RamN_SpecialAgents',
-    USER_MAP: 'RamN_UserMap',
-    MODEL_REGISTRY: 'RamN_ModelRegistry'
+    AGENTS: `${PREFIX}Agents`,
+    CONVERSATIONS: `${PREFIX}Conversations`,
+    TOOL_REGISTRY: `${PREFIX}ToolRegistry`,
+    SPECIAL_AGENTS: `${PREFIX}SpecialAgents`,
+    USER_MAP: `${PREFIX}UserMap`,
+    MODEL_REGISTRY: `${PREFIX}ModelRegistry`
 };
 
 // ─── Error Wrapper ───────────────────────────────────────────────
