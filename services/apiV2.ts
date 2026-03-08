@@ -79,8 +79,12 @@ async function apiRequest<T>(
 
 export interface PrismChatRequest {
     message: string;
-    mode: 'ask' | 'route' | 'create';
+    mode: 'ask' | 'route' | 'create' | 'council';
     conversationId?: string;
+    councilConfig?: {
+        councilModelIds: string[];
+        decisionModelId: string;
+    };
     specialAgentContext?: {
         name: string;
         role: string;
@@ -95,6 +99,13 @@ export interface PrismChatResponse {
     toolCall?: any;
     conversationId: string;
     mode: string;
+    councilTrace?: {
+        requestedCouncilModels: string[];
+        runtimeCouncilModels: string[];
+        requestedDecisionModel: string;
+        runtimeDecisionModel: string;
+        rounds: number;
+    };
     suggestMode?: boolean;
     recommendation?: object;
 }
@@ -106,6 +117,7 @@ export async function prismChat(params: PrismChatRequest): Promise<PrismChatResp
             message: params.message,
             mode: params.mode,
             conversationId: params.conversationId || null,
+            ...(params.councilConfig ? { councilConfig: params.councilConfig } : {}),
             ...(params.specialAgentContext ? { specialAgentContext: params.specialAgentContext } : {})
         });
     } catch (error: any) {

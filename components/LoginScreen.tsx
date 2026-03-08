@@ -155,7 +155,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                             onClick={() => openAuth('signup')}
                             className="group flex items-center justify-center gap-3 px-10 py-5 bg-indigo-600 dark:bg-indigo-500 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl shadow-indigo-500/20 hover:bg-indigo-700 dark:hover:bg-indigo-400 active:scale-[0.98]"
                         >
-                            Initialize Session
+                            Create Account
                             <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>
@@ -235,10 +235,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                     <RamanIcon size={48} />
                                 </div>
                                 <h2 className="text-xl font-black tracking-[0.2em] uppercase text-gray-900 dark:text-white text-center">
-                                    {authMode === 'signup' ? 'Create Workspace' :
+                                    {authMode === 'signup' ? 'Create Account' :
                                         authMode === 'otp' ? 'Verification' :
                                             authMode === 'forgot_pass_email' || authMode === 'forgot_pass_reset' ? 'Account Recovery' :
-                                                'Access Workspace'}
+                                                'Sign In'}
                                 </h2>
                             </div>
 
@@ -399,11 +399,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                     >
                                         {isLoading && <Loader2 size={16} className="animate-spin" />}
                                         {isLoading ? 'Processing...' : (
-                                            authMode === 'signup' ? 'Initialize' :
+                                            authMode === 'signup' ? 'Create Account' :
                                                 authMode === 'otp' ? 'Verify Code' :
-                                                    authMode === 'forgot_pass_email' ? 'Send Code' :
+                                                    authMode === 'forgot_pass_email' ? 'Send Reset Code' :
                                                         authMode === 'forgot_pass_reset' ? 'Reset Password' :
-                                                            'Authenticate'
+                                                            'Sign In'
                                         )}
                                     </button>
                                 </div>
@@ -432,7 +432,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                         }}
                                         className="text-[10px] font-bold text-gray-500 hover:text-gray-900 dark:text-white/40 dark:hover:text-white uppercase tracking-[0.1em] transition-colors"
                                     >
-                                        {authMode === 'signup' ? "Already have account? Log In" : "Need workspace? Create Account"}
+                                        {authMode === 'signup' ? "Already have an account? Sign In" : "Need an account? Create one"}
                                     </button>
                                     {(authMode === 'forgot_pass_email' || authMode === 'forgot_pass_reset') && (
                                         <button

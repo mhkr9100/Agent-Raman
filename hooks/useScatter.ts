@@ -132,7 +132,16 @@ export const useScatter = () => {
     };
 
     // === Send Message (Core Orchestration) ===
-    const handleSendMessage = useCallback(async (text: string, responseSteps: number = 1, file?: { data: string, mimeType: string }, searchEnabled?: boolean, createEnabled?: boolean, prismMode?: 'ask' | 'create', specialAgentContext?: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string }) => {
+    const handleSendMessage = useCallback(async (
+        text: string,
+        responseSteps: number = 1,
+        file?: { data: string, mimeType: string },
+        searchEnabled?: boolean,
+        createEnabled?: boolean,
+        prismMode?: 'ask' | 'create' | 'council',
+        specialAgentContext?: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string },
+        councilConfig?: { councilModelIds: string[]; decisionModelId: string }
+    ) => {
         const chatId = activeChatId;
         if (!currentUser) return;
 
@@ -189,7 +198,7 @@ export const useScatter = () => {
                 ...lastMsg,
                 content: {
                     ...lastMsg.content, type: 'text',
-                    text: `${(lastMsg.content as any).text}\n\n[SYSTEM DIRECTIVE: The user has toggled 'Create Agents'. You MUST analyze the request and immediately use your 'fabricateAgent' tool to deploy the requested specialist. Do NOT just output conversational text.]`
+                    text: `${(lastMsg.content as any).text}\n\n[SYSTEM DIRECTIVE: The user has toggled 'Create Agents'. You MUST analyze the request and output a deployable command. If the user asks for a single specialist, use 'fabricateAgent'. If the user asks for a team/group/squad, use 'fabricateTeam'. Do NOT respond with conversational-only output.]`
                 }
             };
         }
@@ -226,6 +235,7 @@ export const useScatter = () => {
                         message: text,
                         mode: prismMode || 'ask',
                         conversationId: activeSessionId || undefined,
+                        ...(councilConfig ? { councilConfig } : {}),
                         ...(specialAgentContext ? { specialAgentContext } : {})
                     });
 
@@ -264,6 +274,7 @@ export const useScatter = () => {
                         message: text,
                         mode: prismMode || 'ask',
                         conversationId: activeSessionId || undefined,
+                        ...(councilConfig ? { councilConfig } : {}),
                         ...(specialAgentContext ? { specialAgentContext } : {})
                     });
                     responseContent = {

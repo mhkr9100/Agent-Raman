@@ -19,6 +19,38 @@ export interface UserSession {
     name?: string;
 }
 
+const normalizeAuthError = (err: any, fallback: string) => {
+    const raw = (err?.message || err?.code || fallback || 'Authentication failed').toString();
+    const lower = raw.toLowerCase();
+
+    if (lower.includes('user does not exist') || lower.includes('usernotfoundexception')) {
+        return 'No account found for this email.';
+    }
+    if (lower.includes('incorrect username or password') || lower.includes('not authorized')) {
+        return 'Incorrect email or password.';
+    }
+    if (lower.includes('username/client id combination not found')) {
+        return 'No account found for this email.';
+    }
+    if (lower.includes('user is not confirmed')) {
+        return 'Account not verified yet. Please confirm your email code.';
+    }
+    if (lower.includes('code mismatch')) {
+        return 'Invalid verification code.';
+    }
+    if (lower.includes('expiredcodeexception') || lower.includes('expired code')) {
+        return 'Verification code expired. Request a new code.';
+    }
+    if (lower.includes('invalid password')) {
+        return 'Password does not meet security requirements.';
+    }
+    if (lower.includes('limit exceeded')) {
+        return 'Too many attempts. Please wait a moment and try again.';
+    }
+
+    return raw;
+};
+
 export const authService = {
     /**
      * Initializes signup. Will trigger OTP to email.
@@ -35,7 +67,7 @@ export const authService = {
             userPool.signUp(email, password, attributeList, [], (err, result) => {
                 if (err) {
                     console.error("SignUp Error:", err);
-                    reject(new Error(err.message || JSON.stringify(err)));
+                    reject(new Error(normalizeAuthError(err, 'Failed to create account.')));
                     return;
                 }
                 resolve();
@@ -55,7 +87,7 @@ export const authService = {
             cognitoUser.confirmRegistration(otp, true, (err, result) => {
                 if (err) {
                     console.error("OTP Error:", err);
-                    reject(new Error(err.message || JSON.stringify(err)));
+                    reject(new Error(normalizeAuthError(err, 'Failed to verify code.')));
                     return;
                 }
                 resolve();
@@ -75,7 +107,7 @@ export const authService = {
             cognitoUser.resendConfirmationCode((err, result) => {
                 if (err) {
                     console.error("Resend OTP Error:", err);
-                    reject(new Error(err.message || JSON.stringify(err)));
+                    reject(new Error(normalizeAuthError(err, 'Failed to resend verification code.')));
                     return;
                 }
                 resolve();
@@ -97,7 +129,7 @@ export const authService = {
                     resolve();
                 },
                 onFailure: function (err) {
-                    reject(new Error(err.message || JSON.stringify(err)));
+                    reject(new Error(normalizeAuthError(err, 'Unable to start password reset.')));
                 }
             });
         });
@@ -117,7 +149,7 @@ export const authService = {
                     resolve();
                 },
                 onFailure: function (err) {
-                    reject(new Error(err.message || JSON.stringify(err)));
+                    reject(new Error(normalizeAuthError(err, 'Unable to reset password.')));
                 }
             });
         });
@@ -166,7 +198,7 @@ export const authService = {
                 },
                 onFailure: (err) => {
                     console.error("Login Error:", err);
-                    reject(new Error(err.message || JSON.stringify(err)));
+                    reject(new Error(normalizeAuthError(err, 'Sign in failed.')));
                 },
                 newPasswordRequired: (userAttributes, requiredAttributes) => {
                     // Handled if admin creates user, usually not needed for self signup

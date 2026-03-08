@@ -18,7 +18,16 @@ interface ChatViewProps {
   isLoading: boolean;
   typingAgent?: AgentType | null;
   typingAgents?: { agent: AgentType; tasks: any[] }[];
-  onSubmit: (prompt: string, steps: number, file?: { data: string, mimeType: string }, searchEnabled?: boolean, createEnabled?: boolean) => void;
+  onSubmit: (
+    prompt: string,
+    steps: number,
+    file?: { data: string, mimeType: string },
+    searchEnabled?: boolean,
+    createEnabled?: boolean,
+    prismMode?: 'ask' | 'create' | 'council',
+    specialAgentContext?: any,
+    councilConfig?: { councilModelIds: string[]; decisionModelId: string }
+  ) => void;
   onAddAgent: (agentData: Omit<AgentType, 'id' | 'type'>) => void;
   onCreateTeam: (teamData: { name: string, agentIds: string[] }) => void;
   onExecuteCommand?: (messageId: string, toolCall: ToolCall) => void;

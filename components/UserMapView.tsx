@@ -207,7 +207,7 @@ export const UserMapView: React.FC<UserMapViewProps> = ({
                         </div>
                         <h3 className="text-gray-900 dark:text-white font-black text-xl mb-3 z-10 tracking-tight">Empty Context Matrix</h3>
                         <p className="text-gray-500 dark:text-white/50 text-sm max-w-sm leading-relaxed mb-8 z-10">
-                            The UserMap builds a neural profile of your preferences over time. Chat with agents to generate context, then consolidate it here, or configure your profile manually.
+                            The UserMap builds memory from your real conversations. Sync to structure what has already been captured, or edit profile context directly.
                         </p>
                         <div className="flex gap-4 z-10">
                             <button
@@ -215,13 +215,13 @@ export const UserMapView: React.FC<UserMapViewProps> = ({
                                 disabled={isConsolidating}
                                 className="px-6 py-3 bg-indigo-600 dark:bg-indigo-500 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all shadow-lg hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50"
                             >
-                                {isConsolidating ? 'Consolidating...' : 'Force Consolidate'}
+                                {isConsolidating ? 'Consolidating...' : 'Sync Memories'}
                             </button>
                             <button
                                 onClick={onOpenProfile}
                                 className="px-6 py-3 bg-black/5 dark:bg-white/5 text-gray-900 dark:text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all hover:bg-black/10 dark:hover:bg-white/10"
                             >
-                                Manual Profile
+                                Edit Profile Context
                             </button>
                         </div>
                     </div>

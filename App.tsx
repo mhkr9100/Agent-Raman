@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { SideBar } from './components/SideBar';
 import { ChatView } from './components/ChatView';
 import { UserProfileModal } from './components/UserProfileModal';
@@ -10,6 +10,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { HomeView } from './components/HomeView';
 import { UserMapView } from './components/UserMapView';
 import { WelcomeGuideModal } from './components/WelcomeGuideModal';
+import { MemoryImportModal } from './components/MemoryImportModal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { useScatter } from './hooks/useScatter';
@@ -32,7 +33,8 @@ const App: React.FC = () => {
   } = useScatter();
 
   const { globalTasks, updateTaskStatus, deleteTask, updateTask, handleAddGlobalTask } = useTasks(processSilentDirective);
-  const { userMapTree, updateNode, deleteNode, addNode, consolidate, isConsolidating } = useUserMap(currentUser as UserProfile);
+  const { userMapTree, updateNode, deleteNode, addNode, consolidate, isConsolidating, ingestSession, ingestExternalMemory } = useUserMap(currentUser as UserProfile);
+  const chatHistory = useAppStore(state => state.chatHistory);
 
   const [activeView, setActiveView] = useState<'home' | 'prism' | 'spectrum' | 'chats' | 'usermap'>('home');
   const [createModalType, setCreateModalType] = useState<'agent' | 'project' | null>(null);
@@ -42,8 +44,11 @@ const App: React.FC = () => {
   const [isProfileSidebarOpen, setIsProfileSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [isMemoryImportOpen, setIsMemoryImportOpen] = useState(false);
+  const [isMemoryImporting, setIsMemoryImporting] = useState(false);
 
   const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean, id: string, name: string, type: 'Agent' | 'Team' | null }>({ isOpen: false, id: '', name: '', type: null });
+  const ingestedAssistantMessageIdsRef = useRef<Set<string>>(new Set());
 
   const triggerDelete = (id: string, name: string, type: 'Agent' | 'Team') => {
     setDeleteModalState({ isOpen: true, id, name, type });
@@ -136,6 +141,78 @@ const App: React.FC = () => {
   };
 
   const profileData = isPrism ? { type: 'prism' as const, data: AGENTS.PRISM } : (activeTeam ? { type: 'team' as const, data: activeTeam } : (activeAgent ? { type: 'agent' as const, data: activeAgent } : null));
+
+  const extractMessageText = (message: Message | undefined): string => {
+    if (!message) return '';
+    const content: any = message.content || {};
+    return content.text || content.solution || '';
+  };
+
+  useEffect(() => {
+    if (!currentUser || !activeChatId) return;
+    const messages = chatHistory[activeChatId] || [];
+    const last = messages[messages.length - 1];
+    if (!last || last.type !== 'agent') return;
+    if (ingestedAssistantMessageIdsRef.current.has(last.id)) return;
+
+    let latestUserMessage: Message | undefined;
+    for (let i = messages.length - 2; i >= 0; i--) {
+      if (messages[i].type === 'user') {
+        latestUserMessage = messages[i];
+        break;
+      }
+    }
+    if (!latestUserMessage) return;
+
+    const userText = extractMessageText(latestUserMessage).trim();
+    const agentText = extractMessageText(last).trim();
+    if (!userText || !agentText) return;
+
+    ingestedAssistantMessageIdsRef.current.add(last.id);
+    ingestSession(
+      [
+        { role: 'user', content: userText },
+        { role: 'assistant', content: agentText }
+      ],
+      activeAgent?.id
+    );
+  }, [chatHistory, activeChatId, currentUser, ingestSession, activeAgent?.id]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const guideSeen = localStorage.getItem('ramn_seen_welcome_guide') === 'true';
+    const importHandled = localStorage.getItem('ramn_seen_memory_import_prompt') === 'true';
+    if (guideSeen && !importHandled) {
+      setIsMemoryImportOpen(true);
+    }
+  }, [currentUser]);
+
+  const handleWelcomeComplete = useCallback(() => {
+    const importHandled = localStorage.getItem('ramn_seen_memory_import_prompt') === 'true';
+    if (!importHandled) setIsMemoryImportOpen(true);
+  }, []);
+
+  const handleSkipMemoryImport = useCallback(() => {
+    localStorage.setItem('ramn_seen_memory_import_prompt', 'true');
+    setIsMemoryImportOpen(false);
+  }, []);
+
+  const handleImportMemory = useCallback(async (rawText: string) => {
+    setIsMemoryImporting(true);
+    try {
+      const count = await ingestExternalMemory(rawText);
+      if (count > 0) {
+        await consolidate();
+      }
+      localStorage.setItem('ramn_seen_memory_import_prompt', 'true');
+      setIsMemoryImportOpen(false);
+    } catch (err: any) {
+      console.error('External memory import failed:', err);
+      alert(`Memory import failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsMemoryImporting(false);
+    }
+  }, [ingestExternalMemory, consolidate]);
 
   const renderContent = () => {
     switch (activeView) {
@@ -280,7 +357,13 @@ const App: React.FC = () => {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
       />
-      <WelcomeGuideModal onComplete={() => { }} />
+      <WelcomeGuideModal onComplete={handleWelcomeComplete} />
+      <MemoryImportModal
+        isOpen={isMemoryImportOpen}
+        isImporting={isMemoryImporting}
+        onSkip={handleSkipMemoryImport}
+        onImport={handleImportMemory}
+      />
     </div>
   );
 };

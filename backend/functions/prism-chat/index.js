@@ -176,6 +176,152 @@ Wrap JSON in \`\`\`json code block.`;
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  MODE: COUNCIL — Multi-Model Deliberation Framework
+// ═══════════════════════════════════════════════════════════════════
+
+function normalizeCouncilSelection({ councilConfig, availableModels }) {
+    const defaultPanel = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+    const availableIds = new Set((availableModels || []).map(m => m.modelId));
+
+    const requestedPanel = Array.isArray(councilConfig?.councilModelIds)
+        ? councilConfig.councilModelIds.filter(Boolean)
+        : [];
+    const uniquePanel = Array.from(new Set(requestedPanel));
+    const selectedPanel = [...uniquePanel];
+
+    for (const fallbackId of defaultPanel) {
+        if (selectedPanel.length >= 3) break;
+        if (!selectedPanel.includes(fallbackId)) selectedPanel.push(fallbackId);
+    }
+
+    const finalPanel = selectedPanel.slice(0, 3).map(modelId => (
+        availableIds.has(modelId) ? modelId : 'gemini-2.5-pro'
+    ));
+
+    const requestedDecision = councilConfig?.decisionModelId || finalPanel[0] || 'gemini-2.5-pro';
+    const decisionModelId = availableIds.has(requestedDecision) ? requestedDecision : 'gemini-2.5-pro';
+
+    return {
+        requestedPanel: requestedPanel.slice(0, 3),
+        panelModelIds: finalPanel,
+        requestedDecision,
+        decisionModelId
+    };
+}
+
+function runtimeModel(modelId) {
+    // Current shared runtime supports Gemini endpoints directly.
+    return (modelId || '').startsWith('gemini-') ? modelId : 'gemini-2.5-pro';
+}
+
+async function handleCouncil({ userId, message, conversationId, councilConfig }) {
+    console.log(`PRISM: mode=council, userId=${userId}, conversationId=${conversationId}`);
+
+    const convId = conversationId || crypto.randomUUID();
+    const models = await listModels();
+    const userMap = await getUserMap(userId);
+
+    const selection = normalizeCouncilSelection({ councilConfig, availableModels: models });
+
+    const userContext = JSON.stringify({
+        preferences: userMap.preferences || {},
+        agentHistory: userMap.agentHistory || [],
+        orgContext: userMap.orgContext || {}
+    }, null, 2);
+
+    const independentPrompt = `You are a council member in Prism Council mode.
+Provide an independent recommendation for the user request.
+Focus on tradeoffs, risks, and a concrete execution path.
+Keep answer concise, specific, and actionable.
+
+User context:
+${userContext}`;
+
+    const independentOutputs = await Promise.all(
+        selection.panelModelIds.map(async (modelId, index) => {
+            const runtime = runtimeModel(modelId);
+            const result = await callAI({
+                systemPrompt: independentPrompt,
+                userMessage: `Council Seat ${index + 1} — User objective:\n${message}`,
+                modelName: runtime,
+                temperature: 0.3
+            });
+            return {
+                seat: index + 1,
+                requestedModel: modelId,
+                runtimeModel: runtime,
+                output: result.text || ''
+            };
+        })
+    );
+
+    const peerBundle = independentOutputs
+        .map(item => `Seat ${item.seat} (${item.requestedModel})\n${item.output}`)
+        .join('\n\n---\n\n');
+
+    const rebuttalPrompt = `You are a council member revising your recommendation after seeing peer outputs.
+Do three things:
+1) Keep or revise your original stance.
+2) Mention one thing peers got right.
+3) Mention one risk peers underweighted.
+Return a concise final council statement.`;
+
+    const revisedOutputs = await Promise.all(
+        independentOutputs.map(async (item) => {
+            const result = await callAI({
+                systemPrompt: rebuttalPrompt,
+                userMessage: `User objective:\n${message}\n\nPeer drafts:\n${peerBundle}\n\nYour prior draft:\n${item.output}`,
+                modelName: item.runtimeModel,
+                temperature: 0.2
+            });
+            return { ...item, revised: result.text || item.output };
+        })
+    );
+
+    const decisionPrompt = `You are the final decision-maker in Prism Council mode.
+Given three revised council responses, produce one final answer for the user.
+Synthesize agreements, resolve conflicts, and output a single implementation-ready recommendation.
+Be decisive and structured.`;
+
+    const decisionRuntimeModel = runtimeModel(selection.decisionModelId);
+    const revisedBundle = revisedOutputs
+        .map(item => `Seat ${item.seat} (${item.requestedModel})\n${item.revised}`)
+        .join('\n\n---\n\n');
+
+    const decisionResult = await callAI({
+        systemPrompt: decisionPrompt,
+        userMessage: `User objective:\n${message}\n\nRevised council responses:\n${revisedBundle}`,
+        modelName: decisionRuntimeModel,
+        temperature: 0.2
+    });
+
+    let finalText = decisionResult.text || 'Council completed, but no final output was generated.';
+    const usedFallback =
+        selection.panelModelIds.some(m => runtimeModel(m) !== m) ||
+        runtimeModel(selection.decisionModelId) !== selection.decisionModelId;
+    if (usedFallback) {
+        finalText += `\n\n_Note: Non-Gemini selections currently execute on Gemini runtime in this backend deployment._`;
+    }
+
+    await saveMessage({ conversationId: convId, role: 'user', content: message, agentId: null, userId });
+    await saveMessage({ conversationId: convId, role: 'assistant', content: finalText, agentId: null, userId });
+
+    return respond(200, {
+        text: finalText,
+        toolCall: null,
+        conversationId: convId,
+        mode: 'council',
+        councilTrace: {
+            requestedCouncilModels: selection.requestedPanel,
+            runtimeCouncilModels: selection.panelModelIds.map(runtimeModel),
+            requestedDecisionModel: selection.requestedDecision,
+            runtimeDecisionModel: decisionRuntimeModel,
+            rounds: 2
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  MODE: CREATE — Agent Factory (Blueprint Designer)
 // ═══════════════════════════════════════════════════════════════════
 
@@ -241,15 +387,16 @@ Suggested Model: ${specialAgentContext.suggestedModel || 'gemini-2.5-flash'}
 
 IMPORTANT: This is a pre-built Special Agent template. The user clicked "Add via Prism" to personalize it. You MUST:
 1. Set blueprintReady: true immediately — do NOT ask clarifying questions.
-2. Use the predefined prompt as the BASE, but ENRICH the BACKSTORY section with the USER CONTEXT below.
-3. Keep the same tools and model from the template unless there is a strong reason to change.
-4. Keep explanation to 2-3 SHORT sentences.
+2. Set blueprintType: "agent" (do NOT return team blueprints for this flow).
+3. Use the predefined prompt as the BASE, but ENRICH the BACKSTORY section with the USER CONTEXT below.
+4. Keep the same tools and model from the template unless there is a strong reason to change.
+5. Keep explanation to 2-3 SHORT sentences.
 ` : '';
 
     const systemPrompt = `You are Prism, the Meta Agent of RamN AI platform.
 You are an expert AI architect, prompt engineer, and tool strategist.
 
-Your job: Understand the user objective and design an AI Agent Blueprint.
+Your job: Understand the user objective and design either an AI Agent Blueprint or a Team Blueprint.
 
 AVAILABLE TOOLS (select ONLY from these):
 ${toolsJSON}
@@ -270,9 +417,10 @@ A. If the objective is vague, ask 1-3 clarifying questions. Do NOT generate a bl
 B. If you have enough info, generate a blueprint.
    Set blueprintReady: true
 
-When generating a blueprint, respond with JSON:
+When generating a SINGLE AGENT blueprint, respond with JSON:
 {
   "blueprintReady": true,
+  "blueprintType": "agent",
   "agentName": "short descriptive name",
   "agentDescription": "what this agent does",
   "role": "the agent role",
@@ -283,6 +431,27 @@ When generating a blueprint, respond with JSON:
     "temperature": number
   },
   "explanation": "2-3 SHORT sentences: what this agent does and why it fits the user. Be concise."
+}
+
+When generating a TEAM blueprint, respond with JSON:
+{
+  "blueprintReady": true,
+  "blueprintType": "team",
+  "teamName": "short descriptive team name",
+  "objective": "what this team must achieve",
+  "specialists": [
+    {
+      "name": "short agent name",
+      "role": "specialist role",
+      "description": "what this specialist owns",
+      "jobDescription": "<STRUCTURED SYSTEM PROMPT — SEE FORMAT BELOW>",
+      "icon": "single emoji",
+      "capabilities": ["toolId1", "toolId2"],
+      "modelId": "selected model id",
+      "suggestedModel": "human-readable model name"
+    }
+  ],
+  "explanation": "2-3 SHORT sentences: why this team architecture fits."
 }
 
 MANDATORY SYSTEM PROMPT FORMAT (the systemPrompt field MUST use this exact structure):
@@ -337,6 +506,8 @@ RULES FOR DESIGNING AGENTS:
 - Choose the cheapest model that can handle the task
 - Always include all sections: ROLE, GOAL, BACKSTORY, TOOLS, RULES, OUTPUT FORMAT, SAFETY
 - Keep explanations SHORT (2-3 sentences max) — be concise, not verbose
+- If the user explicitly asks for a team/group/squad, return blueprintType: "team"
+- If the user asks for one specialist, return blueprintType: "agent"
 
 Wrap your entire response in \`\`\`json code block.`;
 
@@ -362,6 +533,47 @@ Wrap your entire response in \`\`\`json code block.`;
         }
     }
 
+    const isTeamBlueprint = !!(
+        parsed?.blueprintReady &&
+        (parsed?.blueprintType === 'team' || Array.isArray(parsed?.specialists) || Array.isArray(parsed?.agents))
+    );
+
+    let derivedToolCall = null;
+    if (parsed?.blueprintReady) {
+        if (isTeamBlueprint) {
+            const sourceSpecialists = Array.isArray(parsed.specialists)
+                ? parsed.specialists
+                : (Array.isArray(parsed.agents) ? parsed.agents : []);
+
+            const fallbackIcons = ['🧠', '📊', '✍️', '⚙️', '🔍', '🚀'];
+            const specialists = sourceSpecialists
+                .filter(spec => spec && (spec.name || spec.role))
+                .map((spec, index) => ({
+                    name: spec.name || `Specialist ${index + 1}`,
+                    role: spec.role || 'Specialist',
+                    description: spec.description || spec.agentDescription || `Handles ${spec.role || 'specialized'} tasks.`,
+                    jobDescription: spec.jobDescription || spec.systemPrompt || '',
+                    icon: spec.icon || fallbackIcons[index % fallbackIcons.length],
+                    capabilities: Array.isArray(spec.capabilities) ? spec.capabilities : (Array.isArray(spec.tools) ? spec.tools : []),
+                    modelId: spec.modelId || spec.model?.modelId || 'gemini-2.5-flash',
+                    suggestedModel: spec.suggestedModel || spec.model?.name || spec.modelId || 'gemini-2.5-flash'
+                }));
+
+            if (specialists.length > 0) {
+                derivedToolCall = {
+                    name: 'fabricateTeam',
+                    args: {
+                        teamName: parsed.teamName || parsed.name || 'Task Force',
+                        objective: parsed.objective || parsed.teamObjective || parsed.agentDescription || message,
+                        specialists
+                    }
+                };
+            }
+        } else {
+            derivedToolCall = { name: 'fabricateAgent', args: parsed };
+        }
+    }
+
     // 8. Save messages using the extracted conversational text
     await saveMessage({ conversationId: convId, role: 'user', content: message, agentId: null, userId });
     await saveMessage({
@@ -377,7 +589,7 @@ Wrap your entire response in \`\`\`json code block.`;
     // 9. Return
     return respond(200, {
         text: conversationalText,
-        toolCall: aiResult.toolCalls?.[0] || (parsed?.blueprintReady ? { name: 'fabricateAgent', args: parsed } : null),
+        toolCall: aiResult.toolCalls?.[0] || derivedToolCall,
         conversationId: convId,
         mode: 'create'
     });
@@ -401,11 +613,11 @@ export const handler = async (event) => {
 
         // 2. Parse body
         const body = JSON.parse(event.body || '{}');
-        const { message, mode, conversationId, specialAgentContext } = body;
+        const { message, mode, conversationId, specialAgentContext, councilConfig } = body;
 
         // Validate required fields
         if (!message) return respond(400, { error: 'Missing message' });
-        if (!mode) return respond(400, { error: 'Missing mode. Must be: ask, route, or create' });
+        if (!mode) return respond(400, { error: 'Missing mode. Must be: ask, route, create, or council' });
 
         console.log(`PRISM: ═══ Incoming request ═══ mode=${mode}, userId=${userId}, conversationId=${conversationId || 'new'}, specialAgent=${specialAgentContext?.name || 'none'}`);
 
@@ -417,8 +629,10 @@ export const handler = async (event) => {
                 return await handleRoute({ userId, message, conversationId });
             case 'create':
                 return await handleCreate({ userId, message, conversationId, specialAgentContext });
+            case 'council':
+                return await handleCouncil({ userId, message, conversationId, councilConfig });
             default:
-                return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, or create` });
+                return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, create, or council` });
         }
 
     } catch (error) {

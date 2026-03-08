@@ -104,6 +104,49 @@ export const useUserMap = (currentUser: UserProfile | null) => {
         }
     }, [currentUser, userMapTree, saveTree]);
 
+    const persistFacts = useCallback(async (facts: string[], agentId?: string, source: string = 'chat') => {
+        if (!currentUser || facts.length === 0) return 0;
+        const timestamp = Date.now();
+        const BACKEND_URL = import.meta.env.VITE_API_V2_URL || import.meta.env.VITE_BACKEND_URL || '';
+
+        let storedCount = 0;
+        for (const fact of facts) {
+            const cleaned = (fact || '').trim();
+            if (!cleaned) continue;
+
+            const id = `mem_${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
+
+            await dbService.put(STORES_ENUM.MEMORIES, {
+                id,
+                userId: currentUser.id,
+                agentId,
+                source,
+                content: cleaned,
+                createdAt: new Date().toISOString()
+            });
+            storedCount += 1;
+
+            if (BACKEND_URL) {
+                const token = localStorage.getItem('auth_token');
+                const headers: any = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                fetch(`${BACKEND_URL}/api/memory/add`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        userId: currentUser.id,
+                        agentId,
+                        content: cleaned,
+                        category: source === 'external-import' ? 'profile' : 'general'
+                    })
+                }).catch(e => console.error('[AWS Memory Sync Error]', e));
+            }
+        }
+
+        return storedCount;
+    }, [currentUser]);
+
     // Ingest current chat session into memory — extract facts via API, store in IndexedDB
     const ingestSession = useCallback(async (messages: Array<{ role: string; content: string }>, agentId?: string) => {
         if (!currentUser) return;
@@ -114,53 +157,39 @@ export const useUserMap = (currentUser: UserProfile | null) => {
             // Send messages to backend to extract facts
             const res = await extractMemory({ messages });
             const facts: string[] = res.facts || [];
-
-            if (facts.length > 0) {
-                const timestamp = Date.now();
-                const BACKEND_URL = import.meta.env.VITE_API_V2_URL || import.meta.env.VITE_BACKEND_URL || '';
-
-                for (const fact of facts) {
-                    const id = `mem_${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
-
-                    // 1. Store locally
-                    await dbService.put(STORES_ENUM.MEMORIES, {
-                        id,
-                        userId: currentUser.id,
-                        agentId,
-                        content: fact,
-                        createdAt: new Date().toISOString()
-                    });
-
-                    // 2. Push to AWS Long-Term Memory (vector DB)
-                    // Note: This matches the old behavior where the frontend directly pushed things into long-term memory
-                    if (BACKEND_URL) {
-                        const token = localStorage.getItem('auth_token');
-                        const headers: any = { 'Content-Type': 'application/json' };
-                        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                        // Warning: this path /api/memory/add is currently from V1
-                        // Consider migrating to V2 if /api/memory/add hasn't been migrated
-                        fetch(`${BACKEND_URL}/api/memory/add`, {
-                            method: 'POST',
-                            headers,
-                            body: JSON.stringify({
-                                userId: currentUser.id,
-                                agentId,
-                                content: fact
-                            })
-                        }).catch(e => console.error('[AWS Memory Sync Error]', e));
-                    }
-                }
-            }
+            await persistFacts(facts, agentId, 'chat');
         } catch (e) {
             console.error('Memory ingestion failed:', e);
         }
-    }, [currentUser]);
+    }, [currentUser, persistFacts]);
+
+    const ingestExternalMemory = useCallback(async (rawText: string) => {
+        if (!currentUser) return 0;
+
+        const codeBlockMatch = rawText.match(/```[\w-]*\s*([\s\S]*?)```/);
+        const body = (codeBlockMatch ? codeBlockMatch[1] : rawText)
+            .replace(/\r/g, '\n')
+            .trim();
+
+        const lines = body
+            .split('\n')
+            .map(line => line.trim())
+            .filter(Boolean)
+            .filter(line => !line.startsWith('#'))
+            .filter(line => !/^[-*]\s*$/.test(line));
+
+        const normalized = lines
+            .map(line => line.replace(/^\d+\.\s+/, '').trim())
+            .filter(line => line.length >= 8)
+            .slice(0, 200);
+
+        return persistFacts(normalized, undefined, 'external-import');
+    }, [currentUser, persistFacts]);
 
     return {
         userMapTree, setUserMapTree: saveTree,
         isLoading, isConsolidating,
         updateNode, deleteNode, addNode,
-        consolidate, ingestSession
+        consolidate, ingestSession, ingestExternalMemory
     };
 };

@@ -95,7 +95,13 @@ export const WelcomeGuideModal: React.FC<WelcomeGuideModalProps> = ({ onComplete
                         ))}
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleComplete}
+                            className="px-3 h-10 rounded-xl border border-black/10 dark:border-white/10 text-[10px] font-black uppercase tracking-[0.1em] text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white transition-colors"
+                        >
+                            Skip
+                        </button>
                         {step > 0 && (
                             <button
                                 onClick={() => setStep(s => s - 1)}

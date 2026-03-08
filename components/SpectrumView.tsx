@@ -21,14 +21,18 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [specialAgents, setSpecialAgents] = useState<any[]>(SPECIAL_AGENT_TEMPLATES);
-    const [filter, setFilter] = useState<'all' | 'agents' | 'groups' | 'special'>('all');
 
     useEffect(() => {
         (async () => {
             try {
                 const res = await listSpecialAgents();
                 if (res.templates && res.templates.length > 0) {
-                    setSpecialAgents(res.templates);
+                    const normalized = res.templates.map((template: any) => ({
+                        ...template,
+                        id: template.id || template.templateId,
+                        defaultTools: template.defaultTools || []
+                    }));
+                    setSpecialAgents(normalized);
                 }
             } catch (err) {
                 console.warn('[SpectrumView] Failed to load special agents from API, using fallback:', err);
@@ -61,13 +65,13 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                         onClick={() => scrollToSection(0)}
                         className="px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
                     >
-                        Roster
+                        Agents
                     </button>
                     <button
                         onClick={() => scrollToSection(1)}
                         className="px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
                     >
-                        Tools
+                        Capabilities
                     </button>
                     <button
                         onClick={() => scrollToSection(2)}
@@ -82,60 +86,32 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                 ref={scrollContainerRef}
                 className="flex-1 flex overflow-x-auto snap-x snap-mandatory custom-scrollbar scroll-smooth"
             >
-                {/* SECTION 1: ROSTER (Unified View) */}
+                {/* SECTION 1: AGENTS (User + Special) */}
                 <div className="min-w-full snap-start p-8 overflow-y-auto custom-scrollbar">
                     <div className="max-w-5xl mx-auto">
                         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
-                                <h3 className="text-xs font-black text-gray-500 dark:text-white/40 uppercase tracking-[0.3em]">Entity Roster</h3>
+                                <h3 className="text-xs font-black text-gray-500 dark:text-white/40 uppercase tracking-[0.3em]">Agents Interface</h3>
                                 <div className="h-px w-12 bg-black/10 dark:bg-white/5 hidden md:block" />
-                            </div>
-
-                            {/* Filter Pills */}
-                            <div className="flex gap-2 p-1 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5 overflow-x-auto custom-scrollbar shrink-0">
-                                {(['all', 'agents', 'groups', 'special'] as const).map(f => (
-                                    <button
-                                        key={f}
-                                        onClick={() => setFilter(f)}
-                                        className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-white dark:bg-[#2A2A2A] text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-white/40 hover:text-gray-800 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
-                                    >
-                                        {f}
-                                    </button>
-                                ))}
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max items-start">
+                            <button
+                                onClick={onFabricateAgent}
+                                className="h-[104px] flex flex-col items-center justify-center gap-2 bg-white/50 dark:bg-white/[0.02] border border-dashed border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 rounded-2xl p-4 group transition-all"
+                            >
+                                <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-gray-400 dark:text-white/40 group-hover:bg-gray-900 dark:group-hover:bg-white group-hover:text-white dark:group-hover:text-black transition-all text-xl font-bold">+</div>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Custom Agent</span>
+                            </button>
 
-                            {/* Create Actions — visible mostly in ALL or AGENTS/GROUPS filters */}
-                            {(filter === 'all' || filter === 'agents') && (
-                                <button
-                                    onClick={onFabricateAgent}
-                                    className="h-[104px] flex flex-col items-center justify-center gap-2 bg-white/50 dark:bg-white/[0.02] border border-dashed border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 rounded-2xl p-4 group transition-all"
-                                >
-                                    <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-gray-400 dark:text-white/40 group-hover:bg-gray-900 dark:group-hover:bg-white group-hover:text-white dark:group-hover:text-black transition-all text-xl font-bold">+</div>
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Custom Agent</span>
-                                </button>
-                            )}
-
-                            {(filter === 'all' || filter === 'groups') && (
-                                <button
-                                    onClick={onInitializeGroup}
-                                    className="h-[104px] flex flex-col items-center justify-center gap-2 bg-white/50 dark:bg-white/[0.02] border border-dashed border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 rounded-2xl p-4 group transition-all"
-                                >
-                                    <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-gray-400 dark:text-white/40 group-hover:bg-gray-900 dark:group-hover:bg-white group-hover:text-white dark:group-hover:text-black transition-all text-xl font-bold">⬡</div>
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Create Group</span>
-                                </button>
-                            )}
-
-                            {/* User Agents */}
-                            {(filter === 'all' || filter === 'agents') && userAgents.map(agent => (
+                            {userAgents.map(agent => (
                                 <ListItem
                                     key={agent.id}
                                     icon={agent.icon}
                                     name={agent.name}
                                     sub={agent.role}
-                                    tagline={agent.jobDescription.slice(0, 80) + '...'}
+                                    tagline={agent.jobDescription ? `${agent.jobDescription.slice(0, 80)}...` : 'Custom specialist agent.'}
                                     onClick={() => onOpenChat(agent.id)}
                                     isExpanded={expandedId === agent.id}
                                     onToggleExpand={() => setExpandedId(expandedId === agent.id ? null : agent.id)}
@@ -143,24 +119,7 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                                 />
                             ))}
 
-                            {/* User Groups */}
-                            {(filter === 'all' || filter === 'groups') && userTeams.map(team => (
-                                <ListItem
-                                    key={team.id}
-                                    icon="⬡"
-                                    name={team.name}
-                                    sub="Group Command"
-                                    tagline={team.description || "No objective defined."}
-                                    onClick={() => onOpenChat(team.id)}
-                                    isExpanded={expandedId === team.id}
-                                    onToggleExpand={() => setExpandedId(expandedId === team.id ? null : team.id)}
-                                    viewType="grid"
-                                    teamSize={team.agents.length}
-                                />
-                            ))}
-
-                            {/* Special Agents (Templates) */}
-                            {(filter === 'all' || filter === 'special') && specialAgents.map(template => (
+                            {specialAgents.map(template => (
                                 <ListItem
                                     key={template.id}
                                     icon={template.icon}
@@ -175,12 +134,42 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                                     tools={template.defaultTools}
                                 />
                             ))}
+                        </div>
 
+                        <div className="mt-10 mb-4 flex items-center justify-between">
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500 dark:text-white/40">Teams Interface</h4>
+                            <button
+                                onClick={onInitializeGroup}
+                                className="px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-[9px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 transition-all"
+                            >
+                                Create Team
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max items-start">
+                            {userTeams.map(team => (
+                                <ListItem
+                                    key={team.id}
+                                    icon="⬡"
+                                    name={team.name}
+                                    sub="Team Command"
+                                    tagline={team.description || "No objective defined."}
+                                    onClick={() => onOpenChat(team.id)}
+                                    isExpanded={expandedId === team.id}
+                                    onToggleExpand={() => setExpandedId(expandedId === team.id ? null : team.id)}
+                                    viewType="grid"
+                                    teamSize={team.agents.length}
+                                />
+                            ))}
+                            {userTeams.length === 0 && (
+                                <div className="col-span-full p-6 rounded-2xl border border-dashed border-black/10 dark:border-white/10 text-center text-[10px] text-gray-500 dark:text-white/40 uppercase tracking-[0.15em]">
+                                    No Teams Yet
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* SECTION 2: TOOLS */}
+                {/* SECTION 2: CAPABILITIES */}
                 <div className="min-w-full snap-start p-8 overflow-y-auto custom-scrollbar">
                     <ToolsView />
                 </div>

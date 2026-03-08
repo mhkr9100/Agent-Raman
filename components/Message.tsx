@@ -161,7 +161,7 @@ const CommandProposal: React.FC<{
                         onClick={handleDeploy}
                         className="w-full py-2.5 bg-white hover:bg-slate-100 text-black text-[9px] font-black uppercase tracking-[0.2em] rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
                     >
-                        <span>Deploy Agent</span>
+                        <span>{isSquad ? 'Deploy Team' : 'Deploy Agent'}</span>
                         <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </button>
                 )}
