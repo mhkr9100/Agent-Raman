@@ -85,20 +85,6 @@ const App: React.FC = () => {
     }
   };
 
-  if (isInitializing) {
-    return (
-      <div className="h-screen w-screen bg-[#F8F9FA] dark:bg-[#1A1A1A] flex items-center justify-center transition-colors duration-300">
-        <div className="text-gray-900 dark:text-white font-bold animate-pulse uppercase tracking-[0.5em] text-xs">
-          Initializing RamN AI...
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentUser) {
-    return <LoginScreen onLogin={login} />;
-  }
-
   const activeTeam = teams.find(g => g.id === activeChatId);
   const activeAgent = agents.find(e => e.id === activeChatId);
   const isPrism = activeChatId === 'prism-core';
@@ -213,6 +199,20 @@ const App: React.FC = () => {
       setIsMemoryImporting(false);
     }
   }, [ingestExternalMemory, consolidate]);
+
+  if (isInitializing) {
+    return (
+      <div className="h-screen w-screen bg-[#F8F9FA] dark:bg-[#1A1A1A] flex items-center justify-center transition-colors duration-300">
+        <div className="text-gray-900 dark:text-white font-bold animate-pulse uppercase tracking-[0.5em] text-xs">
+          Initializing RamN AI...
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <LoginScreen onLogin={login} />;
+  }
 
   const renderContent = () => {
     switch (activeView) {
