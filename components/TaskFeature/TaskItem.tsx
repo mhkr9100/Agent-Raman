@@ -34,7 +34,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
     const statusColors = {
         scheduled: 'bg-slate-900 border-white/10 text-slate-400',
-        processing: 'bg-blue-900/20 border-blue-500/30 text-blue-400 animate-pulse',
+        processing: 'bg-white/5 border-white/20 text-slate-300 animate-pulse',
         done: 'bg-green-900/20 border-green-500/30 text-green-400',
         'not-done': 'bg-red-900/20 border-red-500/30 text-red-400'
     };
@@ -65,14 +65,14 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                         <div className="absolute right-0 top-full mt-1 w-40 bg-[#0f0f0f] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-100">
                             <button
                                 onClick={() => { onView(task); setShowMenu(false); }}
-                                className="w-full text-left px-4 py-2.5 text-[10px] text-slate-300 hover:bg-blue-600 hover:text-white transition font-bold uppercase tracking-wider flex items-center gap-2"
+                                className="w-full text-left px-4 py-2.5 text-[10px] text-slate-300 hover:bg-white/10 hover:text-white transition font-bold uppercase tracking-wider flex items-center gap-2"
                             >
                                 <span>👁</span> View Directive
                             </button>
                             {!isLiveTask && (
                                 <button
                                     onClick={() => { onEdit(task); setShowMenu(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-[10px] text-slate-300 hover:bg-blue-600 hover:text-white transition font-bold uppercase tracking-wider border-t border-white/5 flex items-center gap-2"
+                                    className="w-full text-left px-4 py-2.5 text-[10px] text-slate-300 hover:bg-white/10 hover:text-white transition font-bold uppercase tracking-wider border-t border-white/5 flex items-center gap-2"
                                 >
                                     <span>✎</span> Update Task
                                 </button>
@@ -94,15 +94,15 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
             {task.status === 'processing' && (
                 <div className="flex items-center gap-2 py-2">
-                    <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-[10px] text-blue-400 font-mono animate-pulse uppercase tracking-tighter">Synthesizing Directive...</span>
+                    <div className="w-3 h-3 border-2 border-white/40 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-[10px] text-slate-300 font-mono animate-pulse uppercase tracking-tighter">Synthesizing Directive...</span>
                 </div>
             )}
 
             {task.output && (
                 <div className="mt-2 p-1.5 bg-transparent rounded-lg border border-white/5 space-y-2">
                     <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Synthesis Output</span>
+                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Synthesis Output</span>
                         <button
                             onClick={() => setShowOutput(!showOutput)}
                             className="text-[9px] text-slate-500 hover:text-white underline font-bold"
@@ -112,7 +112,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                     </div>
 
                     {showOutput && (
-                        <div className="p-2 text-[10px] text-slate-400 font-mono leading-relaxed max-h-48 overflow-y-auto custom-scrollbar whitespace-pre-wrap italic border-l-2 border-blue-500/30 pl-3">
+                        <div className="p-2 text-[10px] text-slate-400 font-mono leading-relaxed max-h-48 overflow-y-auto custom-scrollbar whitespace-pre-wrap italic border-l-2 border-white/20 pl-3">
                             {task.output}
                         </div>
                     )}
@@ -122,7 +122,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             {!task.output && task.isRecurring && task.status !== 'processing' && (
                 <div className="flex items-center gap-2 pt-1">
                     <span className="text-[9px] text-slate-600 uppercase font-bold flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"></span>
                         Recurring Automation
                     </span>
                 </div>

@@ -16,7 +16,7 @@ interface UserMapViewProps {
     onDeleteNode: (nodeId: string) => void;
     onAddNode: (parentId: string, newNode: PageNode) => void;
     onConsolidate: () => void;
-    onOpenProfile: () => void;
+    onImportContext: () => void;
 }
 
 // Recursive tree node component
@@ -157,7 +157,7 @@ const TreeNode: React.FC<{
 };
 
 export const UserMapView: React.FC<UserMapViewProps> = ({
-    tree, isConsolidating, onUpdateNode, onDeleteNode, onAddNode, onConsolidate, onOpenProfile
+    tree, isConsolidating, onUpdateNode, onDeleteNode, onAddNode, onConsolidate, onImportContext
 }) => {
     const isEmpty = tree.children.length === 0;
 
@@ -176,52 +176,61 @@ export const UserMapView: React.FC<UserMapViewProps> = ({
                         <p className="text-[8px] text-gray-500 dark:text-white/30 uppercase tracking-wider">Neural Map</p>
                     </div>
                 </div>
-                <button
-                    onClick={onConsolidate}
-                    disabled={isConsolidating}
-                    className="px-4 py-2 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-white/60 text-[9px] font-black uppercase tracking-widest hover:bg-black/5 dark:hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                    {isConsolidating ? (
-                        <>
-                            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
-                            Consolidating...
-                        </>
-                    ) : (
-                        <>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
-                            Consolidate
-                        </>
-                    )}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={onImportContext}
+                        className="px-4 py-2 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-white/60 text-[9px] font-black uppercase tracking-widest hover:bg-black/5 dark:hover:bg-white/10 transition-all flex items-center gap-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0 4.142-3.358 7.5-7.5 7.5S4.5 16.142 4.5 12 7.858 4.5 12 4.5m0 0v4.5m0-4.5h4.5" /></svg>
+                        Import Context
+                    </button>
+                    <button
+                        onClick={onConsolidate}
+                        disabled={isConsolidating}
+                        className="px-4 py-2 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-white/60 text-[9px] font-black uppercase tracking-widest hover:bg-black/5 dark:hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {isConsolidating ? (
+                            <>
+                                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                                Consolidating...
+                            </>
+                        ) : (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+                                Sync Memories
+                            </>
+                        )}
+                    </button>
+                </div>
             </header>
 
             {/* Tree Content */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                 {isEmpty ? (
                     <div className="flex flex-col items-center justify-center h-full text-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-500/5 via-transparent to-transparent pointer-events-none" />
-                        <div className="w-20 h-20 rounded-3xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center mb-6 border border-indigo-100 dark:border-indigo-500/20 shadow-inner z-10">
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-black/5 via-transparent to-transparent dark:from-white/5 pointer-events-none" />
+                        <div className="w-20 h-20 rounded-3xl bg-black/5 dark:bg-white/10 text-gray-700 dark:text-white/70 flex items-center justify-center mb-6 border border-black/10 dark:border-white/10 shadow-inner z-10">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
                             </svg>
                         </div>
                         <h3 className="text-gray-900 dark:text-white font-black text-xl mb-3 z-10 tracking-tight">Empty Context Matrix</h3>
                         <p className="text-gray-500 dark:text-white/50 text-sm max-w-sm leading-relaxed mb-8 z-10">
-                            The UserMap builds memory from your real conversations. Sync to structure what has already been captured, or edit profile context directly.
+                            The UserMap builds memory from your real conversations. Sync to structure what has already been captured, or import context from your other AI tools anytime.
                         </p>
                         <div className="flex gap-4 z-10">
                             <button
                                 onClick={onConsolidate}
                                 disabled={isConsolidating}
-                                className="px-6 py-3 bg-indigo-600 dark:bg-indigo-500 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all shadow-lg hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50"
+                                className="px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all shadow-lg hover:bg-black dark:hover:bg-white/90 disabled:opacity-50"
                             >
                                 {isConsolidating ? 'Consolidating...' : 'Sync Memories'}
                             </button>
                             <button
-                                onClick={onOpenProfile}
+                                onClick={onImportContext}
                                 className="px-6 py-3 bg-black/5 dark:bg-white/5 text-gray-900 dark:text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all hover:bg-black/10 dark:hover:bg-white/10"
                             >
-                                Edit Profile Context
+                                Import Context
                             </button>
                         </div>
                     </div>

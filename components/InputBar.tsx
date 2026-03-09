@@ -216,7 +216,7 @@ ${sections.join('\n\n')}
   };
 
   const PRISM_MODES: { key: PrismMode; label: string; icon: string; color: string; activeColor: string }[] = [
-    { key: 'ask', label: 'Ask Prism', icon: '💎', color: 'hover:border-indigo-500/30 hover:text-white', activeColor: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.3)]' },
+    { key: 'ask', label: 'Ask Prism', icon: '△', color: 'hover:border-black/20 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white', activeColor: 'bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white border-black/20 dark:border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.12)] dark:shadow-[0_0_10px_rgba(255,255,255,0.08)]' },
     { key: 'create', label: 'Create Agents', icon: '⚡', color: 'hover:border-emerald-500/30 hover:text-white', activeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' },
     { key: 'council', label: 'Council', icon: '🏛️', color: 'hover:border-amber-500/30 hover:text-white', activeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]' },
   ];

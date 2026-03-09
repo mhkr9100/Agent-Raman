@@ -221,7 +221,7 @@ const App: React.FC = () => {
       case 'spectrum':
         return <SpectrumView onHire={handleHireFromSpectrum} onAddViaPrism={handleAddSpecialAgentViaPrism} onFabricateAgent={() => setCreateModalType('agent')} onInitializeGroup={() => setCreateModalType('project')} onOpenChat={(id) => { setActiveChatId(id); setActiveView('chats'); }} agents={agents} teams={teams} userProfile={userProfile} />;
       case 'usermap':
-        return <UserMapView tree={userMapTree} isConsolidating={isConsolidating} onUpdateNode={updateNode} onDeleteNode={deleteNode} onAddNode={addNode} onConsolidate={consolidate} onOpenProfile={() => setIsUserProfileOpen(true)} />;
+        return <UserMapView tree={userMapTree} isConsolidating={isConsolidating} onUpdateNode={updateNode} onDeleteNode={deleteNode} onAddNode={addNode} onConsolidate={consolidate} onImportContext={() => setIsMemoryImportOpen(true)} />;
 
       default:
         // Automatically deselect Prism if we are supposed to be in 'chats' view and Prism is still active

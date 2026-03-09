@@ -65,6 +65,11 @@ class DBService {
         return db[storeName as keyof RamNDatabase] as Table<any, string>;
     }
 
+    private filterByUser<T extends Record<string, any>>(items: T[], userId?: string): T[] {
+        if (!userId) return items;
+        return items.filter(item => !item?.userId || item.userId === userId);
+    }
+
     private getAuthHeaders(): Record<string, string> {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         const token = localStorage.getItem('auth_token');
@@ -165,11 +170,17 @@ class DBService {
                         const data = await res.json();
                         const items = data.items || [];
                         if (items.length > 0) {
-                            // Refresh local cache
-                            await this.getTable(storeName).clear();
+                            // Upsert cloud items into local cache without destructive clears.
                             await this.getTable(storeName).bulkPut(items.map((i: any) => ({ ...i, id: i.id || i.originalId })));
+                            return this.filterByUser(items as T[], userId);
                         }
-                        return items as T[];
+
+                        // Cloud can be temporarily empty; preserve local continuity.
+                        const localItems = await this.getTable(storeName).toArray();
+                        if (localItems.length > 0) {
+                            return this.filterByUser(localItems as T[], userId);
+                        }
+                        return [];
                     }
                 } catch (e) {
                     console.warn(`[DynamoDB GetAll Fallback] ${storeName}:`, e);
@@ -179,7 +190,7 @@ class DBService {
 
             // Fallback: local IndexedDB
             const items = await this.getTable(storeName).toArray();
-            return items as T[];
+            return this.filterByUser(items as T[], userId);
         } catch (error) {
             console.error(`DB GetAll Error [${storeName}]:`, error);
             return [];
@@ -227,9 +238,8 @@ class DBService {
             const data = await res.json();
             const items = data.items || [];
 
-            // Overwrite local cache
+            // Upsert cloud items into local cache without clearing other cached records.
             if (items.length > 0) {
-                await this.getTable(storeName).clear();
                 await this.getTable(storeName).bulkPut(items);
             }
             return items as T[];

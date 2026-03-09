@@ -237,7 +237,7 @@ Available Tools: googleSearch, thinking, fabricateAgent, fabricateTeam.
 - Use 'googleSearch' silently when you need real-time information.
 - Use 'fabricateAgent' ONLY after completing Phases 1-5 and presenting to the user.
 - Use 'fabricateTeam' when the objective requires multiple coordinated agents.`,
-        icon: '💎',
+        icon: '△',
         provider: 'google',
         model: 'gemini-2.5-flash',
         isDeletable: false,

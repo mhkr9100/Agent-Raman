@@ -90,7 +90,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         <div className="flex items-center justify-between p-5 border-b border-white/10 bg-black">
           <div className="flex flex-col">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="text-blue-500">◈</span>
+              <span className="text-slate-300">△</span>
               {isReadOnly ? 'Directive Details' : initialTask ? 'Refine Directive' : 'Assign Directive'}
             </h2>
             <p className="text-[9px] text-slate-500 font-mono uppercase tracking-widest mt-1">Autonomous Mission Parameters</p>
@@ -110,7 +110,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               rows={3}
               disabled={isReadOnly}
               placeholder="Input specialized instructions for the agent..."
-              className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm focus:border-blue-500 outline-none text-white resize-none disabled:opacity-50 transition-all font-medium"
+              className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm focus:border-white/30 outline-none text-white resize-none disabled:opacity-50 transition-all font-medium"
             />
           </div>
 
@@ -122,7 +122,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 value={date}
                 onChange={e => setDate(e.target.value)}
                 disabled={isReadOnly}
-                className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm focus:border-blue-500 outline-none text-white disabled:opacity-50"
+                className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm focus:border-white/30 outline-none text-white disabled:opacity-50"
               />
             </div>
             <div>
@@ -132,7 +132,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 value={time}
                 onChange={e => setTime(e.target.value)}
                 disabled={isReadOnly}
-                className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm focus:border-blue-500 outline-none text-white disabled:opacity-50"
+                className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm focus:border-white/30 outline-none text-white disabled:opacity-50"
               />
             </div>
           </div>
@@ -143,11 +143,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               value={selectedAgentId}
               onChange={e => setSelectedAgentId(e.target.value)}
               disabled={isReadOnly || (!!activeAgent && !activeTeam && !initialTask)}
-              className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm focus:border-blue-500 outline-none text-white disabled:opacity-50 appearance-none"
+              className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm focus:border-white/30 outline-none text-white disabled:opacity-50 appearance-none"
             >
               {pool.map(a => <option key={a.id} value={a.id}>{a.name} ({a.role})</option>)}
             </select>
-            {activeTeam && <p className="text-[9px] text-blue-500/60 mt-2 italic font-mono uppercase tracking-tight">Routing directive within group spectrum</p>}
+            {activeTeam && <p className="text-[9px] text-slate-500 mt-2 italic font-mono uppercase tracking-tight">Routing directive within group spectrum</p>}
           </div>
 
           <div className="space-y-4">
@@ -160,16 +160,16 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 type="button"
                 disabled={isReadOnly}
                 onClick={() => setIsRecurring(!isRecurring)}
-                className={`w-12 h-6 rounded-full transition-all relative disabled:opacity-50 ${isRecurring ? 'bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]' : 'bg-slate-800'}`}
+                className={`w-12 h-6 rounded-full transition-all relative disabled:opacity-50 ${isRecurring ? 'bg-white/20 shadow-[0_0_10px_rgba(255,255,255,0.15)]' : 'bg-slate-800'}`}
               >
                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${isRecurring ? 'left-7' : 'left-1'}`} />
               </button>
             </div>
 
             {isRecurring && (
-              <div className="p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-xl space-y-4 animate-in slide-in-from-top-2 duration-300">
+              <div className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-4 animate-in slide-in-from-top-2 duration-300">
                 <div>
-                  <label className="block text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Recurrence Frequency</label>
+                  <label className="block text-[9px] font-black text-slate-300 uppercase tracking-widest mb-2">Recurrence Frequency</label>
                   <div className="grid grid-cols-2 gap-2">
                     {(['daily', 'weekly', 'monthly', 'custom'] as const).map(type => (
                       <button
@@ -177,7 +177,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         type="button"
                         disabled={isReadOnly}
                         onClick={() => setRecurrenceType(type)}
-                        className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${recurrenceType === type ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-black border-white/10 text-slate-500 hover:border-white/20'}`}
+                        className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${recurrenceType === type ? 'bg-white/15 border-white/30 text-white shadow-lg' : 'bg-black border-white/10 text-slate-500 hover:border-white/20'}`}
                       >
                         {type}
                       </button>
@@ -187,14 +187,14 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
                 {recurrenceType === 'custom' && (
                   <div>
-                    <label className="block text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Custom Rule (e.g. Every 2 days)</label>
+                    <label className="block text-[9px] font-black text-slate-300 uppercase tracking-widest mb-2">Custom Rule (e.g. Every 2 days)</label>
                     <input
                       type="text"
                       value={recurrenceValue}
                       onChange={e => setRecurrenceValue(e.target.value)}
                       disabled={isReadOnly}
                       placeholder="Enter interval logic..."
-                      className="w-full bg-black border border-white/10 rounded-lg p-2.5 text-sm text-white focus:border-indigo-500 outline-none"
+                      className="w-full bg-black border border-white/10 rounded-lg p-2.5 text-sm text-white focus:border-white/30 outline-none"
                     />
                   </div>
                 )}
@@ -205,7 +205,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           {!isReadOnly && (
             <button
               type="submit"
-              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-xl shadow-blue-900/20 transition-all active:scale-95 mt-2"
+              className="w-full py-4 bg-white text-black hover:bg-white/90 font-bold rounded-xl shadow-xl shadow-white/10 transition-all active:scale-95 mt-2"
             >
               {initialTask ? 'Commit Updates' : 'Commit Mission'}
             </button>

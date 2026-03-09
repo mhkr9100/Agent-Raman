@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Message, ChatSession, UserProfile } from '../types';
 import { AGENTS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
+import { dbService, STORES_ENUM } from '../services/db';
 
 const PRISM_INTRO = `Prism is Active. I am your Meta Agent and Workspace Architect.
 
@@ -28,6 +29,24 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
     const [activeChatId, setActiveChatId] = useState<string>('prism-core');
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+    const persistSession = useCallback((session: ChatSession) => {
+        void dbService.put(STORES_ENUM.SESSIONS as any, {
+            ...session,
+            userId: session.userId
+        }, session.id);
+    }, []);
+
+    const persistChatMessage = useCallback((userId: string, chatId: string, message: Message) => {
+        const recordId = `${chatId}::${message.id}`;
+        void dbService.put(STORES_ENUM.CHATS as any, {
+            id: recordId,
+            userId,
+            chatId,
+            message,
+            createdAt: Date.now()
+        }, recordId);
+    }, []);
 
     // Helper to get initial message for a new session
     const getInitialMessage = useCallback((entityId: string): Message | null => {
@@ -71,30 +90,95 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
         };
     }, []);
 
-    // Initialize sessions — pure in-memory (backend Lambda saves conversations to DynamoDB)
+    const createSession = useCallback((userId: string, entityId: string, isActive: boolean = true): ChatSession => ({
+        id: `session-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        entityId,
+        userId,
+        title: 'New Chat',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messageCount: 0,
+        isActive
+    }), []);
+
+    // Initialize sessions — cloud/local persistent via dbService
     const loadSessions = useCallback(async (userId: string) => {
-        // Start with a fresh Prism session on each page load
-        const newSession: ChatSession = {
-            id: `session-${Date.now()}`,
-            entityId: 'prism-core',
-            userId,
-            title: 'New Chat',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            messageCount: 1,
-            isActive: true
-        };
-        setChatSessions([newSession]);
-        setActiveSessionId(newSession.id);
-        const initMsg = getInitialMessage('prism-core');
-        setChatHistory({
-            'prism-core': initMsg ? [initMsg] : []
+        const rawSessions = await dbService.getAll<ChatSession & { entityId: string }>(STORES_ENUM.SESSIONS as any, userId);
+        const normalizedSessions = (rawSessions || [])
+            .filter(s => s && s.entityId && s.userId === userId)
+            .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+        let sessions = normalizedSessions;
+        if (sessions.length === 0) {
+            const first = createSession(userId, 'prism-core', true);
+            sessions = [first];
+            persistSession(first);
+        }
+
+        const active = sessions.find(s => s.isActive) || sessions[0];
+        setChatSessions(sessions);
+        setActiveSessionId(active.id);
+        setActiveChatId(active.entityId);
+
+        const rawChats = await dbService.getAll<any>(STORES_ENUM.CHATS as any, userId);
+        const grouped: Record<string, { createdAt: number; message: Message }[]> = {};
+
+        for (const row of rawChats || []) {
+            if (row?.userId && row.userId !== userId) continue;
+            if (!row?.chatId || !row?.message) continue;
+            if (!grouped[row.chatId]) grouped[row.chatId] = [];
+            grouped[row.chatId].push({
+                createdAt: Number(row.createdAt || Date.now()),
+                message: row.message as Message
+            });
+        }
+
+        const hydrated: Record<string, Message[]> = {};
+        Object.entries(grouped).forEach(([chatId, rows]) => {
+            hydrated[chatId] = rows
+                .sort((a, b) => a.createdAt - b.createdAt)
+                .map(r => r.message);
         });
-    }, [getInitialMessage]);
+
+        if (!hydrated['prism-core'] || hydrated['prism-core'].length === 0) {
+            const initMsg = getInitialMessage('prism-core');
+            hydrated['prism-core'] = initMsg ? [initMsg] : [];
+            if (initMsg) persistChatMessage(userId, 'prism-core', initMsg);
+        }
+
+        setChatHistory(hydrated);
+    }, [createSession, getInitialMessage, persistSession, persistChatMessage]);
 
     const addMessage = useCallback((chatId: string, message: Message) => {
         addMessageToHistory(chatId, message);
-    }, [addMessageToHistory]);
+        if (currentUser?.id) {
+            persistChatMessage(currentUser.id, chatId, message);
+
+            setChatSessions(prev => {
+                const now = Date.now();
+                const existingActive = prev.find(s => s.id === activeSessionId);
+                const targetSession = existingActive && existingActive.entityId === chatId
+                    ? existingActive
+                    : prev.find(s => s.entityId === chatId) || null;
+
+                if (!targetSession) {
+                    const created = createSession(currentUser.id, chatId, true);
+                    const next = [...prev.map(s => ({ ...s, isActive: false })), created];
+                    persistSession(created);
+                    setActiveSessionId(created.id);
+                    return next;
+                }
+
+                const updated = {
+                    ...targetSession,
+                    updatedAt: now,
+                    messageCount: (targetSession.messageCount || 0) + 1
+                };
+                persistSession(updated);
+                return prev.map(s => s.id === updated.id ? updated : s);
+            });
+        }
+    }, [addMessageToHistory, currentUser, activeSessionId, persistChatMessage, createSession, persistSession]);
 
     const clearChat = useCallback((chatId: string) => {
         clearChatHistory(chatId);
@@ -102,39 +186,39 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
 
     const loadChatHistory = useCallback((chatId: string, messages: Message[]) => {
         setChatHistory(prev => ({ ...prev, [chatId]: messages }));
-    }, []);
+        if (currentUser?.id) {
+            messages.forEach(msg => persistChatMessage(currentUser.id, chatId, msg));
+        }
+    }, [currentUser, persistChatMessage]);
 
     const startNewSession = useCallback(async (entityId: string) => {
         if (!currentUser) return;
 
-        // Deactivate existing sessions for this entity
-        setChatSessions(prev =>
-            prev.map(s =>
-                s.entityId === entityId && s.isActive ? { ...s, isActive: false } : s
-            )
-        );
+        const deactivated = chatSessions.map(s => ({ ...s, isActive: false }));
+        deactivated.forEach(persistSession);
 
-        const newSession: ChatSession = {
-            id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-            entityId,
-            userId: currentUser.id,
-            title: 'New Chat',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            messageCount: 0,
-            isActive: true
-        };
-        setChatSessions(prev => [...prev, newSession]);
+        const newSession: ChatSession = createSession(currentUser.id, entityId, true);
+        persistSession(newSession);
+
+        setChatSessions([...deactivated, newSession]);
         setActiveSessionId(newSession.id);
+        setActiveChatId(entityId);
         const initMsg = getInitialMessage(entityId);
-        setChatHistory(prev => ({ ...prev, [entityId]: initMsg ? [initMsg] : [] }));
-    }, [currentUser, getInitialMessage]);
+        const seeded = initMsg ? [initMsg] : [];
+        setChatHistory(prev => ({ ...prev, [entityId]: seeded }));
+        if (initMsg) persistChatMessage(currentUser.id, entityId, initMsg);
+    }, [currentUser, chatSessions, createSession, getInitialMessage, persistSession, persistChatMessage]);
 
     const resumeSession = useCallback(async (session: ChatSession) => {
-        // In-memory: just switch to the entity's existing chat history
+        const updatedSessions = chatSessions.map(s => ({
+            ...s,
+            isActive: s.id === session.id
+        }));
+        setChatSessions(updatedSessions);
+        updatedSessions.forEach(persistSession);
         setActiveSessionId(session.id);
         setActiveChatId(session.entityId);
-    }, []);
+    }, [chatSessions, persistSession]);
 
     const getSessionsForEntity = useCallback((entityId: string) => {
         return chatSessions.filter(s => s.entityId === entityId).sort((a, b) => b.updatedAt - a.updatedAt);
@@ -151,22 +235,16 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
             setActiveSessionId(activeSession.id);
         } else {
             // Create new session for this entity
-            const newSession: ChatSession = {
-                id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                entityId,
-                userId: currentUser.id,
-                title: 'New Chat',
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-                messageCount: 0,
-                isActive: true
-            };
+            const newSession: ChatSession = createSession(currentUser.id, entityId, true);
             setChatSessions(prev => [...prev, newSession]);
             setActiveSessionId(newSession.id);
+            persistSession(newSession);
             const initMsg = getInitialMessage(entityId);
-            setChatHistory(prev => ({ ...prev, [entityId]: initMsg ? [initMsg] : [] }));
+            const seeded = initMsg ? [initMsg] : [];
+            setChatHistory(prev => ({ ...prev, [entityId]: seeded }));
+            if (initMsg) persistChatMessage(currentUser.id, entityId, initMsg);
         }
-    }, [currentUser, chatSessions, getInitialMessage]);
+    }, [currentUser, chatSessions, createSession, getInitialMessage, persistSession, persistChatMessage]);
 
     return {
         chatHistory, setChatHistory,

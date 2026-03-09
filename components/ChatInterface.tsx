@@ -75,17 +75,17 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           const isTaskMode = typingAgents.length > 0;
           return (
             <div key={`${typerState.agent.id}-${idx}`} className="flex items-start gap-3 justify-start animate-fade-in mb-6">
-              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-xl flex-shrink-0 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-xl flex-shrink-0 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.08)]">
                 {typerState.agent.icon}
               </div>
               <div className="flex flex-col gap-2 max-w-[80%]">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-blue-400 font-bold ml-1">{typerState.agent.name}</span>
+                  <span className="text-xs text-gray-600 dark:text-white/60 font-bold ml-1">{typerState.agent.name}</span>
                   {isTaskMode && (
                     <div className="flex gap-1">
-                      <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                      <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                      <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                      <div className="w-1 h-1 bg-gray-500/70 dark:bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                      <div className="w-1 h-1 bg-gray-500/70 dark:bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      <div className="w-1 h-1 bg-gray-500/70 dark:bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
                     </div>
                   )}
                 </div>
@@ -98,9 +98,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     </div>
                   ) : (
                     <div className="flex gap-1 py-1">
-                      <div className="w-1.5 h-1.5 bg-blue-500/50 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                      <div className="w-1.5 h-1.5 bg-blue-500/50 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                      <div className="w-1.5 h-1.5 bg-blue-500/50 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                      <div className="w-1.5 h-1.5 bg-gray-500/50 dark:bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                      <div className="w-1.5 h-1.5 bg-gray-500/50 dark:bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      <div className="w-1.5 h-1.5 bg-gray-500/50 dark:bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
                     </div>
                   )}
                 </div>
