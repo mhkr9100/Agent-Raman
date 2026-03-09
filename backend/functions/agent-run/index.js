@@ -109,6 +109,43 @@ const TOOL_EXECUTORS = {
     'datetime': executeGetCurrentTime,
 };
 
+function resolveRuntimeModel(requestedModelId) {
+    const requested = (requestedModelId || '').trim();
+
+    if (!requested) {
+        return {
+            runtimeModelId: 'gemini-2.5-flash',
+            fallback: true,
+            reason: 'missing_model'
+        };
+    }
+
+    if (requested.startsWith('gemini-3.0') || requested.startsWith('gemini-2.0')) {
+        return {
+            runtimeModelId: 'gemini-2.5-flash',
+            fallback: true,
+            reason: 'deprecated_gemini_alias'
+        };
+    }
+
+    if (requested.startsWith('gemini-')) {
+        return {
+            runtimeModelId: requested,
+            fallback: false,
+            reason: 'native_gemini'
+        };
+    }
+
+    // Current shared runtime path is Vertex Gemini.
+    // For now, non-Gemini model IDs are mapped to a strong Gemini fallback
+    // to avoid hard failures in production conversations.
+    return {
+        runtimeModelId: 'gemini-2.5-pro',
+        fallback: true,
+        reason: 'non_gemini_not_supported_in_vertex_path'
+    };
+}
+
 async function executeTool(toolName, args) {
     const executor = TOOL_EXECUTORS[toolName];
     if (executor) {
@@ -220,11 +257,14 @@ export const handler = async (event) => {
         const blueprint = agent.blueprint;
         const baseSystemPrompt = blueprint.systemPrompt;
 
-        // Model validation: ensure we don't use invalid placeholder names like gemini-3.0 or gemini-2.0
-        let modelId = blueprint.model?.modelId || 'gemini-2.5-flash';
-        if (modelId.startsWith('gemini-3.0') || modelId.startsWith('gemini-2.0')) {
-            console.warn(`AGENT-RUN: ⚠️ Detected deprecated or invalid model name ${modelId}. Falling back to gemini-2.5-flash`);
-            modelId = 'gemini-2.5-flash';
+        // Resolve selected model to a runtime-supported model.
+        const requestedModelId = blueprint.model?.modelId || 'gemini-2.5-flash';
+        const modelResolution = resolveRuntimeModel(requestedModelId);
+        const modelId = modelResolution.runtimeModelId;
+        if (modelResolution.fallback) {
+            console.warn(
+                `AGENT-RUN: ⚠️ Requested model "${requestedModelId}" mapped to runtime model "${modelId}" (${modelResolution.reason})`
+            );
         }
 
         const temperature = blueprint.model?.temperature ?? 0.3;
@@ -393,6 +433,9 @@ export const handler = async (event) => {
             conversationId: convId,
             agentId,
             agentName: agent.name,
+            requestedModelId,
+            runtimeModelId: modelId,
+            modelFallbackApplied: modelResolution.fallback,
             toolsUsed: allToolCalls.map(tc => tc.name),
             iterations: iteration
         });
