@@ -141,14 +141,15 @@ export const useAgentExecution = (
         };
         useAppStore.getState().setChatHistory(prev => ({ ...prev, [activeChatId]: updatedHistory }));
 
-        // Simulate execution (we will wire up real tool execution later if needed via API)
-        await new Promise(r => setTimeout(r, 1000));
-
-        const finalHistory = [...useAppStore.getState().chatHistory[activeChatId]];
-        const idx = finalHistory.findIndex(m => m.id === messageId);
-        if (idx !== -1) {
-            finalHistory[idx] = { ...finalHistory[idx], content: { ...finalHistory[idx].content, isExecuting: false } };
-            useAppStore.getState().setChatHistory(prev => ({ ...prev, [activeChatId]: finalHistory }));
+        // Execution simulation removed (Rule #2 Compliance)
+        // In the future, the 'isExecuting' state will be managed by the actual backend/streaming response events.
+        const msgIndex = updatedHistory.findIndex(m => m.id === messageId);
+        if (msgIndex !== -1) {
+            updatedHistory[msgIndex] = {
+                ...updatedHistory[msgIndex],
+                content: { ...updatedHistory[msgIndex].content, isExecuting: false }
+            };
+            useAppStore.getState().setChatHistory(prev => ({ ...prev, [activeChatId]: updatedHistory }));
         }
     };
 

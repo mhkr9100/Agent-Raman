@@ -20,10 +20,12 @@ interface SpectrumViewProps {
 export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPrism, onFabricateAgent, onInitializeGroup, onOpenChat, agents, teams, userProfile }) => {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [specialAgents, setSpecialAgents] = useState<any[]>(SPECIAL_AGENT_TEMPLATES);
+    const [specialAgents, setSpecialAgents] = useState<any[]>([]);
+    const [isLoadingAgents, setIsLoadingAgents] = useState(true);
 
     useEffect(() => {
         (async () => {
+            setIsLoadingAgents(true);
             try {
                 const res = await listSpecialAgents();
                 if (res.templates && res.templates.length > 0) {
@@ -33,9 +35,14 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                         defaultTools: template.defaultTools || []
                     }));
                     setSpecialAgents(normalized);
+                } else {
+                    setSpecialAgents([]);
                 }
             } catch (err) {
-                console.warn('[SpectrumView] Failed to load special agents from API, using fallback:', err);
+                console.warn('[SpectrumView] Failed to load special agents from API:', err);
+                setSpecialAgents([]);
+            } finally {
+                setIsLoadingAgents(false);
             }
         })();
     }, []);
@@ -255,8 +262,8 @@ const ListItem: React.FC<{
                 <button
                     onClick={(e) => { e.stopPropagation(); onClick(); }}
                     className={`w-full py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all active:scale-[0.98] ${actionLabel === 'Add via Prism'
-                            ? 'bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-700 dark:text-white/70'
-                            : 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 shadow-sm'
+                        ? 'bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-700 dark:text-white/70'
+                        : 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 shadow-sm'
                         }`}
                 >
                     {actionLabel === 'Add via Prism' && <span className="text-sm">✦</span>}

@@ -103,7 +103,11 @@ ${sections.join('\n\n')}
 
   const extractPdfText = async (file: File): Promise<string> => {
     const data = new Uint8Array(await file.arrayBuffer());
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.mjs',
+      import.meta.url
+    ).toString();
     const task = (pdfjs as any).getDocument({ data, disableWorker: true });
     const doc = await task.promise;
 

@@ -73,10 +73,17 @@ export const useScatter = () => {
         if (currentUser) {
             const init = async () => {
                 try {
+                    const { dbService, STORES_ENUM } = await import('../services/db');
+                    // 1. Core Hydration
                     await loadEntities(currentUser.id);
                     await loadSessions(currentUser.id);
+
+                    // 2. Enterprise Data Sync (Prevent cross-browser data loss)
+                    console.log('[useScatter] Syncing UserMap & Memories from cloud...');
+                    await dbService.pullFromCloud(STORES_ENUM.USERMAP, currentUser.id);
+                    await dbService.pullFromCloud(STORES_ENUM.MEMORIES, currentUser.id);
                 } catch (e) {
-                    console.error(e);
+                    console.error('[useScatter] Initialization Error:', e);
                 } finally {
                     setIsInitializing(false);
                 }

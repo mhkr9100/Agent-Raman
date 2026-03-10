@@ -25,7 +25,7 @@ export const useUserMap = (currentUser: UserProfile | null) => {
     useEffect(() => {
         if (!currentUser) return;
         const load = async () => {
-            const saved = await dbService.get<PageNode>(STORES_ENUM.USERMAP, `usermap_${currentUser.id}`);
+            const saved = await dbService.get<PageNode>(STORES_ENUM.USERMAP, `usermap_${currentUser.id}`, currentUser.id);
             if (saved) setUserMapTree(saved);
         };
         load();
@@ -35,7 +35,9 @@ export const useUserMap = (currentUser: UserProfile | null) => {
     const saveTree = useCallback(async (tree: PageNode) => {
         if (!currentUser) return;
         setUserMapTree(tree);
-        await dbService.put(STORES_ENUM.USERMAP, tree, `usermap_${currentUser.id}`);
+        // Ensure the item has userId for DynamoDB sync
+        const payload = { ...tree, userId: currentUser.id };
+        await dbService.put(STORES_ENUM.USERMAP, payload, `usermap_${currentUser.id}`);
     }, [currentUser]);
 
     // Update a specific node
@@ -125,25 +127,6 @@ export const useUserMap = (currentUser: UserProfile | null) => {
                 createdAt: new Date().toISOString()
             });
             storedCount += 1;
-
-            if (BACKEND_URL) {
-                const token = sessionStorage.getItem('auth_token')
-                    || sessionStorage.getItem('id_token')
-                    || localStorage.getItem('auth_token')
-                    || localStorage.getItem('id_token');
-                const headers: any = { 'Content-Type': 'application/json' };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                fetch(`${BACKEND_URL}/api/memory/add`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({
-                        agentId,
-                        content: cleaned,
-                        category: source === 'external-import' ? 'profile' : 'general'
-                    })
-                }).catch(e => console.error('[AWS Memory Sync Error]', e));
-            }
         }
 
         return storedCount;
