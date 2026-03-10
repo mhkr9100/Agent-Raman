@@ -35,6 +35,10 @@ Parameters:
     Type: String
     Description: S3 bucket used for knowledge uploads
     Default: 'ramn-ai-agent-knowledge-base'
+  S3BucketRegion:
+    Type: String
+    Description: AWS region where the S3 knowledge bucket exists
+    Default: 'us-east-2'
 
 Globals:
   Function:
@@ -49,6 +53,7 @@ Globals:
         CORS_ALLOW_ORIGIN: !Ref CorsAllowOrigin
         ALLOWED_ORIGINS: !Ref AllowedOrigins
         S3_BUCKET_NAME: !Ref S3BucketName
+        S3_BUCKET_REGION: !Ref S3BucketRegion
   Api:
     Cors:
       AllowMethods: "'OPTIONS,GET,POST,PUT,DELETE'"

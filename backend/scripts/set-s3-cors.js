@@ -5,13 +5,13 @@
  *   node backend/scripts/set-s3-cors.js
  *
  * Optional env:
- *   AWS_REGION=us-east-1
+ *   AWS_REGION=us-east-2
  *   S3_BUCKET_NAME=ramn-ai-agent-knowledge-base
  */
 
 import { S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
 
-const REGION = process.env.AWS_REGION || 'us-east-1';
+const REGION = process.env.S3_BUCKET_REGION || process.env.AWS_REGION || 'us-east-2';
 const BUCKET = process.env.S3_BUCKET_NAME || 'ramn-ai-agent-knowledge-base';
 
 const corsRules = [

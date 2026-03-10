@@ -32,7 +32,7 @@ import { deriveToolIdsFromBlueprint, toCanonicalToolId } from '../../shared/tool
 const MAX_REACT_ITERATIONS = 5;
 const DOC_READER_MAX_FILES = 3;
 const DOC_READER_MAX_CHARS = 1800;
-const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
+const s3Client = new S3Client({ region: process.env.S3_BUCKET_REGION || process.env.AWS_REGION || 'us-east-2' });
 
 const CORS = {
     'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
