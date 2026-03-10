@@ -154,7 +154,7 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                                                                 </>
                                                             )}
                                                         </div>
-                                                        <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} accept=".pdf,.txt,.docx,.csv,.md" />
+                                                        <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} accept=".pdf,.txt,.doc,.docx,.csv,.md" />
                                                     </label>
                                                 </div>
                                             </div>

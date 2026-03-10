@@ -2,32 +2,26 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, GetCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
+import { buildCorsHeaders, requireAuth } from './security.js';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || 'RamN-Entities';
 
-// Standard CORS headers
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,PUT,DELETE',
-};
-
 // Return a structured API error
-function apiError(statusCode: number, message: string): APIGatewayProxyResult {
+function apiError(event: APIGatewayProxyEvent, statusCode: number, message: string): APIGatewayProxyResult {
     return {
         statusCode,
-        headers: corsHeaders,
+        headers: buildCorsHeaders(event.headers, 'OPTIONS,POST,GET,PUT,DELETE'),
         body: JSON.stringify({ error: message }),
     };
 }
 
 // Return a structured API success response
-function apiSuccess(data: any): APIGatewayProxyResult {
+function apiSuccess(event: APIGatewayProxyEvent, data: any): APIGatewayProxyResult {
     return {
         statusCode: 200,
-        headers: corsHeaders,
+        headers: buildCorsHeaders(event.headers, 'OPTIONS,POST,GET,PUT,DELETE'),
         body: JSON.stringify(data),
     };
 }
@@ -40,7 +34,7 @@ function hashPassword(password: string, salt: string): string {
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
-        return { statusCode: 200, headers: corsHeaders, body: '' };
+        return { statusCode: 200, headers: buildCorsHeaders(event.headers, 'OPTIONS,POST,GET,PUT,DELETE'), body: '' };
     }
 
     try {
@@ -59,10 +53,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             }
         }
 
-        return apiError(404, 'Not Found');
+        return apiError(event, 404, 'Not Found');
     } catch (error: any) {
         console.error('Auth Error:', error);
-        return apiError(500, error.message || 'Internal Server Error');
+        const status = (error.message || '').startsWith('Unauthorized') ? 401 : 500;
+        return apiError(event, status, error.message || 'Internal Server Error');
     }
 };
 
@@ -72,7 +67,7 @@ async function handleRegister(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const email = (body.email || '').toLowerCase().trim();
 
     if (!email || !password || !name) {
-        return apiError(400, 'Missing email, password, or name');
+        return apiError(event, 400, 'Missing email, password, or name');
     }
 
     // Check if user already exists
@@ -85,7 +80,7 @@ async function handleRegister(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }));
 
     if (existingUser.Item) {
-        return apiError(400, 'User already exists');
+        return apiError(event, 400, 'User already exists');
     }
 
     const salt = crypto.randomBytes(16).toString('hex');
@@ -117,7 +112,7 @@ async function handleRegister(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     await docClient.send(new PutCommand(params));
 
-    return apiSuccess({
+    return apiSuccess(event, {
         success: true,
         user: { id: userId, email, name },
         token: `ramn-jwt-${token}`
@@ -130,7 +125,7 @@ async function handleLogin(event: APIGatewayProxyEvent): Promise<APIGatewayProxy
     const email = (body.email || '').toLowerCase().trim();
 
     if (!email || !password) {
-        return apiError(400, 'Missing email or password');
+        return apiError(event, 400, 'Missing email or password');
     }
 
     const pk = `USER#${email}`;
@@ -144,29 +139,29 @@ async function handleLogin(event: APIGatewayProxyEvent): Promise<APIGatewayProxy
     const userProfile = response.Item ? response.Item.data : null;
 
     if (!userProfile) {
-        return apiError(401, 'Invalid email or password');
+        return apiError(event, 401, 'Invalid email or password');
     }
 
     const hashedPassword = hashPassword(password, userProfile.salt);
 
     if (hashedPassword !== userProfile.passwordHash) {
-        return apiError(401, 'Invalid email or password');
+        return apiError(event, 401, 'Invalid email or password');
     }
 
     const token = crypto.randomBytes(32).toString('hex');
 
-    return apiSuccess({
+    return apiSuccess(event, {
         success: true,
         user: { id: userProfile.id, email: userProfile.email, name: userProfile.name },
         token: `ramn-jwt-${token}` // Mock JWT for now
     });
 }
 async function handleDeleteAccount(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
-    const body = JSON.parse(event.body || '{}');
-    const email = (body.email || '').toLowerCase().trim();
+    const auth = await requireAuth(event.headers);
+    const email = (auth.email || '').toLowerCase().trim();
 
     if (!email) {
-        return apiError(400, 'Missing email');
+        return apiError(event, 400, 'Authenticated email not found in token');
     }
 
     const pk = `USER#${email}`;
@@ -177,5 +172,5 @@ async function handleDeleteAccount(event: APIGatewayProxyEvent): Promise<APIGate
         Key: { PK: pk, SK: sk }
     }));
 
-    return apiSuccess({ success: true, message: 'Account deleted' });
+    return apiSuccess(event, { success: true, message: 'Account deleted' });
 }

@@ -1,6 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import * as crypto from 'crypto';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { buildCorsHeaders, requireAuth } from './security.js';
 
 /**
  * AI Proxy Lambda — Server-Side AI Provider Gateway
@@ -15,13 +16,6 @@ const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID || 'ramn-ai';
 const GCP_LOCATION = process.env.GCP_LOCATION || 'us-central1';
 const GCP_SERVICE_ACCOUNT_SECRET_ARN = process.env.GCP_SERVICE_ACCOUNT_SECRET_ARN || '';
 const AWS_BEDROCK_REGION = process.env.AWS_BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
-    'Content-Type': 'application/json',
-};
 
 // ─── Decode Service Account Key ───
 
@@ -165,6 +159,11 @@ async function callBedrock(contents: any[], systemInstruction?: string): Promise
 // ─── Main Handler ───
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    const corsHeaders = {
+        ...buildCorsHeaders(event.headers, 'OPTIONS,POST,GET'),
+        'Content-Type': 'application/json'
+    };
+
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 200, headers: corsHeaders, body: '' };
     }
@@ -173,14 +172,18 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         const reqContext = event.requestContext as any;
         const path = reqContext?.http?.path || event.path || '';
 
-        if (event.httpMethod === 'POST' && path.endsWith('/generate')) return await handleGenerate(event);
+        if (event.httpMethod === 'POST' && path.endsWith('/generate')) {
+            await requireAuth(event.headers);
+            return await handleGenerate(event, corsHeaders);
+        }
         if (path.endsWith('/health')) return await handleHealth();
 
         return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Not Found' }) };
     } catch (error: any) {
         console.error('[AI Proxy Error]', error);
+        const status = (error.message || '').startsWith('Unauthorized') ? 401 : 500;
         return {
-            statusCode: 500,
+            statusCode: status,
             headers: corsHeaders,
             body: JSON.stringify({ error: error.message || 'Internal Server Error' })
         };
@@ -188,6 +191,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 };
 
 async function handleHealth(): Promise<APIGatewayProxyResult> {
+    const corsHeaders = {
+        ...buildCorsHeaders(undefined, 'OPTIONS,POST,GET'),
+        'Content-Type': 'application/json'
+    };
     const saKey = await getServiceAccountKey();
     return {
         statusCode: 200,
@@ -211,7 +218,10 @@ async function handleHealth(): Promise<APIGatewayProxyResult> {
  * 1. Vertex AI (service account) — highest quota, enterprise
  * 2. AWS Bedrock (Claude 3.5) — pay-per-use, always available
  */
-async function handleGenerate(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+async function handleGenerate(
+    event: APIGatewayProxyEvent,
+    corsHeaders: Record<string, string>
+): Promise<APIGatewayProxyResult> {
     const body = JSON.parse(event.body || '{}');
     const {
         model = 'gemini-2.5-flash',

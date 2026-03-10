@@ -189,10 +189,14 @@ export const authService = {
                         name: payload.name || payload.email.split('@')[0]
                     };
 
-                    // Securely store for apiV2
-                    localStorage.setItem('currentUser', JSON.stringify(session));
-                    // We use ID Token for authorization in API Gateway / Lambda
-                    localStorage.setItem('auth_token', idToken);
+                    // Store session in sessionStorage to reduce long-lived token exposure.
+                    sessionStorage.setItem('currentUser', JSON.stringify(session));
+                    sessionStorage.setItem('auth_token', idToken);
+                    sessionStorage.setItem('id_token', idToken);
+                    // Clear legacy persistent token storage.
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('id_token');
+                    localStorage.removeItem('currentUser');
 
                     resolve(session);
                 },
@@ -209,10 +213,11 @@ export const authService = {
     },
 
     /**
-     * Gets token directly from localStorage for apiV2.ts
+     * Gets token from sessionStorage (with legacy localStorage fallback).
      */
     getToken(): string | null {
-        return localStorage.getItem('auth_token');
+        return sessionStorage.getItem('auth_token')
+            || localStorage.getItem('auth_token');
     },
 
     /**
@@ -223,8 +228,12 @@ export const authService = {
         if (cognitoUser != null) {
             cognitoUser.signOut();
         }
+        sessionStorage.removeItem('currentUser');
+        sessionStorage.removeItem('auth_token');
+        sessionStorage.removeItem('id_token');
         localStorage.removeItem('currentUser');
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('id_token');
     },
 
     /**
@@ -232,9 +241,12 @@ export const authService = {
      */
     async getCurrentUser(): Promise<{ id: string, username: string, email: string, name: string } | null> {
         try {
-            const data = localStorage.getItem('currentUser');
+            const data = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser');
             if (data) {
                 const session: UserSession = JSON.parse(data);
+                // Migrate any legacy persisted session into sessionStorage only.
+                sessionStorage.setItem('currentUser', JSON.stringify(session));
+                localStorage.removeItem('currentUser');
                 return {
                     id: session.id,
                     username: session.email,

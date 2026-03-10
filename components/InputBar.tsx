@@ -58,8 +58,9 @@ export const InputBar: React.FC<InputBarProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
   const MAX_ATTACHMENTS = 3;
+  const MAX_TEXT_CHARS_PER_FILE = 12000;
 
   const filteredCandidates = (mentionCandidates || []).filter(c =>
     c && c.name && typeof c.name === 'string' &&
@@ -92,6 +93,48 @@ export const InputBar: React.FC<InputBarProps> = ({
 Use this user-provided context as high-priority reference while responding.
 ${sections.join('\n\n')}
 [/ATTACHED DOCUMENT CONTEXT]`;
+  };
+
+  const clampText = (text: string) => {
+    const normalized = text.replace(/\u0000/g, '').trim();
+    if (normalized.length <= MAX_TEXT_CHARS_PER_FILE) return normalized;
+    return `${normalized.slice(0, MAX_TEXT_CHARS_PER_FILE)}\n\n[Truncated: attachment exceeded ${MAX_TEXT_CHARS_PER_FILE} characters]`;
+  };
+
+  const extractPdfText = async (file: File): Promise<string> => {
+    const data = new Uint8Array(await file.arrayBuffer());
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const task = (pdfjs as any).getDocument({ data, disableWorker: true });
+    const doc = await task.promise;
+
+    const pages: string[] = [];
+    const maxPages = Math.min(doc.numPages, 30);
+
+    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+      const page = await doc.getPage(pageNum);
+      const content = await page.getTextContent();
+      const lines = (content.items || [])
+        .map((item: any) => (item?.str || '').trim())
+        .filter(Boolean);
+      if (lines.length > 0) {
+        pages.push(lines.join(' '));
+      }
+    }
+
+    return clampText(pages.join('\n\n'));
+  };
+
+  const extractDocxText = async (file: File): Promise<string> => {
+    let mammoth: any;
+    try {
+      mammoth = await import('mammoth/mammoth.browser');
+    } catch {
+      mammoth = await import('mammoth');
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return clampText(result?.value || '');
   };
 
   const handleSubmit = (e?: React.FormEvent) => {
@@ -161,15 +204,32 @@ ${sections.join('\n\n')}
   const parseAttachment = async (file: File): Promise<ParsedAttachment | null> => {
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
     const textOnlyExtensions = ['txt', 'md', 'markdown', 'csv', 'json', 'log', 'xml', 'yaml', 'yml'];
+    const documentExtensions = ['pdf', 'docx', 'doc'];
 
-    if (!textOnlyExtensions.includes(ext)) {
-      throw new Error(`"${file.name}" is not supported yet. Use TXT/MD/CSV/JSON/YAML files.`);
+    if (!textOnlyExtensions.includes(ext) && !documentExtensions.includes(ext)) {
+      throw new Error(`"${file.name}" is not supported yet. Use TXT/MD/CSV/JSON/YAML/PDF/DOCX files.`);
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      throw new Error(`"${file.name}" is larger than 2MB. Please upload a smaller file.`);
+      throw new Error(`"${file.name}" is larger than 10MB. Please upload a smaller file.`);
     }
 
-    const text = await file.text();
+    let text = '';
+    if (textOnlyExtensions.includes(ext)) {
+      text = await file.text();
+      text = clampText(text);
+    } else if (ext === 'pdf') {
+      text = await extractPdfText(file);
+    } else {
+      try {
+        text = await extractDocxText(file);
+      } catch (err: any) {
+        if (ext === 'doc') {
+          throw new Error(`"${file.name}" is a legacy .doc file. Please convert it to .docx for reliable parsing.`);
+        }
+        throw new Error(`"${file.name}" could not be parsed. Please verify the file is a valid DOCX.`);
+      }
+    }
+
     if (!text.trim()) {
       throw new Error(`"${file.name}" is empty.`);
     }
@@ -333,13 +393,13 @@ ${sections.join('\n\n')}
               type="file"
               className="hidden"
               multiple
-              accept=".txt,.md,.markdown,.csv,.json,.log,.xml,.yaml,.yml"
+              accept=".txt,.md,.markdown,.csv,.json,.log,.xml,.yaml,.yml,.pdf,.doc,.docx"
               onChange={handleAttachmentPick}
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              title="Upload context files (TXT/MD/CSV/JSON/YAML)"
+              title="Upload context files (TXT/MD/CSV/JSON/YAML/PDF/DOCX)"
               aria-label="Upload context files"
               className="p-2.5 rounded-xl border border-black/10 dark:border-white/10 text-gray-500 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 transition-all"
             >
@@ -375,7 +435,7 @@ ${sections.join('\n\n')}
           </form>
         </div>
         <p className="mt-2 px-1 text-[9px] text-gray-500 dark:text-white/30">
-          Upload context files: TXT, MD, CSV, JSON, YAML (max 3 files, 2MB each).
+          Upload context files: TXT, MD, CSV, JSON, YAML, PDF, DOCX (max 3 files, 10MB each).
         </p>
       </div>
     </div >

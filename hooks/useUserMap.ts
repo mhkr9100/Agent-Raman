@@ -127,7 +127,10 @@ export const useUserMap = (currentUser: UserProfile | null) => {
             storedCount += 1;
 
             if (BACKEND_URL) {
-                const token = localStorage.getItem('auth_token');
+                const token = sessionStorage.getItem('auth_token')
+                    || sessionStorage.getItem('id_token')
+                    || localStorage.getItem('auth_token')
+                    || localStorage.getItem('id_token');
                 const headers: any = { 'Content-Type': 'application/json' };
                 if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -135,7 +138,6 @@ export const useUserMap = (currentUser: UserProfile | null) => {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({
-                        userId: currentUser.id,
                         agentId,
                         content: cleaned,
                         category: source === 'external-import' ? 'profile' : 'general'

@@ -9,7 +9,7 @@ import { listAgentsByUser } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 
 const CORS = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     'Access-Control-Allow-Methods': 'OPTIONS,GET',
     'Content-Type': 'application/json'

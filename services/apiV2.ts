@@ -11,13 +11,16 @@ const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
 
 function getAuthToken(): string {
     // We need the ID token so the backend validateToken verifier can extract the user's email and details securely.
-    const token = localStorage.getItem('id_token') || localStorage.getItem('auth_token');
+    const token = sessionStorage.getItem('id_token')
+        || sessionStorage.getItem('auth_token')
+        || localStorage.getItem('id_token')
+        || localStorage.getItem('auth_token');
     if (!token) throw new Error('Not authenticated. Please log in.');
     return token;
 }
 
 function getUserId(): string {
-    const raw = localStorage.getItem('currentUser');
+    const raw = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser');
     if (!raw) throw new Error('No user session. Please log in.');
     const user = JSON.parse(raw);
     return user.id;
@@ -52,6 +55,9 @@ async function apiRequest<T>(
     if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
             console.warn('API: ⚠️ Unauthorized token detected. Forcing logout clearing state...');
+            sessionStorage.removeItem('auth_token');
+            sessionStorage.removeItem('id_token');
+            sessionStorage.removeItem('currentUser');
             localStorage.removeItem('auth_token');
             localStorage.removeItem('id_token');
             localStorage.removeItem('currentUser');

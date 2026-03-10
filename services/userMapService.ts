@@ -15,6 +15,13 @@ import { Message } from "../types";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
+function getAuthToken(): string | null {
+    return sessionStorage.getItem('auth_token')
+        || sessionStorage.getItem('id_token')
+        || localStorage.getItem('auth_token')
+        || localStorage.getItem('id_token');
+}
+
 export interface UserContextItem {
     id: string;
     userId: string;
@@ -61,14 +68,14 @@ class UserMapService {
         // Cloud-first
         if (BACKEND_URL) {
             try {
-                const token = localStorage.getItem('auth_token');
+                const token = getAuthToken();
                 const headers: Record<string, string> = { 'Content-Type': 'application/json' };
                 if (token) headers['Authorization'] = `Bearer ${token}`;
 
                 await fetch(`${BACKEND_URL}/api/memory/add`, {
                     method: 'POST',
                     headers,
-                    body: JSON.stringify({ userId, content, category })
+                    body: JSON.stringify({ content, category })
                 });
             } catch (e) {
                 console.error('[UserMap Cloud Error]', e);
@@ -97,14 +104,14 @@ class UserMapService {
         // Cloud-first: vector similarity search
         if (BACKEND_URL) {
             try {
-                const token = localStorage.getItem('auth_token');
+                const token = getAuthToken();
                 const headers: Record<string, string> = { 'Content-Type': 'application/json' };
                 if (token) headers['Authorization'] = `Bearer ${token}`;
 
                 const res = await fetch(`${BACKEND_URL}/api/memory/search`, {
                     method: 'POST',
                     headers,
-                    body: JSON.stringify({ userId, query, limit })
+                    body: JSON.stringify({ query, limit })
                 });
 
                 if (res.ok) {

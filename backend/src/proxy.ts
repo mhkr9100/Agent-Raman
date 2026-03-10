@@ -1,4 +1,5 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import { buildCorsHeaders, requireAuth } from './security.js';
 
 /**
  * CORS Proxy Lambda
@@ -62,16 +63,18 @@ function isDomainAllowed(url: string): boolean {
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+        ...buildCorsHeaders(event.headers, 'OPTIONS,POST'),
         'Content-Type': 'application/json'
     };
+    const method = (event.requestContext as any)?.http?.method || (event as any).httpMethod || 'GET';
 
-    if (event.requestContext.http.method === 'OPTIONS') {
+    if (method === 'OPTIONS') {
         return { statusCode: 200, headers: corsHeaders, body: '' };
     }
 
     try {
+        await requireAuth(event.headers);
+
         const body = JSON.parse(event.body || '{}');
         const { url, method = 'GET', headers = {}, payload } = body;
 
@@ -112,8 +115,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
         };
 
     } catch (error: any) {
+        const statusCode = (error.message || '').startsWith('Unauthorized') ? 401 : 500;
         return {
-            statusCode: 500,
+            statusCode,
             headers: corsHeaders,
             body: JSON.stringify({ error: error.message || 'Proxy error' })
         };

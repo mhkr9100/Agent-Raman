@@ -23,6 +23,18 @@ Parameters:
   GoogleCseId:
     Type: String
     Description: Google Custom Search Engine ID
+  CorsAllowOrigin:
+    Type: String
+    Description: Primary allowed frontend origin for API Gateway CORS
+    Default: 'https://www.ramnai.com'
+  AllowedOrigins:
+    Type: String
+    Description: Comma-separated allowed origins used by Lambda CORS checks
+    Default: 'https://www.ramnai.com,http://localhost:3000,http://localhost:5173'
+  S3BucketName:
+    Type: String
+    Description: S3 bucket used for knowledge uploads
+    Default: 'ramn-ai-agent-knowledge-base'
 
 Globals:
   Function:
@@ -34,11 +46,14 @@ Globals:
         TABLE_NAME: !Ref EntitiesTable
         USER_POOL_ID: !Ref UserPoolId
         CLIENT_ID: !Ref ClientId
+        CORS_ALLOW_ORIGIN: !Ref CorsAllowOrigin
+        ALLOWED_ORIGINS: !Ref AllowedOrigins
+        S3_BUCKET_NAME: !Ref S3BucketName
   Api:
     Cors:
       AllowMethods: "'OPTIONS,GET,POST,PUT,DELETE'"
       AllowHeaders: "'Content-Type,Authorization,X-Requested-With'"
-      AllowOrigin: "'*'"
+      AllowOrigin: !Sub "'${CorsAllowOrigin}'"
 
 Resources:
   # ──── DynamoDB Table ────
@@ -97,6 +112,29 @@ Resources:
           Type: Api
           Properties:
             Path: /api/db
+            Method: OPTIONS
+
+  UploadsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/uploads.handler
+      CodeUri: .
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub "arn:aws:s3:::${S3BucketName}/knowledge-base/*"
+      Events:
+        UploadPresign:
+          Type: Api
+          Properties:
+            Path: /api/uploads/presign
+            Method: POST
+        UploadPresignOptions:
+          Type: Api
+          Properties:
+            Path: /api/uploads/presign
             Method: OPTIONS
 
   ProxyFunction:
@@ -189,7 +227,8 @@ Resources:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
-              Resource: '*'
+              Resource:
+                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0"
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue

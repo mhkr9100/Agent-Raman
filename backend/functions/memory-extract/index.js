@@ -21,7 +21,7 @@ If no new facts found, return [].`;
 // ─── CORS Headers ────────────────────────────────────────────────
 
 const CORS = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     'Access-Control-Allow-Methods': 'OPTIONS,POST',
     'Content-Type': 'application/json'

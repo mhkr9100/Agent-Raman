@@ -28,7 +28,7 @@ import { validateToken } from '../../shared/auth.js';
 const MAX_REACT_ITERATIONS = 5;
 
 const CORS = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     'Access-Control-Allow-Methods': 'OPTIONS,POST',
     'Content-Type': 'application/json'
@@ -70,13 +70,109 @@ async function executeCalculator(args) {
     const expression = args.expression || args.input || '';
     console.log(`TOOL-EXEC: calculator — expression="${expression}"`);
     try {
-        // Safe math evaluation (basic arithmetic only)
-        const sanitized = expression.replace(/[^0-9+\-*/().%\s]/g, '');
-        const result = Function('"use strict"; return (' + sanitized + ')')();
+        const result = evaluateArithmeticExpression(expression);
         return `Result: ${result}`;
     } catch (err) {
         return `Calculator error: Could not evaluate "${expression}". ${err.message}`;
     }
+}
+
+function evaluateArithmeticExpression(input) {
+    const sanitized = String(input || '').replace(/\s+/g, '');
+    if (!sanitized || /[^0-9+\-*/().%]/.test(sanitized)) {
+        throw new Error('Only numbers and + - * / % ( ) are allowed');
+    }
+
+    const tokens = [];
+    let i = 0;
+    while (i < sanitized.length) {
+        const ch = sanitized[i];
+        if (/[0-9.]/.test(ch)) {
+            let num = ch;
+            i++;
+            while (i < sanitized.length && /[0-9.]/.test(sanitized[i])) {
+                num += sanitized[i];
+                i++;
+            }
+            if ((num.match(/\./g) || []).length > 1) {
+                throw new Error(`Invalid number: ${num}`);
+            }
+            tokens.push({ type: 'num', value: Number(num) });
+            continue;
+        }
+        tokens.push({ type: 'op', value: ch });
+        i++;
+    }
+
+    const values = [];
+    const ops = [];
+    const precedence = { '+': 1, '-': 1, '*': 2, '/': 2, '%': 2 };
+
+    const applyOp = () => {
+        const op = ops.pop();
+        const b = values.pop();
+        const a = values.pop();
+        if (typeof a !== 'number' || typeof b !== 'number') {
+            throw new Error('Malformed expression');
+        }
+        if (op === '/' && b === 0) throw new Error('Division by zero');
+        switch (op) {
+            case '+': values.push(a + b); break;
+            case '-': values.push(a - b); break;
+            case '*': values.push(a * b); break;
+            case '/': values.push(a / b); break;
+            case '%': values.push(a % b); break;
+            default: throw new Error(`Unsupported operator: ${op}`);
+        }
+    };
+
+    let prevType = 'start';
+    for (const token of tokens) {
+        if (token.type === 'num') {
+            values.push(token.value);
+            prevType = 'num';
+            continue;
+        }
+
+        const op = token.value;
+        if (op === '(') {
+            ops.push(op);
+            prevType = 'op';
+            continue;
+        }
+        if (op === ')') {
+            while (ops.length && ops[ops.length - 1] !== '(') applyOp();
+            if (!ops.length || ops.pop() !== '(') throw new Error('Mismatched parentheses');
+            prevType = 'num';
+            continue;
+        }
+
+        if (op === '-' && (prevType === 'start' || prevType === 'op')) {
+            values.push(0);
+        }
+
+        while (
+            ops.length &&
+            ops[ops.length - 1] !== '(' &&
+            precedence[ops[ops.length - 1]] >= precedence[op]
+        ) {
+            applyOp();
+        }
+        ops.push(op);
+        prevType = 'op';
+    }
+
+    while (ops.length) {
+        const top = ops[ops.length - 1];
+        if (top === '(' || top === ')') throw new Error('Mismatched parentheses');
+        applyOp();
+    }
+
+    if (values.length !== 1 || Number.isNaN(values[0]) || !Number.isFinite(values[0])) {
+        throw new Error('Malformed expression');
+    }
+
+    return values[0];
 }
 
 async function executeGetCurrentTime(args) {

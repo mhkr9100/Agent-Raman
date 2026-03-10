@@ -3,6 +3,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { buildCorsHeaders, requireAuth } from './security.js';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -10,18 +11,12 @@ const TABLE_NAME = process.env.TABLE_NAME || 'RamN-Entities';
 const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID || 'ramn-ai';
 const GCP_LOCATION = process.env.GCP_LOCATION || 'us-central1';
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST',
-};
-
 function apiError(statusCode: number, message: string): APIGatewayProxyResult {
-    return { statusCode, headers: corsHeaders, body: JSON.stringify({ error: message }) };
+    return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: message }) };
 }
 
 function apiSuccess(data: any): APIGatewayProxyResult {
-    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(data) };
+    return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) };
 }
 
 // ─── Decode Service Account Key ───
@@ -139,22 +134,26 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     if (event.httpMethod === 'OPTIONS') {
-        return { statusCode: 200, headers: corsHeaders, body: '' };
+        return { statusCode: 200, headers: buildCorsHeaders(event.headers, 'OPTIONS,POST'), body: '' };
     }
 
     try {
+        const auth = await requireAuth(event.headers);
+        const userId = auth.userId;
+
         const reqContext = event.requestContext as any;
         const path = reqContext?.http?.path || event.path;
 
         if (event.httpMethod === 'POST') {
-            if (path.endsWith('/add')) return await handleAdd(event);
-            if (path.endsWith('/search')) return await handleSearch(event);
+            if (path.endsWith('/add')) return await handleAdd(event, userId);
+            if (path.endsWith('/search')) return await handleSearch(event, userId);
         }
 
-        return apiError(404, 'Not Found');
+        return { ...apiError(404, 'Not Found'), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
     } catch (error: any) {
         console.error('Memory Error:', error);
-        return apiError(500, error.message || 'Internal Server Error');
+        const status = (error.message || '').startsWith('Unauthorized') ? 401 : 500;
+        return { ...apiError(status, error.message || 'Internal Server Error'), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
     }
 };
 
@@ -163,12 +162,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
  * { userId, content, agentId?, category? }
  * Embeds the content using Vertex AI and stores with embedding in DynamoDB
  */
-async function handleAdd(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+async function handleAdd(event: APIGatewayProxyEvent, userId: string): Promise<APIGatewayProxyResult> {
     const body = JSON.parse(event.body || '{}');
-    const { userId, content, agentId, category } = body;
+    const { content, agentId, category } = body;
 
-    if (!userId || !content) {
-        return apiError(400, 'Missing userId or content');
+    if (!content) {
+        return { ...apiError(400, 'Missing content'), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
     }
 
     // Generate embedding
@@ -203,7 +202,7 @@ async function handleAdd(event: APIGatewayProxyEvent): Promise<APIGatewayProxyRe
         }
     }));
 
-    return apiSuccess({ success: true, memoryId, hasEmbedding: embedding.length > 0 });
+    return { ...apiSuccess({ success: true, memoryId, hasEmbedding: embedding.length > 0 }), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
 }
 
 /**
@@ -211,12 +210,12 @@ async function handleAdd(event: APIGatewayProxyEvent): Promise<APIGatewayProxyRe
  * { userId, query, limit? }
  * Embeds the query, fetches all user memories, does cosine similarity, returns top K
  */
-async function handleSearch(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+async function handleSearch(event: APIGatewayProxyEvent, userId: string): Promise<APIGatewayProxyResult> {
     const body = JSON.parse((event as any).body || '{}');
-    const { userId, query, limit = 5 } = body;
+    const { query, limit = 5 } = body;
 
-    if (!userId || !query) {
-        return apiError(400, 'Missing userId or query');
+    if (!query) {
+        return { ...apiError(400, 'Missing query'), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
     }
 
     // Embed the query
@@ -225,7 +224,7 @@ async function handleSearch(event: APIGatewayProxyEvent): Promise<APIGatewayProx
         queryEmbedding = await getEmbedding(query);
     } catch (e: any) {
         console.error('[Query embedding failed]', e.message);
-        return apiError(500, 'Failed to embed query');
+        return { ...apiError(500, 'Failed to embed query'), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
     }
 
     // Fetch all user memories
@@ -241,7 +240,7 @@ async function handleSearch(event: APIGatewayProxyEvent): Promise<APIGatewayProx
 
     const items = response.Items || [];
     if (items.length === 0) {
-        return apiSuccess({ results: [], count: 0 });
+        return { ...apiSuccess({ results: [], count: 0 }), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
     }
 
     // Compute similarity and rank
@@ -268,8 +267,11 @@ async function handleSearch(event: APIGatewayProxyEvent): Promise<APIGatewayProx
             createdAt: item.data.createdAt
         }));
 
-    return apiSuccess({
+    return {
+        ...apiSuccess({
         results: [...scored, ...noEmbedding].slice(0, limit),
         count: items.length
-    });
+        }),
+        headers: buildCorsHeaders(event.headers, 'OPTIONS,POST')
+    };
 }
