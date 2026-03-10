@@ -149,7 +149,7 @@ export function SideBar({
             className="w-8 h-8 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex items-center justify-center hover:border-black/20 dark:hover:border-white/20 transition-all group"
             title="Feedback"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 dark:text-white/40 group-hover:text-amber-500 dark:group-hover:text-amber-400 group-hover:scale-110 transition-all"><path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785.5.5 0 0 0 .337.839 7.737 7.737 0 0 0 4.388-1.723c.071-.051.147-.094.225-.135a6.07 6.07 0 0 1 2.14-.387Z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 dark:text-white/40 group-hover:text-amber-500 dark:group-hover:text-amber-400 group-hover:scale-110 transition-all"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 12h9m-9 3h5.25m5.86 3.12A9 9 0 1 0 6.34 18.12L3 21l3.54-.89c.62-.15 1.27-.15 1.88 0Z" /></svg>
           </button>
 
           <button

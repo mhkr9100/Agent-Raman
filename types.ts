@@ -2,6 +2,11 @@
 export type AgentType = 'agent' | 'HR' | 'user' | 'custom';
 
 export type AgentCapability =
+  | 'web-search'
+  | 'image-generation'
+  | 'doc-reader'
+  | 'webSearch'
+  | 'web_search'
   | 'googleSearch'
   | 'googleMaps'
   | 'imageGeneration'

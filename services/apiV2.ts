@@ -398,6 +398,53 @@ export async function listTools(): Promise<ListToolsResponse> {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  Documents Registry
+// ═══════════════════════════════════════════════════════════════
+
+export interface DocumentRecord {
+    docId: string;
+    userId: string;
+    ownerType: 'agent' | 'user';
+    ownerId: string;
+    fileName: string;
+    fileKey: string;
+    fileUrl?: string | null;
+    textKey?: string | null;
+    textUrl?: string | null;
+    contentType?: string;
+    size?: number;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface RegisterDocumentRequest {
+    ownerType: 'agent' | 'user';
+    ownerId: string;
+    fileName: string;
+    fileKey: string;
+    fileUrl?: string;
+    textKey?: string;
+    textUrl?: string;
+    contentType?: string;
+    size?: number;
+}
+
+export async function registerDocument(params: RegisterDocumentRequest): Promise<{ document: DocumentRecord }> {
+    return apiRequest<{ document: DocumentRecord }>('POST', '/api/v2/documents/register', params);
+}
+
+export async function listDocuments(ownerType: 'agent' | 'user', ownerId: string): Promise<{ documents: DocumentRecord[] }> {
+    return apiRequest<{ documents: DocumentRecord[] }>(
+        'GET',
+        `/api/v2/documents?ownerType=${encodeURIComponent(ownerType)}&ownerId=${encodeURIComponent(ownerId)}`
+    );
+}
+
+export async function deleteDocument(docId: string): Promise<{ success: boolean; docId: string }> {
+    return apiDeleteRequest<{ success: boolean; docId: string }>(`/api/v2/documents/${encodeURIComponent(docId)}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  UserMap and Memory
 // ═══════════════════════════════════════════════════════════════
 
@@ -412,6 +459,12 @@ export interface UserMapTreeResponse {
     updatedAt?: string | null;
 }
 
+export interface SaveUserMapResponse {
+    success: boolean;
+    userId: string;
+    updatedAt?: string | null;
+}
+
 export async function getUserMapTree(): Promise<UserMapTreeResponse> {
     try {
         return await apiRequest<UserMapTreeResponse>('GET', '/api/v2/usermap');
@@ -421,13 +474,34 @@ export async function getUserMapTree(): Promise<UserMapTreeResponse> {
     }
 }
 
-export async function saveUserMapTree(tree: any): Promise<{ success: boolean; userId: string }> {
-    try {
-        return await apiRequest<{ success: boolean; userId: string }>('POST', '/api/v2/usermap', { tree });
-    } catch (error: any) {
-        console.error('API: saveUserMapTree failed:', error.message);
-        throw error;
+export async function saveUserMapTree(tree: any, expectedUpdatedAt?: string | null): Promise<SaveUserMapResponse> {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE}/api/v2/usermap`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ tree, expectedUpdatedAt: expectedUpdatedAt || null })
+    });
+
+    if (response.status === 409) {
+        const conflict = await response.json().catch(() => ({}));
+        const err: any = new Error(conflict.message || 'UserMap conflict');
+        err.code = 'CONFLICT';
+        err.currentTree = conflict.currentTree || null;
+        err.currentUpdatedAt = conflict.currentUpdatedAt || null;
+        throw err;
     }
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText, message: '' }));
+        const error = errorData.error || `Request failed: ${response.status}`;
+        const detail = errorData.message ? ` — ${errorData.message}` : '';
+        throw new Error(`${error}${detail}`);
+    }
+
+    return await response.json() as SaveUserMapResponse;
 }
 
 export async function consolidateUserMap(params: ConsolidateUserMapRequest): Promise<any> {

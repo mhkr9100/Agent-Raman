@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Agent } from '../types';
 import { listModels, ModelRegistryItem } from '../services/apiV2';
+import { validateDocumentFile, MAX_DOCUMENT_BYTES } from '../services/documentParser';
 
 export type PrismMode = 'create' | 'ask' | 'council';
 
@@ -11,18 +12,11 @@ export interface CouncilConfig {
   decisionModelId: string;
 }
 
-interface ParsedAttachment {
-  id: string;
-  name: string;
-  size: number;
-  text: string;
-}
-
 interface InputBarProps {
   onSubmit: (
     prompt: string,
     steps: number,
-    file?: undefined,
+    attachments?: File[],
     searchEnabled?: boolean,
     createEnabled?: boolean,
     prismMode?: PrismMode,
@@ -49,15 +43,14 @@ export const InputBar: React.FC<InputBarProps> = ({
   const [councilModels, setCouncilModels] = useState<string[]>([]);
   const [decisionModelId, setDecisionModelId] = useState<string>('');
   const [availableModels, setAvailableModels] = useState<ModelRegistryItem[]>([]);
-  const [attachments, setAttachments] = useState<ParsedAttachment[]>([]);
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-  const MAX_ATTACHMENTS = 3;
-  const MAX_TEXT_CHARS_PER_FILE = 12000;
+  const MAX_FILE_SIZE_BYTES = MAX_DOCUMENT_BYTES;
+  const MAX_ATTACHMENTS = 5;
 
   const filteredCandidates = (mentionCandidates || []).filter(c =>
     c && c.name && typeof c.name === 'string' &&
@@ -114,72 +107,11 @@ export const InputBar: React.FC<InputBarProps> = ({
     };
   }, [isPrism]);
 
-  const buildPromptWithAttachments = (basePrompt: string) => {
-    if (attachments.length === 0) return basePrompt;
-    const sections = attachments.map((file, idx) =>
-      `[Document ${idx + 1}: ${file.name}]\n${file.text.slice(0, 6000)}`
-    );
-
-    return `${basePrompt}
-
-[ATTACHED DOCUMENT CONTEXT]
-Use this user-provided context as high-priority reference while responding.
-${sections.join('\n\n')}
-[/ATTACHED DOCUMENT CONTEXT]`;
-  };
-
-  const clampText = (text: string) => {
-    const normalized = text.replace(/\u0000/g, '').trim();
-    if (normalized.length <= MAX_TEXT_CHARS_PER_FILE) return normalized;
-    return `${normalized.slice(0, MAX_TEXT_CHARS_PER_FILE)}\n\n[Truncated: attachment exceeded ${MAX_TEXT_CHARS_PER_FILE} characters]`;
-  };
-
-  const extractPdfText = async (file: File): Promise<string> => {
-    const data = new Uint8Array(await file.arrayBuffer());
-    const [{ getDocument, GlobalWorkerOptions }, workerModule] = await Promise.all([
-      import('pdfjs-dist/legacy/build/pdf.mjs'),
-      import('pdfjs-dist/legacy/build/pdf.worker.mjs?url')
-    ]);
-    GlobalWorkerOptions.workerSrc = workerModule.default;
-    const task = getDocument({ data });
-    const doc = await task.promise;
-
-    const pages: string[] = [];
-    const maxPages = Math.min(doc.numPages, 30);
-
-    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
-      const page = await doc.getPage(pageNum);
-      const content = await page.getTextContent();
-      const lines = (content.items || [])
-        .map((item: any) => (item?.str || '').trim())
-        .filter(Boolean);
-      if (lines.length > 0) {
-        pages.push(lines.join(' '));
-      }
-    }
-
-    return clampText(pages.join('\n\n'));
-  };
-
-  const extractDocxText = async (file: File): Promise<string> => {
-    let mammoth: any;
-    try {
-      mammoth = await import('mammoth/mammoth.browser');
-    } catch {
-      mammoth = await import('mammoth');
-    }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return clampText(result?.value || '');
-  };
-
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!prompt.trim() && attachments.length === 0) return;
 
-    const basePrompt = prompt.trim() || 'Analyze the uploaded document context and assist me.';
-    const finalPrompt = buildPromptWithAttachments(basePrompt);
+    const finalPrompt = prompt.trim() || 'I uploaded supporting documents. Use document-reader to incorporate them.';
 
     const councilConfig = (isPrism && prismMode === 'council')
       ? {
@@ -198,7 +130,7 @@ ${sections.join('\n\n')}
     onSubmit(
       finalPrompt,
       1,
-      undefined,
+      attachments,
       false,
       prismMode === 'create',
       isPrism ? prismMode : undefined,
@@ -245,47 +177,6 @@ ${sections.join('\n\n')}
     textareaRef.current?.focus();
   };
 
-  const parseAttachment = async (file: File): Promise<ParsedAttachment | null> => {
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const textOnlyExtensions = ['txt', 'md', 'markdown', 'csv', 'json', 'log', 'xml', 'yaml', 'yml'];
-    const documentExtensions = ['pdf', 'docx', 'doc'];
-
-    if (!textOnlyExtensions.includes(ext) && !documentExtensions.includes(ext)) {
-      throw new Error(`"${file.name}" is not supported yet. Use TXT/MD/CSV/JSON/YAML/PDF/DOCX files.`);
-    }
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      throw new Error(`"${file.name}" is larger than 10MB. Please upload a smaller file.`);
-    }
-
-    let text = '';
-    if (textOnlyExtensions.includes(ext)) {
-      text = await file.text();
-      text = clampText(text);
-    } else if (ext === 'pdf') {
-      text = await extractPdfText(file);
-    } else {
-      try {
-        text = await extractDocxText(file);
-      } catch (err: any) {
-        if (ext === 'doc') {
-          throw new Error(`"${file.name}" is a legacy .doc file. Please convert it to .docx for reliable parsing.`);
-        }
-        throw new Error(`"${file.name}" could not be parsed. Please verify the file is a valid DOCX.`);
-      }
-    }
-
-    if (!text.trim()) {
-      throw new Error(`"${file.name}" is empty.`);
-    }
-
-    return {
-      id: `${file.name}-${file.size}-${Date.now()}`,
-      name: file.name,
-      size: file.size,
-      text
-    };
-  };
-
   const handleAttachmentPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -298,25 +189,28 @@ ${sections.join('\n\n')}
       setAttachmentError(`Only ${MAX_ATTACHMENTS} files are allowed per message.`);
     }
 
-    const parsed: ParsedAttachment[] = [];
+    const accepted: File[] = [];
     for (const file of filesToProcess) {
       try {
-        const result = await parseAttachment(file);
-        if (result) parsed.push(result);
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          throw new Error(`"${file.name}" exceeds ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))}MB limit.`);
+        }
+        validateDocumentFile(file);
+        accepted.push(file);
       } catch (err: any) {
         setAttachmentError(err.message || 'Failed to parse selected file.');
       }
     }
 
-    if (parsed.length > 0) {
-      setAttachments(prev => [...prev, ...parsed].slice(0, MAX_ATTACHMENTS));
+    if (accepted.length > 0) {
+      setAttachments(prev => [...prev, ...accepted].slice(0, MAX_ATTACHMENTS));
     }
 
     e.target.value = '';
   };
 
-  const removeAttachment = (id: string) => {
-    setAttachments(prev => prev.filter(file => file.id !== id));
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   const PRISM_MODES: { key: PrismMode; label: string; icon: string; color: string; activeColor: string }[] = [
@@ -395,15 +289,15 @@ ${sections.join('\n\n')}
 
         {attachments.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
-            {attachments.map(file => (
+            {attachments.map((file, idx) => (
               <span
-                key={file.id}
+                key={`${file.name}-${file.size}-${idx}`}
                 className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 text-[9px] font-mono text-gray-600 dark:text-white/60"
               >
                 <span className="truncate max-w-[160px]">{file.name}</span>
                 <button
                   type="button"
-                  onClick={() => removeAttachment(file.id)}
+                  onClick={() => removeAttachment(idx)}
                   className="text-gray-500 hover:text-gray-900 dark:text-white/40 dark:hover:text-white"
                   aria-label={`Remove ${file.name}`}
                 >
@@ -486,7 +380,7 @@ ${sections.join('\n\n')}
           </form>
         </div>
         <p className="mt-2 px-1 text-[9px] text-gray-500 dark:text-white/30">
-          Upload context files: TXT, MD, CSV, JSON, YAML, PDF, DOCX (max 3 files, 10MB each).
+          Upload context files: TXT, MD, CSV, JSON, YAML, PDF, DOCX (max 5 files, 10MB each).
         </p>
       </div>
     </div >

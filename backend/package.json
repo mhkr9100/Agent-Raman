@@ -5,7 +5,9 @@
     "scripts": {
         "build": "tsc",
         "deploy": "npm run build && sam deploy --guided",
-        "local": "npm run build && sam local start-api --port 3001"
+        "local": "npm run build && sam local start-api --port 3001",
+        "migrate:agent-tools": "node scripts/migrate-agent-tool-ids.js",
+        "configure:s3-cors": "node scripts/set-s3-cors.js"
     },
     "dependencies": {
         "@aws-sdk/client-bedrock-runtime": "^3.1000.0",

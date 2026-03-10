@@ -41,7 +41,8 @@ const TABLES = {
     TOOL_REGISTRY: `${PREFIX}ToolRegistry`,
     SPECIAL_AGENTS: `${PREFIX}SpecialAgents`,
     USER_MAP: `${PREFIX}UserMap`,
-    MODEL_REGISTRY: `${PREFIX}ModelRegistry`
+    MODEL_REGISTRY: `${PREFIX}ModelRegistry`,
+    DOCUMENTS: `${PREFIX}Documents`
 };
 
 // ─── Error Wrapper ───────────────────────────────────────────────
@@ -423,6 +424,100 @@ export async function getModelById(modelId) {
     }
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  DOCUMENTS — RamN_Documents (PK: docId, SK: userId)
+// ══════════════════════════════════════════════════════════════════
+
+export async function saveDocument({
+    docId,
+    userId,
+    ownerType,
+    ownerId,
+    fileName,
+    fileKey,
+    fileUrl,
+    textKey,
+    textUrl,
+    contentType,
+    size
+}) {
+    console.log(`[dynamo] saveDocument: ${docId} for user ${userId} (${ownerType}:${ownerId})`);
+    try {
+        const now = new Date().toISOString();
+        const ownerKey = `${userId}#${ownerType}#${ownerId}`;
+        const item = {
+            docId,
+            userId,
+            ownerType,
+            ownerId,
+            ownerKey,
+            fileName,
+            fileKey,
+            fileUrl: fileUrl || null,
+            textKey: textKey || null,
+            textUrl: textUrl || null,
+            contentType: contentType || 'application/octet-stream',
+            size: Number(size) || 0,
+            createdAt: now,
+            updatedAt: now
+        };
+
+        await docClient.send(new PutCommand({
+            TableName: TABLES.DOCUMENTS,
+            Item: item
+        }));
+
+        return item;
+    } catch (error) {
+        wrapError(TABLES.DOCUMENTS, 'saveDocument', error);
+    }
+}
+
+export async function getDocument(docId, userId) {
+    console.log(`[dynamo] getDocument: ${docId} for user ${userId}`);
+    try {
+        const result = await docClient.send(new GetCommand({
+            TableName: TABLES.DOCUMENTS,
+            Key: { docId, userId }
+        }));
+        return result.Item || null;
+    } catch (error) {
+        wrapError(TABLES.DOCUMENTS, 'getDocument', error);
+    }
+}
+
+export async function listDocumentsByOwner(userId, ownerType, ownerId) {
+    console.log(`[dynamo] listDocumentsByOwner: ${userId} ${ownerType}:${ownerId}`);
+    try {
+        const ownerKey = `${userId}#${ownerType}#${ownerId}`;
+        const result = await docClient.send(new QueryCommand({
+            TableName: TABLES.DOCUMENTS,
+            IndexName: 'ownerKey-createdAt-index',
+            KeyConditionExpression: 'ownerKey = :ownerKey',
+            ExpressionAttributeValues: {
+                ':ownerKey': ownerKey
+            },
+            ScanIndexForward: false
+        }));
+        return result.Items || [];
+    } catch (error) {
+        wrapError(TABLES.DOCUMENTS, 'listDocumentsByOwner', error);
+    }
+}
+
+export async function deleteDocument(docId, userId) {
+    console.log(`[dynamo] deleteDocument: ${docId} for user ${userId}`);
+    try {
+        await docClient.send(new DeleteCommand({
+            TableName: TABLES.DOCUMENTS,
+            Key: { docId, userId }
+        }));
+        return { success: true, docId };
+    } catch (error) {
+        wrapError(TABLES.DOCUMENTS, 'deleteDocument', error);
+    }
+}
+
 // ─── Export table names for scripts that need them ────────────────
 
 export { TABLES };
@@ -440,6 +535,8 @@ export default {
     getUserMap, updateUserMap,
     // Model Registry
     listModels, getModelById,
+    // Documents
+    saveDocument, getDocument, listDocumentsByOwner, deleteDocument,
     // Constants
     TABLES
 };

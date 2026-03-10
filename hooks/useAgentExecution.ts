@@ -5,6 +5,7 @@ import { AGENTS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
 
 import { createAgent } from '../services/apiV2';
+import { normalizeToolIds } from '../services/toolIds';
 
 export const useAgentExecution = (
     currentUser: UserProfile | null,
@@ -43,6 +44,7 @@ export const useAgentExecution = (
 
                 const createdAgents: Agent[] = [];
                 for (const spec of specialists) {
+                    const toolIds = normalizeToolIds(spec.capabilities || spec.toolIds || spec.tools || []);
                     const response = await createAgent({
                         agentName: spec.name || spec.agentName,
                         role: spec.role || 'Specialist',
@@ -53,7 +55,7 @@ export const useAgentExecution = (
                             modelId: spec.modelId || 'gemini-2.5-flash',
                             temperature: 0.3
                         },
-                        tools: spec.capabilities || spec.tools || []
+                        toolIds
                     });
 
                     const newAgent: Agent = {
@@ -66,6 +68,7 @@ export const useAgentExecution = (
                         icon: spec.icon || '🤖',
                         provider: 'google',
                         model: spec.modelId || 'gemini-2.5-flash',
+                        capabilities: toolIds as any,
                         isDeletable: true,
                         isSystem: false
                     };
@@ -124,6 +127,7 @@ export const useAgentExecution = (
 
         if (toolCall.name === 'fabricateAgent') {
             try {
+                const toolIds = normalizeToolIds(toolCall.args.toolIds || toolCall.args.capabilities || toolCall.args.tools || []);
                 // Call actual V2 API to handle saving to DB
                 console.log('API: POST /api/v2/agents/create (fabricateAgent UI intercept)');
                 const res = await createAgent({
@@ -136,7 +140,7 @@ export const useAgentExecution = (
                         modelId: toolCall.args.modelId || 'gemini-2.5-flash',
                         temperature: 0.3
                     },
-                    tools: toolCall.args.capabilities || toolCall.args.tools || []
+                    toolIds
                 });
 
                 const agentParam = {
@@ -146,6 +150,7 @@ export const useAgentExecution = (
                     type: 'agent',
                     userId: currentUser?.id,
                     model: toolCall.args.modelId || 'gemini-2.5-flash',
+                    capabilities: toolIds as any,
                     provider: 'google',
                     isDeletable: true,
                     isSystem: false

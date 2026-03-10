@@ -21,7 +21,7 @@ interface ChatViewProps {
   onSubmit: (
     prompt: string,
     steps: number,
-    file?: { data: string, mimeType: string },
+    attachments?: File[],
     searchEnabled?: boolean,
     createEnabled?: boolean,
     prismMode?: 'ask' | 'create' | 'council',

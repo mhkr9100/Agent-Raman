@@ -60,8 +60,7 @@ export const useScatter = () => {
                     await loadSessions(currentUser.id);
 
                     // 2. Enterprise Data Sync (Prevent cross-browser data loss)
-                    console.log('[useScatter] Syncing UserMap & Memories from cloud...');
-                    await dbService.pullFromCloud(STORES_ENUM.USERMAP, currentUser.id);
+                    console.log('[useScatter] Syncing memories from cloud...');
                     await dbService.pullFromCloud(STORES_ENUM.MEMORIES, currentUser.id);
                 } catch (e) {
                     console.error('[useScatter] Initialization Error:', e);
@@ -122,7 +121,7 @@ export const useScatter = () => {
     const handleSendMessage = useCallback(async (
         text: string,
         responseSteps: number = 1,
-        file?: { data: string, mimeType: string },
+        attachments?: File[],
         searchEnabled?: boolean,
         createEnabled?: boolean,
         prismMode?: 'ask' | 'create' | 'council',
@@ -160,9 +159,21 @@ export const useScatter = () => {
         setActiveRequests(prev => prev + 1);
 
         try {
+            const runtimeMessage = text;
+            if (attachments && attachments.length > 0) {
+                const { uploadAndRegisterDocument } = await import('../services/documentService');
+                const files = attachments.slice(0, 5);
+                const ownerType: 'agent' | 'user' = agent ? 'agent' : 'user';
+                const ownerId = agent ? agent.id : currentUser.id;
+
+                for (const file of files) {
+                    await uploadAndRegisterDocument({ ownerType, ownerId, file });
+                }
+            }
+
             const callPrism = async () => {
                 const request = {
-                    message: text,
+                    message: runtimeMessage,
                     mode: prismMode || 'ask',
                     conversationId: activeSessionId || undefined,
                     ...(councilConfig ? { councilConfig } : {}),
@@ -196,7 +207,7 @@ export const useScatter = () => {
                     await Promise.all(mentionedAgents.map(async (targetAgent) => {
                         const response = await agentChat({
                             agentId: targetAgent.id,
-                            message: text,
+                            message: runtimeMessage,
                             conversationId: activeSessionId || undefined
                         });
                         const responseContent = { type: 'text', text: response.response } as any;
@@ -246,7 +257,7 @@ export const useScatter = () => {
                 } else {
                     const agentRes = await agentChat({
                         agentId: target.id,
-                        message: text,
+                        message: runtimeMessage,
                         conversationId: activeSessionId || undefined
                     });
                     // For now map string response to content interface

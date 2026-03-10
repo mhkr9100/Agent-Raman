@@ -8,7 +8,8 @@ interface PresignResponse {
 }
 
 function getAuthToken(): string | null {
-    return sessionStorage.getItem('auth_token')
+    return sessionStorage.getItem('id_token')
+        || sessionStorage.getItem('auth_token')
         || localStorage.getItem('id_token')
         || localStorage.getItem('auth_token');
 }
@@ -40,6 +41,24 @@ async function getPresignedUploadUrl(file: File, agentId: string): Promise<Presi
     return response.json();
 }
 
+async function uploadWithPresignedUrl(file: File, agentId: string): Promise<{ url: string; key: string }> {
+    const { uploadUrl, key, publicUrl } = await getPresignedUploadUrl(file, agentId);
+
+    const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': file.type || 'application/octet-stream'
+        },
+        body: file
+    });
+
+    if (!uploadRes.ok) {
+        throw new Error(`S3 upload failed (${uploadRes.status})`);
+    }
+
+    return { url: publicUrl, key };
+}
+
 export const s3Service = {
     /**
      * Uploads to S3 via a backend-generated presigned URL.
@@ -50,20 +69,15 @@ export const s3Service = {
             throw new Error('File upload requires VITE_BACKEND_URL to be configured.');
         }
 
-        const { uploadUrl, key, publicUrl } = await getPresignedUploadUrl(file, agentId);
+        return uploadWithPresignedUrl(file, agentId);
+    },
 
-        const uploadRes = await fetch(uploadUrl, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': file.type || 'application/octet-stream'
-            },
-            body: file
-        });
-
-        if (!uploadRes.ok) {
-            throw new Error(`S3 upload failed (${uploadRes.status})`);
+    async uploadTextDocument(text: string, originalName: string, agentId: string): Promise<{ url: string; key: string }> {
+        if (!BACKEND_URL) {
+            throw new Error('File upload requires VITE_BACKEND_URL to be configured.');
         }
-
-        return { url: publicUrl, key };
+        const safeName = `${originalName.replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
+        const textFile = new File([text], safeName, { type: 'text/plain;charset=utf-8' });
+        return uploadWithPresignedUrl(textFile, agentId);
     }
 };

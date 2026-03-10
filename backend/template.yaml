@@ -73,6 +73,35 @@ Resources:
         - AttributeName: SK
           KeyType: RANGE
 
+  DocumentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: RamN_Documents
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: docId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: ownerKey
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: docId
+          KeyType: HASH
+        - AttributeName: userId
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: ownerKey-createdAt-index
+          KeySchema:
+            - AttributeName: ownerKey
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
   # ──── Secrets Manager ────
   GcpServiceAccountSecret:
     Type: AWS::SecretsManager::Secret
@@ -369,9 +398,15 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:Query
                 - dynamodb:Scan
+                - dynamodb:UpdateItem
               Resource:
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${S3BucketName}/knowledge-base/*"
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
@@ -620,6 +655,60 @@ Resources:
           Type: Api
           Properties:
             Path: /api/v2/usermap/consolidate
+            Method: OPTIONS
+
+  DocumentsRegistryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/documents/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 20
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:DeleteItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+      Events:
+        DocumentsRegister:
+          Type: Api
+          Properties:
+            Path: /api/v2/documents/register
+            Method: POST
+        DocumentsList:
+          Type: Api
+          Properties:
+            Path: /api/v2/documents
+            Method: GET
+        DocumentsDelete:
+          Type: Api
+          Properties:
+            Path: /api/v2/documents/{docId}
+            Method: DELETE
+        DocumentsRegisterOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/documents/register
+            Method: OPTIONS
+        DocumentsListOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/documents
+            Method: OPTIONS
+        DocumentsDeleteOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/documents/{docId}
             Method: OPTIONS
 
   MemoryExtractFunction:

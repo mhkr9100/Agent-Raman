@@ -39,12 +39,29 @@ export const handler = async (event) => {
         if (event.httpMethod === 'POST') {
             const body = JSON.parse(event.body || '{}');
             const tree = body?.tree;
+            const expectedUpdatedAt = body?.expectedUpdatedAt ? String(body.expectedUpdatedAt) : null;
             if (!tree || tree.id !== 'root') {
                 return respond(400, { error: 'Missing or invalid tree payload' });
             }
 
+            const current = await getUserMap(userId);
+            const currentUpdatedAt = current?.updatedAt ? String(current.updatedAt) : null;
+            if (expectedUpdatedAt && currentUpdatedAt && expectedUpdatedAt !== currentUpdatedAt) {
+                return respond(409, {
+                    error: 'Conflict',
+                    message: 'UserMap has been updated from another session.',
+                    currentTree: current.tree || null,
+                    currentUpdatedAt
+                });
+            }
+
             await updateUserMap(userId, { tree });
-            return respond(200, { success: true, userId });
+            const updated = await getUserMap(userId);
+            return respond(200, {
+                success: true,
+                userId,
+                updatedAt: updated?.updatedAt || null
+            });
         }
 
         return respond(405, { error: 'Method Not Allowed' });
@@ -56,4 +73,3 @@ export const handler = async (event) => {
         return respond(500, { error: 'Failed to handle user map', message: error.message });
     }
 };
-

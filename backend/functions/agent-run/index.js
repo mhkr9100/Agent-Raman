@@ -14,19 +14,25 @@
  */
 
 import { callAI, callAIWithTools } from '../../shared/vertex-ai.js';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import {
     getAgent,
     saveMessage,
     getConversation,
     getToolById,
-    getUserMap
+    getUserMap,
+    listDocumentsByOwner
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { checkAndRecordUsage } from '../../shared/rate-limit.js';
+import { deriveToolIdsFromBlueprint, toCanonicalToolId } from '../../shared/tool-ids.js';
 
 // ─── Constants ───────────────────────────────────────────────────
 
 const MAX_REACT_ITERATIONS = 5;
+const DOC_READER_MAX_FILES = 3;
+const DOC_READER_MAX_CHARS = 1800;
+const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 
 const CORS = {
     'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
@@ -37,6 +43,43 @@ const CORS = {
 
 function respond(statusCode, body) {
     return { statusCode, headers: CORS, body: JSON.stringify(body) };
+}
+
+async function streamToString(stream) {
+    if (!stream) return '';
+    const chunks = [];
+    for await (const chunk of stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks).toString('utf-8');
+}
+
+function tokenizeSearch(input) {
+    return String(input || '')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/g)
+        .filter(Boolean)
+        .filter(token => token.length > 2)
+        .slice(0, 20);
+}
+
+function buildSnippet(text, queryTokens) {
+    const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    if (!queryTokens.length) return normalized.slice(0, DOC_READER_MAX_CHARS);
+
+    const lower = normalized.toLowerCase();
+    let bestIndex = -1;
+    for (const token of queryTokens) {
+        const idx = lower.indexOf(token);
+        if (idx !== -1 && (bestIndex === -1 || idx < bestIndex)) {
+            bestIndex = idx;
+        }
+    }
+    if (bestIndex === -1) return normalized.slice(0, DOC_READER_MAX_CHARS);
+    const start = Math.max(0, bestIndex - 350);
+    const end = Math.min(normalized.length, bestIndex + DOC_READER_MAX_CHARS);
+    return normalized.slice(start, end);
 }
 
 // ─── Built-in Tool Executors ─────────────────────────────────────
@@ -187,14 +230,81 @@ async function executeGetCurrentTime(args) {
     }
 }
 
+async function executeDocReader(args, context = {}) {
+    const query = String(args?.query || args?.question || args?.input || '').trim();
+    const { userId, agentId } = context;
+    if (!userId) {
+        return 'Document Reader cannot run without a valid user context.';
+    }
+
+    const docsFromAgent = agentId
+        ? await listDocumentsByOwner(userId, 'agent', agentId)
+        : [];
+    const docsFromUser = await listDocumentsByOwner(userId, 'user', userId);
+
+    const allDocs = [...docsFromAgent, ...docsFromUser];
+    if (allDocs.length === 0) {
+        return 'No registered documents found for this session.';
+    }
+
+    const queryTokens = tokenizeSearch(query);
+    const bucket = process.env.S3_BUCKET_NAME || '';
+    if (!bucket) {
+        return 'Document Reader is unavailable because S3 bucket configuration is missing.';
+    }
+
+    const hydrated = [];
+    for (const doc of allDocs) {
+        if (!doc?.textKey) continue;
+        try {
+            const result = await s3Client.send(new GetObjectCommand({
+                Bucket: bucket,
+                Key: doc.textKey
+            }));
+            const text = await streamToString(result.Body);
+            if (!text.trim()) continue;
+            const lower = text.toLowerCase();
+            const score = queryTokens.length === 0
+                ? 1
+                : queryTokens.reduce((acc, token) => acc + (lower.includes(token) ? 1 : 0), 0);
+
+            hydrated.push({
+                doc,
+                score,
+                snippet: buildSnippet(text, queryTokens)
+            });
+        } catch (error) {
+            console.warn(`DOC-READER: Failed to read text payload for ${doc.docId}:`, error.message);
+        }
+    }
+
+    if (hydrated.length === 0) {
+        return 'Document Reader could not load parsed text payloads for available documents.';
+    }
+
+    hydrated.sort((a, b) => b.score - a.score);
+    const selected = hydrated.slice(0, DOC_READER_MAX_FILES);
+
+    const body = selected.map((item, index) => {
+        const title = item.doc.fileName || `Document ${index + 1}`;
+        return [
+            `### ${index + 1}. ${title}`,
+            `Relevance score: ${item.score}`,
+            `Snippet: ${item.snippet}`
+        ].join('\n');
+    }).join('\n\n');
+
+    return `Document Reader Results${query ? ` for "${query}"` : ''}:\n\n${body}`;
+}
+
 // Tool executor registry — maps toolId to function
 const TOOL_EXECUTORS = {
     // Search Tool Aliases
-    'googleSearch': executeGoogleSearch,
-    'google_search': executeGoogleSearch,
-    'webSearch': executeGoogleSearch,
-    'web_search': executeGoogleSearch,
     'web-search': executeGoogleSearch,
+    googleSearch: executeGoogleSearch,
+    google_search: executeGoogleSearch,
+    webSearch: executeGoogleSearch,
+    web_search: executeGoogleSearch,
 
     // Calculator Aliases
     'calculator': executeCalculator,
@@ -204,7 +314,32 @@ const TOOL_EXECUTORS = {
     'getCurrentTime': executeGetCurrentTime,
     'get_current_time': executeGetCurrentTime,
     'datetime': executeGetCurrentTime,
+
+    // Document Reader
+    'doc-reader': executeDocReader,
+    'doc_reader': executeDocReader,
+    'docReader': executeDocReader
 };
+
+const LEGACY_TOOL_CANDIDATES = {
+    'web-search': ['webSearch', 'googleSearch', 'web_search'],
+    'image-generation': ['imageGeneration', 'imageEditing'],
+    'doc-reader': ['docReader', 'doc_reader', 'fileManipulation'],
+    thinking: ['thinking']
+};
+
+async function getToolRecordWithFallback(toolId) {
+    const canonical = toCanonicalToolId(toolId);
+    let record = await getToolById(canonical);
+    if (record) return record;
+
+    const candidates = LEGACY_TOOL_CANDIDATES[canonical] || [];
+    for (const legacyId of candidates) {
+        record = await getToolById(legacyId);
+        if (record) return record;
+    }
+    return null;
+}
 
 function resolveRuntimeModel(requestedModelId) {
     const requested = (requestedModelId || '').trim();
@@ -243,10 +378,11 @@ function resolveRuntimeModel(requestedModelId) {
     };
 }
 
-async function executeTool(toolName, args) {
-    const executor = TOOL_EXECUTORS[toolName];
+async function executeTool(toolName, args, context = {}) {
+    const canonical = toCanonicalToolId(toolName);
+    const executor = TOOL_EXECUTORS[canonical] || TOOL_EXECUTORS[toolName];
     if (executor) {
-        return await executor(args);
+        return await executor(args, context);
     }
     return `[Tool "${toolName}" has no executor configured yet] The agent requested this tool but it is not yet implemented. Please answer using your training data.`;
 }
@@ -255,13 +391,14 @@ async function executeTool(toolName, args) {
 
 function toolToFunctionDeclaration(tool) {
     // Map RamN_ToolRegistry shape → Gemini functionDeclaration shape
+    const canonicalId = toCanonicalToolId(tool.toolId);
     const decl = {
-        name: tool.toolId,
+        name: canonicalId,
         description: tool.description || `Tool: ${tool.name}`
     };
 
     // Build parameters schema based on tool type
-    if (['googleSearch', 'webSearch', 'web_search', 'web-search'].includes(tool.toolId)) {
+    if (['googleSearch', 'webSearch', 'web_search', 'web-search'].includes(canonicalId)) {
         decl.parameters = {
             type: 'OBJECT',
             properties: {
@@ -269,7 +406,7 @@ function toolToFunctionDeclaration(tool) {
             },
             required: ['query']
         };
-    } else if (['calculator', 'math'].includes(tool.toolId)) {
+    } else if (['calculator', 'math'].includes(canonicalId)) {
         decl.parameters = {
             type: 'OBJECT',
             properties: {
@@ -277,11 +414,19 @@ function toolToFunctionDeclaration(tool) {
             },
             required: ['expression']
         };
-    } else if (['getCurrentTime', 'datetime', 'get_current_time'].includes(tool.toolId)) {
+    } else if (['getCurrentTime', 'datetime', 'get_current_time'].includes(canonicalId)) {
         decl.parameters = {
             type: 'OBJECT',
             properties: {
                 timezone: { type: 'STRING', description: 'IANA timezone string (e.g., "America/New_York", "UTC")' }
+            },
+            required: []
+        };
+    } else if (['doc-reader', 'doc_reader', 'docReader'].includes(canonicalId)) {
+        decl.parameters = {
+            type: 'OBJECT',
+            properties: {
+                query: { type: 'STRING', description: 'Question or query to retrieve relevant document snippets' }
             },
             required: []
         };
@@ -395,9 +540,9 @@ export const handler = async (event) => {
         console.log(`AGENT-RUN: System prompt length: ${systemPrompt.length} chars`);
 
         // 4. Resolve tools from ToolRegistry → Gemini functionDeclarations
-        // We handle both legacy agents (tools = array of IDs) and V2 agents (pre-resolved tools or toolIds array)
-        const blueprintTools = blueprint.tools || [];
-        const blueprintToolIds = blueprint.toolIds || [];
+        // Support legacy + canonical tool IDs.
+        const blueprintTools = Array.isArray(blueprint.tools) ? blueprint.tools : [];
+        const blueprintToolIds = deriveToolIdsFromBlueprint(blueprint);
         let functionDeclarations = [];
 
         console.log(`AGENT-RUN: Resolving tools...`);
@@ -408,16 +553,21 @@ export const handler = async (event) => {
             functionDeclarations = blueprintTools.map(toolToFunctionDeclaration);
         } else {
             // Case 2: We have IDs, need to fetch from DB
-            const idsToResolve = blueprintToolIds.length > 0 ? blueprintToolIds : blueprintTools;
+            const idsToResolve = blueprintToolIds.length > 0 ? blueprintToolIds : (Array.isArray(blueprintTools) ? blueprintTools.map(toCanonicalToolId) : []);
             if (idsToResolve.length > 0 && typeof idsToResolve[0] === 'string') {
                 console.log(`AGENT-RUN: Fetching ${idsToResolve.length} tools from registry by ID: [${idsToResolve.join(', ')}]`);
-                const toolPromises = idsToResolve.map(tid => getToolById(tid));
+                const toolPromises = idsToResolve.map(tid => getToolRecordWithFallback(tid));
                 const toolRecords = await Promise.all(toolPromises);
                 functionDeclarations = toolRecords
                     .filter(t => t !== null)
                     .map(toolToFunctionDeclaration);
             }
         }
+
+        // Deduplicate function declarations by name after canonicalization.
+        functionDeclarations = Array.from(
+            new Map(functionDeclarations.map(d => [d.name, d])).values()
+        );
 
         console.log(`AGENT-RUN: Resolved ${functionDeclarations.length} function declarations`);
 
@@ -484,7 +634,7 @@ export const handler = async (event) => {
                     console.log(`AGENT-RUN: 🔧 Tool call: ${tc.name}(${JSON.stringify(tc.args)})`);
                     allToolCalls.push(tc);
 
-                    const observation = await executeTool(tc.name, tc.args);
+                    const observation = await executeTool(tc.name, tc.args, { userId, agentId });
                     console.log(`AGENT-RUN: 📋 Observation: ${observation.substring(0, 200)}...`);
 
                     // Append the model's response (with tool call) to history

@@ -21,6 +21,7 @@ import { Agent, GlobalTask, Message, UserProfile } from './types';
 import { AGENTS } from './constants';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { createAgent } from './services/apiV2';
+import { normalizeToolIds } from './services/toolIds';
 
 const App: React.FC = () => {
   const {
@@ -70,6 +71,8 @@ const App: React.FC = () => {
   // Creates an agent via real backend API, then adds to local state
   const handleCreateAgentFromModal = async (data: any) => {
     try {
+      const toolIds = normalizeToolIds(data.toolIds || data.capabilities || []);
+      const pendingDocuments: File[] = Array.isArray(data.pendingDocuments) ? data.pendingDocuments.slice(0, 5) : [];
       const res = await createAgent({
         agentName: data.name,
         agentDescription: data.jobDescription || data.description || `A specialized ${data.role} agent.`,
@@ -77,12 +80,23 @@ const App: React.FC = () => {
         systemPrompt: data.jobDescription || `You are a specialized ${data.role} AI agent. ${data.description || ''}`,
         icon: data.icon || '🤖',
         model: {
-          modelId: data.model || 'gemini-3.0-flash',
+          modelId: data.model || 'gemini-2.5-flash',
           temperature: 0.3
         },
-        tools: data.capabilities || []
+        toolIds
       });
-      recruitAgent({ ...data, id: res.agentId, name: res.name });
+
+      if (pendingDocuments.length > 0) {
+        try {
+          const { uploadAndRegisterMany } = await import('./services/documentService');
+          await uploadAndRegisterMany(pendingDocuments, 'agent', res.agentId);
+        } catch (uploadErr: any) {
+          console.error('Agent created but document registration failed:', uploadErr);
+          alert(`Agent created, but one or more documents failed to register: ${uploadErr?.message || 'Unknown error'}`);
+        }
+      }
+
+      recruitAgent({ ...data, id: res.agentId, name: res.name, capabilities: toolIds });
     } catch (err: any) {
       console.error('Failed to create agent:', err);
       alert(`Agent creation failed: ${err.message}`);
@@ -96,11 +110,11 @@ const App: React.FC = () => {
   const handleHireFromSpectrum = (p: any) => {
     if ('modelId' in p) {
       // AI Model Profile → open CreateEntityModal
-      setCreateModalInitialValues({ profileId: p.id, role: p.tags[0], jd: p.summary, isLiveSpaceEnabled: p.isLiveSpaceEnabled });
+      setCreateModalInitialValues({ modelId: p.modelId, role: p.tags?.[0] || 'Specialist', jd: p.summary, isLiveSpaceEnabled: p.isLiveSpaceEnabled });
       setCreateModalType('agent');
     } else {
       // Regular agent template → open CreateEntityModal
-      setCreateModalInitialValues({ profileId: p.defaultModelId, role: p.role, jd: p.jobDescription, name: p.name, isLiveSpaceEnabled: p.isLiveSpaceEnabled });
+      setCreateModalInitialValues({ modelId: p.defaultModelId, role: p.role, jd: p.jobDescription, name: p.name, isLiveSpaceEnabled: p.isLiveSpaceEnabled });
       setCreateModalType('agent');
     }
   };
@@ -113,7 +127,7 @@ const App: React.FC = () => {
       role: template.role,
       predefinedPrompt: template.predefinedPrompt,
       defaultTools: template.defaultTools || [],
-      suggestedModel: template.suggestedModel || 'gemini-3.0-flash'
+      suggestedModel: template.suggestedModel || 'gemini-2.5-flash'
     });
   };
 

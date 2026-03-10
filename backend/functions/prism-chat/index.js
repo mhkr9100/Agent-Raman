@@ -437,7 +437,7 @@ A. If the objective is vague, ask 1-3 clarifying questions. Do NOT generate a bl
 B. If you have enough info, generate a blueprint.
    Set blueprintReady: true
 
-When generating a SINGLE AGENT blueprint, respond with JSON:
+When generating a SINGLE AGENT blueprint, respond with this JSON shape:
 {
   "blueprintReady": true,
   "blueprintType": "agent",
@@ -453,7 +453,7 @@ When generating a SINGLE AGENT blueprint, respond with JSON:
   "explanation": "2-3 SHORT sentences: what this agent does and why it fits the user. Be concise."
 }
 
-When generating a TEAM blueprint, respond with JSON:
+When generating a TEAM blueprint, respond with this JSON shape:
 {
   "blueprintReady": true,
   "blueprintType": "team",
@@ -474,7 +474,7 @@ When generating a TEAM blueprint, respond with JSON:
   "explanation": "2-3 SHORT sentences: why this team architecture fits."
 }
 
-MANDATORY SYSTEM PROMPT FORMAT (the systemPrompt field MUST use this exact structure):
+MANDATORY SYSTEM PROMPT FORMAT (systemPrompt MUST include these sections):
 """
 # ROLE
 You are [Agent Name], a [specific role]. You specialize in [domain].
@@ -513,7 +513,7 @@ MUST NOT:
 - If the task exceeds your capabilities, recommend the user create a more specialized agent.
 """
 
-When asking questions, respond with JSON:
+When asking questions, respond with this JSON shape:
 {
   "blueprintReady": false,
   "message": "your clarifying questions",
@@ -528,8 +528,7 @@ RULES FOR DESIGNING AGENTS:
 - Keep explanations SHORT (2-3 sentences max) — be concise, not verbose
 - If the user explicitly asks for a team/group/squad, return blueprintType: "team"
 - If the user asks for one specialist, return blueprintType: "agent"
-
-Wrap your entire response in \`\`\`json code block.`;
+- Return ONLY a raw JSON object. Do NOT use markdown, code fences, or surrounding commentary.`;
 
     // 6. Call Vertex AI
     const aiResult = await callAI({
@@ -543,13 +542,14 @@ Wrap your entire response in \`\`\`json code block.`;
     // 7. Parse AI response JSON
     const parsed = extractJSON(aiResult.text);
 
-    // Extract nicely formatted text to show to the user (fallback to raw if error)
-    let conversationalText = aiResult.text;
+    // Never return raw JSON payloads to end users in chat.
+    let conversationalText = 'I need a bit more detail before I can build this blueprint.';
     if (parsed) {
         if (parsed.blueprintReady === false && parsed.message) {
             conversationalText = parsed.message;
-        } else if (parsed.blueprintReady === true && parsed.explanation) {
-            conversationalText = parsed.explanation;
+        } else if (parsed.blueprintReady === true) {
+            conversationalText = parsed.explanation
+                || `Blueprint ready: ${parsed.agentName || parsed.teamName || 'New specialist'} is ready to deploy.`;
         }
     }
 
@@ -590,8 +590,14 @@ Wrap your entire response in \`\`\`json code block.`;
                 };
             }
         } else {
-            derivedToolCall = { name: 'fabricateAgent', args: parsed };
+            if (parsed.agentName && parsed.role && (Array.isArray(parsed.tools) || Array.isArray(parsed.toolIds))) {
+                derivedToolCall = { name: 'fabricateAgent', args: parsed };
+            }
         }
+    }
+
+    if (parsed?.blueprintReady && !derivedToolCall) {
+        conversationalText = 'I designed a blueprint, but it is missing required deployment fields. Please confirm tools and model, then I will regenerate it.';
     }
 
     // 8. Save messages using the extracted conversational text
@@ -609,7 +615,7 @@ Wrap your entire response in \`\`\`json code block.`;
     // 9. Return
     return respond(200, {
         text: conversationalText,
-        toolCall: aiResult.toolCalls?.[0] || derivedToolCall,
+        toolCall: derivedToolCall || aiResult.toolCalls?.[0] || null,
         conversationId: convId,
         mode: 'create'
     });

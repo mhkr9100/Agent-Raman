@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Message as MessageType, ToolCall, CustomGroupSuggestion } from '../types';
 import { LoadingSpinner } from './LoadingSpinner';
-import { AI_RESUMES } from '../constants';
 import { PrismIcon } from './icons/PrismIcon';
+import { listModels, ModelRegistryItem } from '../services/apiV2';
 
 interface MessageProps {
     message: MessageType;
@@ -20,6 +20,24 @@ const CommandProposal: React.FC<{
     onProceed: (modifiedArgs?: any) => void
 }> = ({ toolCall, isExecuting, onProceed }) => {
     const [selectedModels, setSelectedModels] = useState<Record<number, string>>({});
+    const [registryModels, setRegistryModels] = useState<ModelRegistryItem[]>([]);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const response = await listModels();
+                if (!mounted) return;
+                setRegistryModels(Array.isArray(response.models) ? response.models : []);
+            } catch {
+                if (!mounted) return;
+                setRegistryModels([]);
+            }
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const isSquad = toolCall.name === 'fabricateTeam';
     const isSingleAgent = toolCall.name === 'fabricateAgent';
@@ -27,12 +45,15 @@ const CommandProposal: React.FC<{
 
     const handleDeploy = () => {
         const modifiedArgs = { ...toolCall.args };
-        const validModelIds = AI_RESUMES.map(m => m.modelId);
+        const validModelIds = registryModels.map(m => m.modelId).filter(Boolean);
 
         const getValidModel = (id: string, fallbackId?: string) => {
+            if (validModelIds.length === 0) {
+                return id || fallbackId || 'gemini-2.5-flash';
+            }
             if (id && validModelIds.includes(id)) return id;
             if (fallbackId && validModelIds.includes(fallbackId)) return fallbackId;
-            return AI_RESUMES[0].modelId;
+            return validModelIds[0];
         };
 
         if (isSquad) {
@@ -117,9 +138,9 @@ const CommandProposal: React.FC<{
                             )}
 
                             {/* Tool badges */}
-                            {spec.capabilities && spec.capabilities.length > 0 && (
+                            {(spec.capabilities || spec.toolIds || spec.tools) && (spec.capabilities || spec.toolIds || spec.tools).length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
-                                    {spec.capabilities.map((tool: string) => (
+                                    {(spec.capabilities || spec.toolIds || spec.tools).map((tool: string) => (
                                         <span key={tool} className="text-[8px] px-2 py-0.5 bg-indigo-500/10 text-indigo-300/60 rounded border border-indigo-500/20 uppercase tracking-wider font-bold">
                                             {tool}
                                         </span>
@@ -131,13 +152,15 @@ const CommandProposal: React.FC<{
                             <div className="space-y-1.5">
                                 <label className="text-[7px] font-black text-gray-500 dark:text-white/20 uppercase tracking-[0.2em]">Select Brain Layer</label>
                                 <select
-                                    value={selectedModels[idx] || spec.modelId || ''}
+                                    value={selectedModels[idx] || spec.modelId || spec.model?.modelId || ''}
                                     onChange={e => setSelectedModels(prev => ({ ...prev, [idx]: e.target.value }))}
                                     className="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg p-2 text-[10px] text-indigo-600 dark:text-indigo-300 font-bold outline-none focus:border-indigo-500 transition-colors"
                                 >
-                                    <option value="" disabled>Choose Model...</option>
-                                    {AI_RESUMES.map(m => (
-                                        <option key={m.id} value={m.modelId}>{m.name} ({m.tagline})</option>
+                                    <option value="" disabled>{registryModels.length > 0 ? 'Choose Model...' : 'No registry models'}</option>
+                                    {registryModels.map(m => (
+                                        <option key={m.modelId} value={m.modelId}>
+                                            {m.name || m.modelId}
+                                        </option>
                                     ))}
                                 </select>
                                 {spec.suggestedModel && (

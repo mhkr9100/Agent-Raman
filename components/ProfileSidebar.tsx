@@ -1,8 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Agent, Team, UserProfile } from '../types';
 import { XMarkIcon } from './icons/XMarkIcon';
-import { AI_RESUMES } from '../constants';
+import { deleteDocument, DocumentRecord, listDocuments } from '../services/apiV2';
+import { uploadAndRegisterMany } from '../services/documentService';
+import { validateDocumentFile } from '../services/documentParser';
 
 interface ProfileSidebarProps {
     isOpen: boolean;
@@ -17,67 +18,119 @@ interface ProfileSidebarProps {
 }
 
 export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
-    isOpen, type, data, onClose, onSaveAgent, onSaveTeam, onUpdateUserProfile, userProfile
+    isOpen, type, data, onClose, onSaveAgent, onSaveTeam
 }) => {
     const [name, setName] = useState('');
-    const [role, setRole] = useState('');
     const [jd, setJd] = useState('');
-    const [knowledgeBase, setKnowledgeBase] = useState<any[]>([]);
-    const [isUploading, setIsUploading] = useState(false);
 
     const [teamName, setTeamName] = useState('');
     const [teamDesc, setTeamDesc] = useState('');
+
+    const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+    const [isDocsLoading, setIsDocsLoading] = useState(false);
+    const [isUploadingDocs, setIsUploadingDocs] = useState(false);
+    const [docError, setDocError] = useState<string | null>(null);
 
     useEffect(() => {
         if (type === 'team') {
             const team = data as Team;
             setTeamName(team.name);
             setTeamDesc(team.description || '');
-        } else {
-            const agent = data as Agent;
-            setName(agent.name);
-            setRole(agent.role);
-            setJd(agent.jobDescription);
-            setKnowledgeBase(agent.knowledgeBase || []);
+            setDocuments([]);
+            return;
         }
-    }, [data.id, type, data]);
+
+        const agent = data as Agent;
+        setName(agent.name);
+        setJd(agent.jobDescription || '');
+
+        if (type !== 'agent' || !isOpen) {
+            setDocuments([]);
+            return;
+        }
+
+        let mounted = true;
+        (async () => {
+            setIsDocsLoading(true);
+            setDocError(null);
+            try {
+                const response = await listDocuments('agent', agent.id);
+                if (!mounted) return;
+                setDocuments(Array.isArray(response.documents) ? response.documents : []);
+            } catch (error: any) {
+                if (!mounted) return;
+                setDocuments([]);
+                setDocError(error?.message || 'Failed to load documents');
+            } finally {
+                if (mounted) setIsDocsLoading(false);
+            }
+        })();
+
+        return () => {
+            mounted = false;
+        };
+    }, [data, isOpen, type]);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0 || type !== 'agent') return;
 
-        setIsUploading(true);
+        setDocError(null);
+        const selected = files.slice(0, 5);
+        if (files.length > 5) {
+            setDocError('Only 5 documents can be uploaded at once.');
+        }
+
+        const validFiles: File[] = [];
+        for (const file of selected) {
+            try {
+                validateDocumentFile(file);
+                validFiles.push(file);
+            } catch (err: any) {
+                setDocError(err?.message || 'Invalid document');
+            }
+        }
+
+        if (validFiles.length === 0) {
+            if (e.target) e.target.value = '';
+            return;
+        }
+
+        const agent = data as Agent;
+        setIsUploadingDocs(true);
         try {
-            const { s3Service } = await import('../services/s3Service');
-            const { url } = await s3Service.uploadKnowledgeDocument(file, data.id);
-
-            setKnowledgeBase(prev => [...prev, {
-                id: `kb-${Date.now()}`,
-                name: file.name,
-                url,
-                type: file.type,
-                size: file.size,
-                uploadedAt: Date.now()
-            }]);
-        } catch (error) {
+            const created = await uploadAndRegisterMany(validFiles, 'agent', agent.id);
+            setDocuments(prev => [...created, ...prev]);
+        } catch (error: any) {
             console.error(error);
-            alert("Failed to upload document to AWS S3.");
+            setDocError(error?.message || 'Failed to upload documents');
         } finally {
-            setIsUploading(false);
+            setIsUploadingDocs(false);
             if (e.target) e.target.value = '';
         }
     };
 
-    const handleSave = () => {
-        if (type === 'team') onSaveTeam?.({ ...data as Team, name: teamName, description: teamDesc });
-        else if (type === 'prism') {
-            // Prism profile is now just informational, keys moved to User Profile
+    const handleDeleteDocument = async (docId: string) => {
+        try {
+            await deleteDocument(docId);
+            setDocuments(prev => prev.filter(doc => doc.docId !== docId));
+        } catch (error: any) {
+            console.error(error);
+            setDocError(error?.message || 'Failed to delete document');
         }
-        else onSaveAgent?.({ ...data as Agent, name, role, jobDescription: jd, knowledgeBase });
+    };
+
+    const handleSave = () => {
+        if (type === 'team') {
+            onSaveTeam?.({ ...data as Team, name: teamName, description: teamDesc });
+        } else if (type === 'agent') {
+            const existing = data as Agent;
+            onSaveAgent?.({ ...existing, name, role: existing.role, jobDescription: jd });
+        }
         onClose();
     };
+
     const agent = data as Agent;
-    const brainProfile = AI_RESUMES.find(p => p.modelId === agent.model) || AI_RESUMES[0];
 
     return (
         <div className={`fixed top-0 right-0 h-full w-full max-w-sm md:max-w-md bg-[#1A1A1A] border-l border-white/5 shadow-2xl z-[50] transition-transform duration-300 transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -108,7 +161,7 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-[0.2em]">AI Model</label>
                                             <div className="w-full bg-black border border-white/10 rounded-xl p-3 text-[11px] font-mono text-white/60">
-                                                {brainProfile?.name || agent.model}
+                                                {agent.model || 'Unknown model'}
                                             </div>
                                         </div>
                                     )}
@@ -122,39 +175,53 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
                                             <div>
                                                 <div className="flex items-center justify-between mb-3">
-                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Memory Data (Knowledge Base)</label>
-                                                    <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider font-bold">AWS S3</span>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Agent Documents</label>
+                                                    <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider font-bold">Backend Registry</span>
                                                 </div>
 
                                                 <div className="space-y-2 mb-6">
-                                                    {knowledgeBase.map(doc => (
-                                                        <div key={doc.id} className="flex items-center justify-between bg-white/[0.02] border border-white/10 rounded-lg p-3">
+                                                    {isDocsLoading && (
+                                                        <div className="text-[10px] text-white/50">Loading documents...</div>
+                                                    )}
+
+                                                    {!isDocsLoading && documents.length === 0 && (
+                                                        <div className="text-[10px] text-white/40 border border-dashed border-white/10 rounded-lg p-3">
+                                                            No documents registered for this agent yet.
+                                                        </div>
+                                                    )}
+
+                                                    {documents.map((doc) => (
+                                                        <div key={doc.docId} className="flex items-center justify-between bg-white/[0.02] border border-white/10 rounded-lg p-3">
                                                             <div className="flex flex-1 items-center gap-3 overflow-hidden">
                                                                 <span className="text-lg">📄</span>
                                                                 <div className="truncate pr-4">
-                                                                    <div className="text-[11px] font-bold text-slate-300 truncate">{doc.name}</div>
-                                                                    <div className="text-[9px] text-slate-500 uppercase tracking-widest">{(doc.size / 1024).toFixed(1)} KB</div>
+                                                                    <div className="text-[11px] font-bold text-slate-300 truncate">{doc.fileName}</div>
+                                                                    <div className="text-[9px] text-slate-500 uppercase tracking-widest">{((doc.size || 0) / 1024).toFixed(1)} KB</div>
                                                                 </div>
                                                             </div>
-                                                            <button onClick={() => setKnowledgeBase(prev => prev.filter(k => k.id !== doc.id))} className="text-red-500/50 hover:text-red-400 p-1 flex-shrink-0 relative z-10 transition-colors">
+                                                            <button onClick={() => handleDeleteDocument(doc.docId)} className="text-red-500/50 hover:text-red-400 p-1 flex-shrink-0 relative z-10 transition-colors">
                                                                 <XMarkIcon />
                                                             </button>
                                                         </div>
                                                     ))}
 
-                                                    <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${isUploading ? 'bg-white/5 border-white/20' : 'bg-black border-white/10 hover:bg-white/5 hover:border-white/30'}`}>
+                                                    {docError && (
+                                                        <p className="text-[10px] text-amber-400">{docError}</p>
+                                                    )}
+
+                                                    <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${isUploadingDocs ? 'bg-white/5 border-white/20' : 'bg-black border-white/10 hover:bg-white/5 hover:border-white/30'}`}>
                                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                            {isUploading ? (
-                                                                <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                                            {isUploadingDocs ? (
+                                                                <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                                                             ) : (
                                                                 <>
                                                                     <svg className="w-6 h-6 mb-2 text-white/40" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" /></svg>
-                                                                    <p className="mb-1 text-[10px] text-white/60 font-bold"><span className="text-white">Click to upload</span></p>
-                                                                    <p className="text-[8px] uppercase tracking-widest text-white/40">PDF, TXT, DOCX</p>
+                                                                    <p className="mb-1 text-[10px] text-white/60 font-bold"><span className="text-white">Upload documents</span></p>
+                                                                    <p className="text-[8px] uppercase tracking-widest text-white/40">PDF, TXT, DOCX, CSV, MD (max 5)</p>
                                                                 </>
                                                             )}
                                                         </div>
-                                                        <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} accept=".pdf,.txt,.doc,.docx,.csv,.md" />
+                                                        <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploadingDocs} accept=".pdf,.txt,.doc,.docx,.csv,.md,.json,.yaml,.yml,.xml" multiple />
                                                     </label>
                                                 </div>
                                             </div>
@@ -165,7 +232,7 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                                                     <div className="flex flex-wrap gap-2">
                                                         {agent.capabilities!.map(cap => (
                                                             <span key={cap} className="px-2.5 py-1 bg-white/[0.05] border border-white/10 rounded-lg text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                                                                {cap.replace('google', '').replace('Generation', '')}
+                                                                {cap}
                                                             </span>
                                                         ))}
                                                     </div>

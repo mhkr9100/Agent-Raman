@@ -17,6 +17,7 @@ import {
     getModelById
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
+import { normalizeToolIds } from '../../shared/tool-ids.js';
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
@@ -34,15 +35,16 @@ function respond(statusCode, body) {
 // ─── Validation ──────────────────────────────────────────────────
 
 function validateBlueprint(blueprint) {
-    const required = ['agentName', 'agentDescription', 'role', 'systemPrompt', 'tools', 'model'];
+    const required = ['agentName', 'agentDescription', 'role', 'systemPrompt', 'model'];
     const missing = required.filter(field => !blueprint[field]);
 
     if (missing.length > 0) {
         return `Missing blueprint fields: ${missing.join(', ')}`;
     }
 
-    if (!Array.isArray(blueprint.tools)) {
-        return 'blueprint.tools must be an array of toolIds';
+    const toolIds = normalizeToolIds(blueprint.toolIds || blueprint.tools || []);
+    if (!Array.isArray(toolIds) || toolIds.length === 0) {
+        return 'blueprint.toolIds (or tools) must contain at least one tool ID';
     }
 
     if (!blueprint.model.modelId) {
@@ -55,6 +57,13 @@ function validateBlueprint(blueprint) {
 
     return null; // valid
 }
+
+const LEGACY_TOOL_CANDIDATES = {
+    'web-search': ['webSearch', 'googleSearch', 'web_search'],
+    'image-generation': ['imageGeneration', 'imageEditing'],
+    'doc-reader': ['docReader', 'doc_reader', 'fileManipulation'],
+    thinking: ['thinking']
+};
 
 // ─── Handler ─────────────────────────────────────────────────────
 
@@ -78,22 +87,37 @@ export const handler = async (event) => {
         const validationError = validateBlueprint(blueprint);
         if (validationError) return respond(400, { error: validationError });
 
-        console.log(`AGENT-CREATE: userId=${userId}, agentName="${blueprint.agentName}"`);
+        const requestedToolIds = normalizeToolIds(blueprint.toolIds || blueprint.tools || []);
+        const requestedDocumentIds = Array.isArray(blueprint.documentIds)
+            ? blueprint.documentIds.filter(Boolean)
+            : [];
+
+        console.log(`AGENT-CREATE: userId=${userId}, agentName="${blueprint.agentName}", toolIds=[${requestedToolIds.join(', ')}]`);
 
         // 1. Generate agent ID
         const agentId = crypto.randomUUID();
 
         // 2. Resolve tools from RamN_ToolRegistry
-        console.log(`AGENT-CREATE: Resolving ${blueprint.tools.length} tools...`);
+        console.log(`AGENT-CREATE: Resolving ${requestedToolIds.length} tools...`);
         const resolvedTools = [];
-        for (const toolId of blueprint.tools) {
-            const tool = await getToolById(toolId);
+        for (const toolId of requestedToolIds) {
+            let tool = await getToolById(toolId);
+            if (!tool) {
+                const legacyCandidates = LEGACY_TOOL_CANDIDATES[toolId] || [];
+                for (const legacyId of legacyCandidates) {
+                    tool = await getToolById(legacyId);
+                    if (tool) break;
+                }
+            }
             if (tool) {
                 resolvedTools.push(tool);
                 console.log(`  ✅ Tool resolved: ${toolId} → ${tool.name}`);
             } else {
                 console.warn(`  ⚠️ Tool not found: ${toolId} — skipping`);
             }
+        }
+        if (resolvedTools.length === 0) {
+            return respond(400, { error: 'No valid tools were resolved from toolIds' });
         }
 
         // 3. Resolve model from RamN_ModelRegistry
@@ -110,8 +134,10 @@ export const handler = async (event) => {
             agentDescription: blueprint.agentDescription,
             role: blueprint.role,
             systemPrompt: blueprint.systemPrompt,
+            icon: blueprint.icon || '🤖',
             tools: resolvedTools,
-            toolIds: blueprint.tools,
+            toolIds: requestedToolIds,
+            documentIds: requestedDocumentIds,
             model: {
                 ...resolvedModel,
                 temperature: blueprint.model.temperature
