@@ -28,38 +28,81 @@ export const useUserMap = (currentUser: UserProfile | null) => {
     const [isLoading, setIsLoading] = useState(false);
     const [isConsolidating, setIsConsolidating] = useState(false);
 
-    // Load UserMap from local DB on mount
+    const readLocalTree = useCallback(async (userId: string) => {
+        const keyPrimary = `usermap-${userId}`;
+        const keyLegacy = `usermap_${userId}`;
+        let saved = await dbService.get<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, keyPrimary, userId);
+        if (!saved) saved = await dbService.get<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, keyLegacy, userId);
+
+        if (saved && (saved as StoredUserMapRecord).tree) {
+            const record = saved as StoredUserMapRecord;
+            return {
+                key: keyPrimary,
+                tree: record.tree,
+                updatedAt: record.updatedAt || null
+            };
+        }
+
+        if (saved && (saved as PageNode).id === 'root') {
+            return {
+                key: keyPrimary,
+                tree: saved as PageNode,
+                updatedAt: null
+            };
+        }
+
+        return {
+            key: keyPrimary,
+            tree: null as PageNode | null,
+            updatedAt: null as string | null
+        };
+    }, []);
+
+    // Load UserMap from backend (authoritative) with local conflict fallback.
     useEffect(() => {
         if (!currentUser) return;
         const load = async () => {
-            const keyPrimary = `usermap-${currentUser.id}`;
-            const keyLegacy = `usermap_${currentUser.id}`;
-            let saved = await dbService.get<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, keyPrimary, currentUser.id);
-            if (!saved) {
-                saved = await dbService.get<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, keyLegacy, currentUser.id);
+            setIsLoading(true);
+            const local = await readLocalTree(currentUser.id);
+            if (local.tree && local.tree.id === 'root') {
+                setUserMapTree(local.tree);
             }
 
-            if (!saved) {
-                const all = await dbService.getAll<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, currentUser.id);
-                const candidate = (all || []).find((entry: any) => (
-                    (entry as StoredUserMapRecord).userId === currentUser.id || (entry as PageNode).id === 'root'
-                ));
-                if (!candidate) return;
-                saved = candidate;
-            }
+            try {
+                const { getUserMapTree, saveUserMapTree } = await import('../services/apiV2');
+                const remote = await getUserMapTree();
+                if (remote?.tree && remote.tree.id === 'root') {
+                    const remoteTs = remote.updatedAt ? Date.parse(remote.updatedAt) : NaN;
+                    const localTs = local.updatedAt ? Date.parse(local.updatedAt) : NaN;
+                    const useLocal = local.tree && !Number.isNaN(localTs) && (Number.isNaN(remoteTs) || localTs > remoteTs);
 
-            if ((saved as StoredUserMapRecord).tree) {
-                setUserMapTree((saved as StoredUserMapRecord).tree);
-                return;
-            }
+                    if (useLocal && local.tree) {
+                        await saveUserMapTree(local.tree);
+                        setUserMapTree(local.tree);
+                    } else {
+                        setUserMapTree(remote.tree);
+                    }
 
-            // Backward compatibility for older local-only shape.
-            if ((saved as PageNode).id === 'root') {
-                setUserMapTree(saved as PageNode);
+                    const payload: StoredUserMapRecord = {
+                        id: local.key,
+                        userId: currentUser.id,
+                        tree: useLocal && local.tree ? local.tree : remote.tree,
+                        updatedAt: remote.updatedAt || new Date().toISOString()
+                    };
+                    await dbService.put(STORES_ENUM.USERMAP, payload, local.key);
+                } else if (local.tree) {
+                    // Remote not initialized yet; backfill from local.
+                    const { saveUserMapTree } = await import('../services/apiV2');
+                    await saveUserMapTree(local.tree);
+                }
+            } catch (error) {
+                console.warn('[useUserMap] Remote tree load failed, falling back to local cache:', error);
+            } finally {
+                setIsLoading(false);
             }
         };
         load();
-    }, [currentUser]);
+    }, [currentUser, readLocalTree]);
 
     // Save to local DB whenever tree changes
     const saveTree = useCallback(async (tree: PageNode) => {
@@ -73,6 +116,14 @@ export const useUserMap = (currentUser: UserProfile | null) => {
             updatedAt: new Date().toISOString()
         };
         await dbService.put(STORES_ENUM.USERMAP, payload, key);
+
+        // Persist authoritative copy to backend so it survives device/browser changes.
+        try {
+            const { saveUserMapTree } = await import('../services/apiV2');
+            await saveUserMapTree(tree);
+        } catch (error) {
+            console.error('[useUserMap] Failed to persist UserMap tree to backend:', error);
+        }
     }, [currentUser]);
 
     // Update a specific node

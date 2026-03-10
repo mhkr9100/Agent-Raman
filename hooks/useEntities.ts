@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Agent, Team, UserProfile } from '../types';
 import { AGENTS } from '../constants';
-import { listAgents } from '../services/apiV2';
+import { listAgents, deleteAgent as deleteAgentApi } from '../services/apiV2';
 import { dbService, STORES_ENUM } from '../services/db';
 
 export const useEntities = (currentUser: UserProfile | null) => {
@@ -84,10 +84,17 @@ export const useEntities = (currentUser: UserProfile | null) => {
         return newAgent;
     }, [currentUser]);
 
-    const deleteAgent = useCallback((id: string) => {
+    const deleteAgent = useCallback(async (id: string) => {
+        const previous = agents;
         setAgents(prev => prev.filter(a => a.id !== id));
-        // TODO: wire to DELETE /api/v2/agents/:id when backend endpoint exists
-    }, []);
+        try {
+            await deleteAgentApi(id);
+        } catch (err) {
+            console.error('[useEntities] Failed to delete agent from backend, rolling back:', err);
+            setAgents(previous);
+            throw err;
+        }
+    }, [agents]);
 
     const deleteTeam = useCallback(async (id: string) => {
         setTeams(prev => prev.filter(t => t.id !== id));

@@ -292,10 +292,20 @@ Resources:
           Properties:
             Path: /api/v2/prism/chat
             Method: POST
+        PrismChatStream:
+          Type: Api
+          Properties:
+            Path: /api/v2/prism/chat/stream
+            Method: POST
         PrismChatOptions:
           Type: Api
           Properties:
             Path: /api/v2/prism/chat
+            Method: OPTIONS
+        PrismChatStreamOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/prism/chat/stream
             Method: OPTIONS
 
   # ──── Agent Create (Blueprint Saver) ────
@@ -411,6 +421,42 @@ Resources:
             Path: /api/v2/agents
             Method: OPTIONS
 
+  # ──── Agent Delete ────
+  AgentDeleteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/agent-delete/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 15
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:DeleteItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+                - dynamodb:Scan
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+      Events:
+        AgentDelete:
+          Type: Api
+          Properties:
+            Path: /api/v2/agents/{agentId}
+            Method: DELETE
+        AgentDeleteOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/agents/{agentId}
+            Method: OPTIONS
+
   # ──── Model Registry V2 (Read-Only) ────
   ModelRegistryV2Function:
     Type: AWS::Serverless::Function
@@ -508,6 +554,43 @@ Resources:
             Method: OPTIONS
 
   # ──── UserMap Consolidate ────
+  UserMapStoreFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/usermap-store/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 20
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+      Events:
+        UserMapGet:
+          Type: Api
+          Properties:
+            Path: /api/v2/usermap
+            Method: GET
+        UserMapPost:
+          Type: Api
+          Properties:
+            Path: /api/v2/usermap
+            Method: POST
+        UserMapOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/usermap
+            Method: OPTIONS
+
   UserMapConsolidateFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -569,6 +652,26 @@ Resources:
           Properties:
             Path: /api/v2/memory/extract
             Method: OPTIONS
+
+  ApiGatewayDefault4xx:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref ServerlessRestApi
+      ResponseType: DEFAULT_4XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${CorsAllowOrigin}'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Requested-With'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'OPTIONS,GET,POST,PUT,DELETE'"
+
+  ApiGatewayDefault5xx:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref ServerlessRestApi
+      ResponseType: DEFAULT_5XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: !Sub "'${CorsAllowOrigin}'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Requested-With'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'OPTIONS,GET,POST,PUT,DELETE'"
 
   # ──── API Gateway Usage Plan (Cloud Protection) ────
   RamNUsagePlan:

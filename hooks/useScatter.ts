@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Agent, Team, Message, UserProfile, MessageContent, Task, ToolCall, GlobalTask } from '../types';
 import { AGENTS } from '../constants';
-import { prismChat, agentChat } from '../services/apiV2';
+import { prismChat, prismChatStream, agentChat } from '../services/apiV2';
 import { useAppStore } from '../store/useAppStore';
 
 // Composed Hooks
@@ -160,6 +160,27 @@ export const useScatter = () => {
         setActiveRequests(prev => prev + 1);
 
         try {
+            const callPrism = async () => {
+                const request = {
+                    message: text,
+                    mode: prismMode || 'ask',
+                    conversationId: activeSessionId || undefined,
+                    ...(councilConfig ? { councilConfig } : {}),
+                    ...(specialAgentContext ? { specialAgentContext } : {})
+                } as const;
+
+                try {
+                    return await prismChatStream(request, (event) => {
+                        if (event?.type === 'status' && event.phase) {
+                            setPrismStatus(event.phase);
+                        }
+                    });
+                } catch (streamErr) {
+                    console.warn('[useScatter] Stream endpoint unavailable; falling back to JSON response.', streamErr);
+                    return await prismChat(request);
+                }
+            };
+
             if (team) {
                 setPrismStatus("Scanning for Mentions...");
                 const mentionedNames = text.match(/@(\w+)/g)?.map(m => m.slice(1).toLowerCase()) || [];
@@ -183,13 +204,7 @@ export const useScatter = () => {
                     }));
                 } else {
                     setPrismStatus("No mention detected. Consulting Core...");
-                    const response = await prismChat({
-                        message: text,
-                        mode: prismMode || 'ask',
-                        conversationId: activeSessionId || undefined,
-                        ...(councilConfig ? { councilConfig } : {}),
-                        ...(specialAgentContext ? { specialAgentContext } : {})
-                    });
+                    const response = await callPrism();
 
                     if (response) {
                         const msgId = `msg-${Date.now()}`;
@@ -222,13 +237,7 @@ export const useScatter = () => {
                 let responseContent: any;
 
                 if (target.id === 'prism-core') {
-                    const prismRes = await prismChat({
-                        message: text,
-                        mode: prismMode || 'ask',
-                        conversationId: activeSessionId || undefined,
-                        ...(councilConfig ? { councilConfig } : {}),
-                        ...(specialAgentContext ? { specialAgentContext } : {})
-                    });
+                    const prismRes = await callPrism();
                     responseContent = {
                         type: 'text',
                         text: prismRes.text,

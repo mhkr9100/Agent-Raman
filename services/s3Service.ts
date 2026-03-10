@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
-
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 interface PresignResponse {
@@ -49,11 +47,7 @@ export const s3Service = {
      */
     async uploadKnowledgeDocument(file: File, agentId: string): Promise<{ url: string; key: string }> {
         if (!BACKEND_URL) {
-            // Local fallback only when backend URL is not configured.
-            return {
-                url: URL.createObjectURL(file),
-                key: `mock-key-${uuidv4()}`
-            };
+            throw new Error('File upload requires VITE_BACKEND_URL to be configured.');
         }
 
         const { uploadUrl, key, publicUrl } = await getPresignedUploadUrl(file, agentId);

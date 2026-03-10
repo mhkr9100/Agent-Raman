@@ -79,6 +79,29 @@ async function apiRequest<T>(
     return data as T;
 }
 
+async function apiDeleteRequest<T>(path: string): Promise<T> {
+    const url = `${API_BASE}${path}`;
+    console.log(`API: DELETE ${path}`);
+
+    const token = getAuthToken();
+    const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText, message: '' }));
+        const error = errorData.error || `Request failed: ${response.status}`;
+        const detail = errorData.message ? ` — ${errorData.message}` : '';
+        throw new Error(`${error}${detail}`);
+    }
+
+    return await response.json() as T;
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  Prism Chat (Meta Agent Brain)
 // ═══════════════════════════════════════════════════════════════
@@ -130,6 +153,75 @@ export async function prismChat(params: PrismChatRequest): Promise<PrismChatResp
         console.error('API: prismChat failed:', error.message);
         throw error;
     }
+}
+
+export async function prismChatStream(
+    params: PrismChatRequest,
+    onEvent?: (event: { type?: string; phase?: string; payload?: PrismChatResponse }) => void
+): Promise<PrismChatResponse> {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE}/api/v2/prism/chat/stream`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            userId: getUserId(),
+            message: params.message,
+            mode: params.mode,
+            conversationId: params.conversationId || null,
+            ...(params.councilConfig ? { councilConfig: params.councilConfig } : {}),
+            ...(params.specialAgentContext ? { specialAgentContext: params.specialAgentContext } : {})
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText, message: '' }));
+        const error = errorData.error || `Request failed: ${response.status}`;
+        const detail = errorData.message ? ` — ${errorData.message}` : '';
+        throw new Error(`${error}${detail}`);
+    }
+
+    // Fallback: if stream body is not available, parse regular JSON.
+    if (!response.body) {
+        return await response.json() as PrismChatResponse;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalPayload: PrismChatResponse | null = null;
+
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split('\n\n');
+        buffer = chunks.pop() || '';
+
+        for (const chunk of chunks) {
+            const line = chunk.trim();
+            if (!line.startsWith('data:')) continue;
+
+            const jsonStr = line.slice(5).trim();
+            if (!jsonStr) continue;
+
+            try {
+                const event = JSON.parse(jsonStr);
+                onEvent?.(event);
+                if (event?.type === 'final' && event.payload) {
+                    finalPayload = event.payload;
+                }
+            } catch {
+                // Ignore malformed chunk and continue parsing stream.
+            }
+        }
+    }
+
+    if (finalPayload) return finalPayload;
+    throw new Error('Stream ended without final payload');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -207,6 +299,20 @@ export async function listAgents(): Promise<ListAgentsResponse> {
         return await apiRequest<ListAgentsResponse>('GET', `/api/v2/agents?userId=${encodeURIComponent(userId)}`);
     } catch (error: any) {
         console.error('API: listAgents failed:', error.message);
+        throw error;
+    }
+}
+
+export interface DeleteAgentResponse {
+    success: boolean;
+    agentId: string;
+}
+
+export async function deleteAgent(agentId: string): Promise<DeleteAgentResponse> {
+    try {
+        return await apiDeleteRequest<DeleteAgentResponse>(`/api/v2/agents/${encodeURIComponent(agentId)}`);
+    } catch (error: any) {
+        console.error('API: deleteAgent failed:', error.message);
         throw error;
     }
 }
@@ -298,6 +404,30 @@ export async function listTools(): Promise<ListToolsResponse> {
 export interface ConsolidateUserMapRequest {
     memories: string[];
     existingTree?: any;
+}
+
+export interface UserMapTreeResponse {
+    userId: string;
+    tree: any;
+    updatedAt?: string | null;
+}
+
+export async function getUserMapTree(): Promise<UserMapTreeResponse> {
+    try {
+        return await apiRequest<UserMapTreeResponse>('GET', '/api/v2/usermap');
+    } catch (error: any) {
+        console.error('API: getUserMapTree failed:', error.message);
+        throw error;
+    }
+}
+
+export async function saveUserMapTree(tree: any): Promise<{ success: boolean; userId: string }> {
+    try {
+        return await apiRequest<{ success: boolean; userId: string }>('POST', '/api/v2/usermap', { tree });
+    } catch (error: any) {
+        console.error('API: saveUserMapTree failed:', error.message);
+        throw error;
+    }
 }
 
 export async function consolidateUserMap(params: ConsolidateUserMapRequest): Promise<any> {

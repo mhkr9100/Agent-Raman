@@ -33,6 +33,9 @@ export const handler = async (event) => {
         return respond(200, { models });
     } catch (error) {
         console.error('MODEL-REGISTRY: ❌ Error:', error);
+        if (error.message && error.message.startsWith('Unauthorized')) {
+            return respond(401, { error: 'Unauthorized', message: error.message });
+        }
         return respond(500, { error: 'Failed to list models', message: error.message });
     }
 };

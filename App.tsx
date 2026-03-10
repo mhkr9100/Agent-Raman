@@ -54,13 +54,17 @@ const App: React.FC = () => {
     setDeleteModalState({ isOpen: true, id, name, type });
   };
 
-  const confirmDelete = () => {
-    if (deleteModalState.type === 'Agent') {
-      deleteAgent(deleteModalState.id);
-    } else if (deleteModalState.type === 'Team') {
-      deleteTeam(deleteModalState.id);
+  const confirmDelete = async () => {
+    try {
+      if (deleteModalState.type === 'Agent') {
+        await deleteAgent(deleteModalState.id);
+      } else if (deleteModalState.type === 'Team') {
+        await deleteTeam(deleteModalState.id);
+      }
+      setDeleteModalState({ isOpen: false, id: '', name: '', type: null });
+    } catch (err: any) {
+      alert(`Delete failed: ${err?.message || 'Unknown error'}`);
     }
-    setDeleteModalState({ isOpen: false, id: '', name: '', type: null });
   };
 
   // Creates an agent via real backend API, then adds to local state

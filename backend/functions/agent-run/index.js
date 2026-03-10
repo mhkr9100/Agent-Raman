@@ -22,6 +22,7 @@ import {
     getUserMap
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
+import { checkAndRecordUsage } from '../../shared/rate-limit.js';
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -315,6 +316,15 @@ export const handler = async (event) => {
 
         if (!agentId) return respond(400, { error: 'Missing agentId' });
         if (!message) return respond(400, { error: 'Missing message' });
+
+        const usage = await checkAndRecordUsage(userId, 'agent');
+        if (!usage.allowed) {
+            return respond(429, {
+                error: 'Rate limit exceeded',
+                message: `Hourly limit reached (${usage.limit}/hour).`,
+                usage
+            });
+        }
 
         console.log(`AGENT-RUN: agentId=${agentId}, userId=${userId}, conversationId=${conversationId || 'new'}`);
 

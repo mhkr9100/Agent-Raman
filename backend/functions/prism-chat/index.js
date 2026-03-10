@@ -19,6 +19,7 @@ import {
     getUserMap
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
+import { checkAndRecordUsage } from '../../shared/rate-limit.js';
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
@@ -31,6 +32,25 @@ const CORS = {
 
 function respond(statusCode, body) {
     return { statusCode, headers: CORS, body: JSON.stringify(body) };
+}
+
+function respondSSE(body) {
+    const payload = [
+        `data: ${JSON.stringify({ type: 'status', phase: 'accepted' })}`,
+        `data: ${JSON.stringify({ type: 'final', payload: body })}`,
+        `data: ${JSON.stringify({ type: 'done' })}`
+    ].join('\n\n') + '\n\n';
+
+    return {
+        statusCode: 200,
+        headers: {
+            ...CORS,
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        },
+        body: payload
+    };
 }
 
 // ─── JSON Extraction Helper ──────────────────────────────────────
@@ -606,6 +626,9 @@ export const handler = async (event) => {
     }
 
     try {
+        const requestPath = event.requestContext?.resourcePath || event.path || '';
+        const isStreamEndpoint = requestPath.endsWith('/stream');
+
         // 1. Auth check
         const authHeader = event.headers?.Authorization || event.headers?.authorization;
         const auth = await validateToken(authHeader);
@@ -619,21 +642,42 @@ export const handler = async (event) => {
         if (!message) return respond(400, { error: 'Missing message' });
         if (!mode) return respond(400, { error: 'Missing mode. Must be: ask, route, create, or council' });
 
+        const usage = await checkAndRecordUsage(userId, 'prism');
+        if (!usage.allowed) {
+            return respond(429, {
+                error: 'Rate limit exceeded',
+                message: `Hourly limit reached (${usage.limit}/hour).`,
+                usage
+            });
+        }
+
         console.log(`PRISM: ═══ Incoming request ═══ mode=${mode}, userId=${userId}, conversationId=${conversationId || 'new'}, specialAgent=${specialAgentContext?.name || 'none'}`);
 
-        // Route to mode handler
-        switch (mode) {
-            case 'ask':
-                return await handleAsk({ userId, message, conversationId });
-            case 'route':
-                return await handleRoute({ userId, message, conversationId });
-            case 'create':
-                return await handleCreate({ userId, message, conversationId, specialAgentContext });
-            case 'council':
-                return await handleCouncil({ userId, message, conversationId, councilConfig });
-            default:
-                return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, create, or council` });
+        const runMode = async () => {
+            switch (mode) {
+                case 'ask':
+                    return await handleAsk({ userId, message, conversationId });
+                case 'route':
+                    return await handleRoute({ userId, message, conversationId });
+                case 'create':
+                    return await handleCreate({ userId, message, conversationId, specialAgentContext });
+                case 'council':
+                    return await handleCouncil({ userId, message, conversationId, councilConfig });
+                default:
+                    return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, create, or council` });
+            }
+        };
+
+        const modeResponse = await runMode();
+        if (!isStreamEndpoint) {
+            return modeResponse;
         }
+        if (modeResponse.statusCode !== 200) {
+            return modeResponse;
+        }
+
+        const parsed = JSON.parse(modeResponse.body || '{}');
+        return respondSSE(parsed);
 
     } catch (error) {
         console.error('PRISM: ❌ Fatal error:', error);
