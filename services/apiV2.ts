@@ -216,6 +216,7 @@ export async function listAgents(): Promise<ListAgentsResponse> {
 // ═══════════════════════════════════════════════════════════════
 
 export interface SpecialAgentTemplate {
+    id?: string;
     templateId: string;
     name: string;
     role: string;
@@ -235,6 +236,57 @@ export async function listSpecialAgents(): Promise<ListSpecialAgentsResponse> {
         return await apiRequest<ListSpecialAgentsResponse>('GET', '/api/v2/special-agents');
     } catch (error: any) {
         console.error('API: listSpecialAgents failed:', error.message);
+        throw error;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Model & Tool Registries
+// ═══════════════════════════════════════════════════════════════
+
+export interface ModelRegistryItem {
+    modelId: string;
+    name?: string;
+    provider?: string;
+    version?: string;
+    icon?: string;
+    tagline?: string;
+    status?: string;
+}
+
+export interface ListModelsResponse {
+    models: ModelRegistryItem[];
+}
+
+export async function listModels(): Promise<ListModelsResponse> {
+    try {
+        return await apiRequest<ListModelsResponse>('GET', '/api/v2/models');
+    } catch (error: any) {
+        console.error('API: listModels failed:', error.message);
+        throw error;
+    }
+}
+
+export interface ToolRegistryItem {
+    toolId: string;
+    name?: string;
+    icon?: string;
+    category?: string;
+    description?: string;
+    summary?: string;
+    behavior?: string;
+    status?: string;
+}
+
+export interface ListToolsResponse {
+    tools: ToolRegistryItem[];
+}
+
+export async function listTools(): Promise<ListToolsResponse> {
+    try {
+        return await apiRequest<ListToolsResponse>('GET', '/api/v2/tools');
+    } catch (error: any) {
+        console.error('API: listTools failed:', error.message);
         throw error;
     }
 }

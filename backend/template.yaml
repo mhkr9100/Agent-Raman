@@ -411,6 +411,38 @@ Resources:
             Path: /api/v2/agents
             Method: OPTIONS
 
+  # ──── Model Registry V2 (Read-Only) ────
+  ModelRegistryV2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/model-registry/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+      Events:
+        ModelRegistryV2:
+          Type: Api
+          Properties:
+            Path: /api/v2/models
+            Method: GET
+        ModelRegistryV2Options:
+          Type: Api
+          Properties:
+            Path: /api/v2/models
+            Method: OPTIONS
+
   # ──── Tool Registry V2 (Read-Only) ────
   ToolRegistryV2Function:
     Type: AWS::Serverless::Function

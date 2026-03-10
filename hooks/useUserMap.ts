@@ -10,6 +10,13 @@ export interface PageNode {
     children: PageNode[];
 }
 
+interface StoredUserMapRecord {
+    id: string;
+    userId: string;
+    tree: PageNode;
+    updatedAt: string;
+}
+
 const EMPTY_TREE: PageNode = {
     id: 'root',
     label: 'UserMap',
@@ -25,8 +32,31 @@ export const useUserMap = (currentUser: UserProfile | null) => {
     useEffect(() => {
         if (!currentUser) return;
         const load = async () => {
-            const saved = await dbService.get<PageNode>(STORES_ENUM.USERMAP, `usermap_${currentUser.id}`, currentUser.id);
-            if (saved) setUserMapTree(saved);
+            const keyPrimary = `usermap-${currentUser.id}`;
+            const keyLegacy = `usermap_${currentUser.id}`;
+            let saved = await dbService.get<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, keyPrimary, currentUser.id);
+            if (!saved) {
+                saved = await dbService.get<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, keyLegacy, currentUser.id);
+            }
+
+            if (!saved) {
+                const all = await dbService.getAll<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, currentUser.id);
+                const candidate = (all || []).find((entry: any) => (
+                    (entry as StoredUserMapRecord).userId === currentUser.id || (entry as PageNode).id === 'root'
+                ));
+                if (!candidate) return;
+                saved = candidate;
+            }
+
+            if ((saved as StoredUserMapRecord).tree) {
+                setUserMapTree((saved as StoredUserMapRecord).tree);
+                return;
+            }
+
+            // Backward compatibility for older local-only shape.
+            if ((saved as PageNode).id === 'root') {
+                setUserMapTree(saved as PageNode);
+            }
         };
         load();
     }, [currentUser]);
@@ -35,9 +65,14 @@ export const useUserMap = (currentUser: UserProfile | null) => {
     const saveTree = useCallback(async (tree: PageNode) => {
         if (!currentUser) return;
         setUserMapTree(tree);
-        // Ensure the item has userId for DynamoDB sync
-        const payload = { ...tree, userId: currentUser.id };
-        await dbService.put(STORES_ENUM.USERMAP, payload, `usermap_${currentUser.id}`);
+        const key = `usermap-${currentUser.id}`;
+        const payload: StoredUserMapRecord = {
+            id: key,
+            userId: currentUser.id,
+            tree,
+            updatedAt: new Date().toISOString()
+        };
+        await dbService.put(STORES_ENUM.USERMAP, payload, key);
     }, [currentUser]);
 
     // Update a specific node
@@ -86,7 +121,7 @@ export const useUserMap = (currentUser: UserProfile | null) => {
         setIsConsolidating(true);
         try {
             // Get all stored memories from IndexedDB
-            const stored = await dbService.getAll<{ id: string; content: string }>(STORES_ENUM.MEMORIES);
+            const stored = await dbService.getAll<{ id: string; content: string }>(STORES_ENUM.MEMORIES, currentUser.id);
             const memoryStrings = stored.map(m => m.content || m.id).filter(Boolean);
 
             if (memoryStrings.length === 0) {
@@ -106,10 +141,20 @@ export const useUserMap = (currentUser: UserProfile | null) => {
         }
     }, [currentUser, userMapTree, saveTree]);
 
-    const persistFacts = useCallback(async (facts: string[], agentId?: string, source: string = 'chat') => {
+    const persistFacts = useCallback(async (
+        facts: string[],
+        agentId?: string,
+        source: string = 'chat',
+        requireCloudAck: boolean = false
+    ) => {
         if (!currentUser || facts.length === 0) return 0;
         const timestamp = Date.now();
         const BACKEND_URL = import.meta.env.VITE_API_V2_URL || import.meta.env.VITE_BACKEND_URL || '';
+        const failures: string[] = [];
+
+        if (requireCloudAck && !BACKEND_URL) {
+            throw new Error('Cloud memory endpoint is not configured. External memory import requires backend sync.');
+        }
 
         let storedCount = 0;
         for (const fact of facts) {
@@ -127,6 +172,40 @@ export const useUserMap = (currentUser: UserProfile | null) => {
                 createdAt: new Date().toISOString()
             });
             storedCount += 1;
+
+            if (BACKEND_URL) {
+                const token = sessionStorage.getItem('auth_token')
+                    || sessionStorage.getItem('id_token')
+                    || localStorage.getItem('auth_token')
+                    || localStorage.getItem('id_token');
+                const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                try {
+                    const response = await fetch(`${BACKEND_URL}/api/memory/add`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({
+                            agentId,
+                            content: cleaned,
+                            category: source === 'external-import' ? 'profile' : 'general'
+                        })
+                    });
+                    if (!response.ok) {
+                        const body = await response.text();
+                        failures.push(`memory/add failed (${response.status}): ${body || 'no response body'}`);
+                    }
+                } catch (error: any) {
+                    failures.push(`memory/add network error: ${error?.message || 'unknown error'}`);
+                }
+            }
+        }
+
+        if (failures.length > 0) {
+            if (requireCloudAck) {
+                throw new Error(failures[0]);
+            }
+            console.error('[AWS Memory Sync Error]', failures[0]);
         }
 
         return storedCount;
@@ -142,7 +221,7 @@ export const useUserMap = (currentUser: UserProfile | null) => {
             // Send messages to backend to extract facts
             const res = await extractMemory({ messages });
             const facts: string[] = res.facts || [];
-            await persistFacts(facts, agentId, 'chat');
+            await persistFacts(facts, agentId, 'chat', false);
         } catch (e) {
             console.error('Memory ingestion failed:', e);
         }
@@ -168,7 +247,7 @@ export const useUserMap = (currentUser: UserProfile | null) => {
             .filter(line => line.length >= 8)
             .slice(0, 200);
 
-        return persistFacts(normalized, undefined, 'external-import');
+        return persistFacts(normalized, undefined, 'external-import', true);
     }, [currentUser, persistFacts]);
 
     return {

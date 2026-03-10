@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AIModelProfile, AgentTemplate, Agent, Team, UserProfile } from '../types';
-import { SPECIAL_AGENT_TEMPLATES } from '../constants';
 import { listSpecialAgents, SpecialAgentTemplate } from '../services/apiV2';
 import { ToolsView } from './ToolsView';
 import { ModelsView } from './ModelsView';
@@ -20,7 +19,7 @@ interface SpectrumViewProps {
 export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPrism, onFabricateAgent, onInitializeGroup, onOpenChat, agents, teams, userProfile }) => {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [specialAgents, setSpecialAgents] = useState<any[]>([]);
+    const [specialAgents, setSpecialAgents] = useState<SpecialAgentTemplate[]>([]);
     const [isLoadingAgents, setIsLoadingAgents] = useState(true);
 
     useEffect(() => {
@@ -125,6 +124,18 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                                     viewType="grid"
                                 />
                             ))}
+
+                            {isLoadingAgents && (
+                                <div className="col-span-full p-6 rounded-2xl border border-dashed border-black/10 dark:border-white/10 text-center text-[10px] text-gray-500 dark:text-white/40 uppercase tracking-[0.15em]">
+                                    Loading Special Agents...
+                                </div>
+                            )}
+
+                            {!isLoadingAgents && specialAgents.length === 0 && (
+                                <div className="col-span-full p-6 rounded-2xl border border-dashed border-black/10 dark:border-white/10 text-center text-[10px] text-gray-500 dark:text-white/40 uppercase tracking-[0.15em]">
+                                    No Special Agents Found
+                                </div>
+                            )}
 
                             {specialAgents.map(template => (
                                 <ListItem
@@ -243,7 +254,7 @@ const ListItem: React.FC<{
                     {tools && tools.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-3">
                             {tools.map(tool => (
-                                <span key={tool} className="text-[8px] px-1.5 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded uppercase tracking-wider font-bold">
+                                <span key={tool} className="text-[8px] px-1.5 py-0.5 bg-black/5 dark:bg-white/10 text-gray-700 dark:text-white/70 rounded uppercase tracking-wider font-bold">
                                     {tool}
                                 </span>
                             ))}

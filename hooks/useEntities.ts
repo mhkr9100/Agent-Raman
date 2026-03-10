@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Agent, Team, UserProfile } from '../types';
-import { AGENTS, SYSTEM_TEAMS } from '../constants';
+import { AGENTS } from '../constants';
 import { listAgents } from '../services/apiV2';
+import { dbService, STORES_ENUM } from '../services/db';
 
 export const useEntities = (currentUser: UserProfile | null) => {
     const [agents, setAgents] = useState<Agent[]>([]);
@@ -40,8 +41,22 @@ export const useEntities = (currentUser: UserProfile | null) => {
             setAgents([...systemAgents]);
         }
 
-        // Teams remain local for now (no backend equivalent yet)
-        setTeams([...SYSTEM_TEAMS]);
+        try {
+            const dbTeams = await dbService.getAll<Team>(STORES_ENUM.GROUPS, userId);
+            const normalizedTeams = (dbTeams || [])
+                .filter((team) => !!team?.id)
+                .map((team) => ({
+                    ...team,
+                    userId: team.userId || userId,
+                    agents: Array.isArray(team.agents) ? team.agents : [],
+                    type: team.type || 'rouge',
+                    isSystem: !!team.isSystem
+                }));
+            setTeams(normalizedTeams);
+        } catch (err) {
+            console.error('[useEntities] Failed to load teams from backend:', err);
+            setTeams([]);
+        }
     }, []);
 
     /**
@@ -74,25 +89,57 @@ export const useEntities = (currentUser: UserProfile | null) => {
         // TODO: wire to DELETE /api/v2/agents/:id when backend endpoint exists
     }, []);
 
-    const deleteTeam = useCallback((id: string) => {
+    const deleteTeam = useCallback(async (id: string) => {
         setTeams(prev => prev.filter(t => t.id !== id));
-    }, []);
+        if (currentUser?.id) {
+            await dbService.delete(STORES_ENUM.GROUPS, id, currentUser.id);
+        }
+    }, [currentUser]);
 
-    const createTeam = useCallback((data: any, switchChatFn: (id: string) => void) => {
-        const newTeam = {
-            ...data,
-            id: `team-${Date.now()}`,
-            userId: currentUser?.id,
-            agents: agents.filter(a => data.agentIds?.includes(a.id)),
+    const addTeam = useCallback(async (team: Team) => {
+        const ownerId = currentUser?.id || team.userId;
+        const normalizedTeam: Team = {
+            ...team,
+            userId: ownerId,
+            agents: Array.isArray(team.agents) ? team.agents : [],
+            type: team.type || 'rouge',
             isSystem: false
         };
-        setTeams(prev => [...prev, newTeam]);
+
+        setTeams(prev => {
+            const exists = prev.some(t => t.id === normalizedTeam.id);
+            if (exists) {
+                return prev.map(t => t.id === normalizedTeam.id ? normalizedTeam : t);
+            }
+            return [...prev, normalizedTeam];
+        });
+
+        if (ownerId) {
+            await dbService.put(STORES_ENUM.GROUPS, normalizedTeam, normalizedTeam.id);
+        }
+        return normalizedTeam;
+    }, [currentUser]);
+
+    const createTeam = useCallback(async (data: any, switchChatFn: (id: string) => void) => {
+        const resolvedAgents: Agent[] = Array.isArray(data.agents)
+            ? data.agents
+            : agents.filter(a => data.agentIds?.includes(a.id));
+        const newTeam: Team = {
+            ...data,
+            id: data.id || `team-${Date.now()}`,
+            userId: currentUser?.id,
+            agents: resolvedAgents,
+            type: data.type || 'rouge',
+            isSystem: false
+        };
+        await addTeam(newTeam);
         switchChatFn(newTeam.id);
-    }, [currentUser, agents]);
+        return newTeam;
+    }, [currentUser, agents, addTeam]);
 
     return {
         agents, setAgents,
         teams, setTeams,
-        loadEntities, addDynamoAgent, deleteAgent, deleteTeam, createTeam
+        loadEntities, addDynamoAgent, deleteAgent, deleteTeam, createTeam, addTeam
     };
 };

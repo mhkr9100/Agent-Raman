@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Agent } from '../types';
-import { AI_RESUMES } from '../constants';
+import { listModels, ModelRegistryItem } from '../services/apiV2';
 
 export type PrismMode = 'create' | 'ask' | 'council';
 
@@ -46,12 +46,9 @@ export const InputBar: React.FC<InputBarProps> = ({
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [prismMode, setPrismMode] = useState<PrismMode>('ask');
-  const [councilModels, setCouncilModels] = useState<string[]>([
-    'gemini-2.5-pro',
-    'gpt-4o',
-    'anthropic.claude-3-5-sonnet-20240620-v1:0'
-  ]);
-  const [decisionModelId, setDecisionModelId] = useState<string>('gemini-2.5-pro');
+  const [councilModels, setCouncilModels] = useState<string[]>([]);
+  const [decisionModelId, setDecisionModelId] = useState<string>('');
+  const [availableModels, setAvailableModels] = useState<ModelRegistryItem[]>([]);
   const [attachments, setAttachments] = useState<ParsedAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
@@ -69,17 +66,53 @@ export const InputBar: React.FC<InputBarProps> = ({
   );
 
   const normalizeCouncilModels = () => {
+    const availableIds = availableModels.map(m => m.modelId).filter(Boolean);
     const unique = Array.from(new Set(councilModels.filter(Boolean)));
-    const fallback = AI_RESUMES.map(m => m.modelId);
-    const normalized = [...unique];
+    const normalized = unique.filter(modelId => availableIds.includes(modelId));
 
-    for (const modelId of fallback) {
+    for (const modelId of availableIds) {
       if (normalized.length >= 3) break;
       if (!normalized.includes(modelId)) normalized.push(modelId);
     }
 
     return normalized.slice(0, 3);
   };
+
+  useEffect(() => {
+    if (!isPrism) return;
+    let mounted = true;
+
+    (async () => {
+      try {
+        const response = await listModels();
+        if (!mounted) return;
+
+        const models = Array.isArray(response.models) ? response.models : [];
+        setAvailableModels(models);
+        const ids = models.map(model => model.modelId).filter(Boolean);
+
+        if (ids.length > 0) {
+          setCouncilModels(prev => {
+            const validExisting = prev.filter(modelId => ids.includes(modelId));
+            const merged = [...validExisting];
+            for (const modelId of ids) {
+              if (merged.length >= 3) break;
+              if (!merged.includes(modelId)) merged.push(modelId);
+            }
+            return merged.slice(0, 3);
+          });
+          setDecisionModelId(prev => (prev && ids.includes(prev) ? prev : ids[0]));
+        }
+      } catch (err) {
+        if (!mounted) return;
+        setAvailableModels([]);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isPrism]);
 
   const buildPromptWithAttachments = (basePrompt: string) => {
     if (attachments.length === 0) return basePrompt;
@@ -103,12 +136,12 @@ ${sections.join('\n\n')}
 
   const extractPdfText = async (file: File): Promise<string> => {
     const data = new Uint8Array(await file.arrayBuffer());
-    const pdfjs = await import('pdfjs-dist');
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.mjs',
-      import.meta.url
-    ).toString();
-    const task = (pdfjs as any).getDocument({ data, disableWorker: true });
+    const [{ getDocument, GlobalWorkerOptions }, workerModule] = await Promise.all([
+      import('pdfjs-dist/legacy/build/pdf.mjs'),
+      import('pdfjs-dist/legacy/build/pdf.worker.mjs?url')
+    ]);
+    GlobalWorkerOptions.workerSrc = workerModule.default;
+    const task = getDocument({ data });
     const doc = await task.promise;
 
     const pages: string[] = [];
@@ -151,9 +184,16 @@ ${sections.join('\n\n')}
     const councilConfig = (isPrism && prismMode === 'council')
       ? {
         councilModelIds: normalizeCouncilModels(),
-        decisionModelId: decisionModelId || 'gemini-2.5-pro'
+        decisionModelId: decisionModelId || normalizeCouncilModels()[0] || ''
       }
       : undefined;
+
+    if (isPrism && prismMode === 'council') {
+      if (!councilConfig?.decisionModelId || (councilConfig.councilModelIds || []).length < 3) {
+        setAttachmentError('Council mode requires at least 3 advisor models and 1 decision model from Model Registry.');
+        return;
+      }
+    }
 
     onSubmit(
       finalPrompt,
@@ -310,6 +350,11 @@ ${sections.join('\n\n')}
             <p className="text-[9px] font-black uppercase tracking-[0.15em] text-amber-500 mb-2">
               Council Setup: Pick 3 Advisors + 1 Decision Model
             </p>
+            {availableModels.length === 0 && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 mb-2">
+                No models available from Model Registry.
+              </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {[0, 1, 2].map((idx) => (
                 <select
@@ -323,10 +368,11 @@ ${sections.join('\n\n')}
                     });
                   }}
                   className="bg-white dark:bg-black/20 border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-gray-700 dark:text-white/70 outline-none"
+                  disabled={availableModels.length === 0}
                 >
-                  {AI_RESUMES.map(model => (
+                  {availableModels.map(model => (
                     <option key={model.modelId} value={model.modelId}>
-                      {`Advisor ${idx + 1}: ${model.name}`}
+                      {`Advisor ${idx + 1}: ${model.name || model.modelId}`}
                     </option>
                   ))}
                 </select>
@@ -335,10 +381,11 @@ ${sections.join('\n\n')}
                 value={decisionModelId}
                 onChange={(e) => setDecisionModelId(e.target.value)}
                 className="bg-white dark:bg-black/20 border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-gray-700 dark:text-white/70 outline-none"
+                disabled={availableModels.length === 0}
               >
-                {AI_RESUMES.map(model => (
+                {availableModels.map(model => (
                   <option key={model.modelId} value={model.modelId}>
-                    {`Decision: ${model.name}`}
+                    {`Decision: ${model.name || model.modelId}`}
                   </option>
                 ))}
               </select>

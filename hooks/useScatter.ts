@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Agent, Team, Message, UserProfile, MessageContent, Task, ToolCall, GlobalTask } from '../types';
 import { AGENTS } from '../constants';
-import { prismChat, agentChat, createAgent } from '../services/apiV2';
-import { canMakeRequest, recordRequest, getUsageInfo, formatResetTime } from '../services/rateLimiter';
+import { prismChat, agentChat } from '../services/apiV2';
 import { useAppStore } from '../store/useAppStore';
 
 // Composed Hooks
@@ -35,7 +34,7 @@ export const useScatter = () => {
 
     const {
         agents, setAgents, teams, setTeams,
-        loadEntities, addDynamoAgent, deleteAgent, deleteTeam, createTeam
+        loadEntities, addDynamoAgent, deleteAgent, deleteTeam, createTeam, addTeam
     } = useEntities(currentUser);
 
     const {
@@ -46,27 +45,9 @@ export const useScatter = () => {
     } = useChatSessions(currentUser);
 
     // === Rate Limit State ===
-    const [rateLimitInfo, setRateLimitInfo] = useState<RateLimitInfo>({
+    const [rateLimitInfo] = useState<RateLimitInfo>({
         blocked: false, remaining: 15, limit: 15, resetTime: null, resetTimeFormatted: null
     });
-
-    // Refresh rate limit info periodically
-    useEffect(() => {
-        if (!currentUser) return;
-        const refreshRate = () => {
-            const usage = getUsageInfo(currentUser.id);
-            setRateLimitInfo({
-                blocked: usage.remaining <= 0,
-                remaining: usage.remaining,
-                limit: usage.limit,
-                resetTime: usage.resetTime,
-                resetTimeFormatted: usage.resetTime ? formatResetTime(usage.resetTime) : null
-            });
-        };
-        refreshRate();
-        const interval = setInterval(refreshRate, 10_000); // refresh every 10s
-        return () => clearInterval(interval);
-    }, [currentUser]);
 
     // === Load Data on Auth ===
     useEffect(() => {
@@ -107,7 +88,6 @@ export const useScatter = () => {
     const processSilentDirective = useCallback(async (task: GlobalTask) => {
         const agent = agents.find(a => a.id === task.agentId);
         if (!agent) return "Error: Agent not found.";
-        const userKeys = getUserKeys();
         const response = await agentChat({
             agentId: agent.id,
             message: task.label,
@@ -132,7 +112,7 @@ export const useScatter = () => {
     // === Proxy Functions ===
     const _executeCmdProxy = async (messageId: string, toolCall: ToolCall) => {
         return handleExecuteCommand(activeChatId, messageId, toolCall,
-            (team) => { setTeams(prev => [...prev, team]); },
+            addTeam,
             addDynamoAgent,
             setActiveChatId
         );
@@ -147,46 +127,11 @@ export const useScatter = () => {
         createEnabled?: boolean,
         prismMode?: 'ask' | 'create' | 'council',
         specialAgentContext?: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string },
-        councilConfig?: { councilModelIds: string[]; decisionModelId: string }
+        councilConfig?: { councilModelIds: string[]; decisionModelId: string },
+        targetChatId?: string
     ) => {
-        const chatId = activeChatId;
+        const chatId = targetChatId || activeChatId;
         if (!currentUser) return;
-
-        // ── STRICT RATE LIMIT CHECK ──
-        const rateCheck = canMakeRequest(currentUser.id);
-        if (!rateCheck.allowed) {
-            const usage = getUsageInfo(currentUser.id);
-            setRateLimitInfo({
-                blocked: true,
-                remaining: 0,
-                limit: usage.limit,
-                resetTime: usage.resetTime,
-                resetTimeFormatted: usage.resetTime ? formatResetTime(usage.resetTime) : null
-            });
-            // Show rate limit as a system message
-            addMessage(chatId, {
-                id: `ratelimit-${Date.now()}`,
-                agent: AGENTS.PRISM,
-                content: {
-                    type: 'text',
-                    text: `⏳ **Hourly Quota Reached.** You've used your limit of 15 requests per hour. Please come back after 1 hour (resets at **${usage.resetTime ? formatResetTime(usage.resetTime) : 'soon'}**).`
-                },
-                type: 'agent'
-            });
-            return; // BLOCK — do not send
-        }
-
-        // Record this request
-        recordRequest(currentUser.id);
-        const updatedUsage = getUsageInfo(currentUser.id);
-        setRateLimitInfo({
-            blocked: updatedUsage.remaining <= 0,
-            remaining: updatedUsage.remaining,
-            limit: updatedUsage.limit,
-            resetTime: updatedUsage.resetTime,
-            resetTimeFormatted: updatedUsage.resetTime ? formatResetTime(updatedUsage.resetTime) : null
-        });
-        // ── END RATE LIMIT ──
 
         const newMessage: Message = {
             id: Date.now().toString(),
@@ -264,7 +209,7 @@ export const useScatter = () => {
                         // Auto-execute READ_ONLY tool calls silently (e.g., search)
                         if (response.toolCall && response.toolCall.safetyType === 'READ_ONLY') {
                             await handleExecuteCommand(chatId, msgId, response.toolCall,
-                                (team) => { setTeams(prev => [...prev, team]); },
+                                addTeam,
                                 addDynamoAgent, setActiveChatId
                             );
                         }
@@ -313,7 +258,7 @@ export const useScatter = () => {
 
                     if (responseContent.toolCall && responseContent.toolCall.safetyType === 'READ_ONLY') {
                         await handleExecuteCommand(chatId, msgId, responseContent.toolCall,
-                            (team) => { setTeams(prev => [...prev, team]); },
+                            addTeam,
                             addDynamoAgent, setActiveChatId
                         );
                     }
@@ -335,7 +280,7 @@ export const useScatter = () => {
             setTypingAgent(null);
             setOrchestrationWeights({});
         }
-    }, [currentUser, activeChatId, agents, teams, addMessage, getUserKeys]);
+    }, [currentUser, activeChatId, agents, teams, addMessage, getUserKeys, addTeam]);
 
     // === Special Agent → Prism Flow ===
     const sendSpecialAgentToPrism = useCallback((template: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string }) => {
@@ -343,10 +288,7 @@ export const useScatter = () => {
         setActiveChatId('prism-core');
         // Auto-send create-mode message with special agent context
         const message = `Personalize and deploy the "${template.name}" agent for me.`;
-        // Small delay to ensure chat switch is rendered
-        setTimeout(() => {
-            handleSendMessage(message, 1, undefined, false, false, 'create', template);
-        }, 100);
+        handleSendMessage(message, 1, undefined, false, false, 'create', template, undefined, 'prism-core');
     }, [setActiveChatId, handleSendMessage]);
 
     return {

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Agent, Message, UserProfile, ToolCall, Team } from '../types';
 import { AGENTS } from '../constants';
 // import { generateSingleAgentResponse, generatePrismResponse, executeInterceptedCommand } from '../services/aiService';
@@ -22,48 +22,103 @@ export const useAgentExecution = (
 
 
 
-    const handleExecuteCommand = async (activeChatId: string, messageId: string, toolCall: ToolCall, onCreateTeam: (team: Team) => void, onRecruitAgent: (agent: Agent) => void, setActiveChatId: (id: string) => void) => {
+    const handleExecuteCommand = async (
+        activeChatId: string,
+        messageId: string,
+        toolCall: ToolCall,
+        onCreateTeam: (team: Team) => void | Promise<void | Team> | Team,
+        onRecruitAgent: (agent: Agent) => void,
+        setActiveChatId: (id: string) => void
+    ) => {
         const history = useAppStore.getState().chatHistory[activeChatId] || [];
         const msgIndex = history.findIndex(m => m.id === messageId);
         if (msgIndex === -1) return;
 
         if (toolCall.name === 'fabricateTeam') {
-            const squad = toolCall.args.specialists.map((spec: any) => {
-                const newAgent = { ...spec, id: `agent-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, type: 'agent', userId: currentUser?.id, model: spec.modelId || 'gemini-2.5-flash', provider: 'google', isDeletable: true, isSystem: false };
-                onRecruitAgent(newAgent);
-                return newAgent;
-            });
-            const newTeam: Team = {
-                id: `team-${Date.now()}`,
-                userId: currentUser?.id,
-                name: toolCall.args.teamName,
-                description: toolCall.args.objective,
-                type: 'rouge',
-                agents: squad,
-                isSystem: false
-            };
-            onCreateTeam(newTeam);
+            try {
+                const specialists = Array.isArray(toolCall.args?.specialists) ? toolCall.args.specialists : [];
+                if (specialists.length === 0) {
+                    throw new Error('No specialists provided for team fabrication.');
+                }
 
-            const updatedHistory = [...history];
-            updatedHistory[msgIndex] = {
-                ...updatedHistory[msgIndex],
-                content: { ...updatedHistory[msgIndex].content, text: `✅ Command Initialized: The **${newTeam.name}** squad has been deployed.`, toolCall: undefined }
-            };
+                const createdAgents: Agent[] = [];
+                for (const spec of specialists) {
+                    const response = await createAgent({
+                        agentName: spec.name || spec.agentName,
+                        role: spec.role || 'Specialist',
+                        agentDescription: spec.jobDescription || spec.description || `A specialized ${spec.role || 'AI'} agent.`,
+                        systemPrompt: spec.jobDescription || spec.systemPrompt || `You are a ${spec.role || 'Specialist'} agent.`,
+                        icon: spec.icon || '🤖',
+                        model: {
+                            modelId: spec.modelId || 'gemini-2.5-flash',
+                            temperature: 0.3
+                        },
+                        tools: spec.capabilities || spec.tools || []
+                    });
 
-            const introMessage: Message = {
-                id: `intro-${Date.now()}`,
-                userId: currentUser?.id,
-                agent: AGENTS.PRISM, // Prism introduces the team
-                content: { type: 'text', text: `The **${newTeam.name}** squad has been successfully deployed and synchronized. Instruct them when ready.` },
-                type: 'agent'
-            };
+                    const newAgent: Agent = {
+                        id: response.agentId,
+                        userId: currentUser?.id,
+                        name: response.name,
+                        type: 'agent',
+                        role: spec.role || 'Specialist',
+                        jobDescription: spec.jobDescription || spec.description || `A specialized ${spec.role || 'AI'} agent.`,
+                        icon: spec.icon || '🤖',
+                        provider: 'google',
+                        model: spec.modelId || 'gemini-2.5-flash',
+                        isDeletable: true,
+                        isSystem: false
+                    };
+                    onRecruitAgent(newAgent);
+                    createdAgents.push(newAgent);
+                }
 
-            useAppStore.getState().setChatHistory(prev => ({
-                ...prev,
-                [activeChatId]: updatedHistory,
-                [newTeam.id]: [introMessage]
-            }));
-            setActiveChatId(newTeam.id);
+                const newTeam: Team = {
+                    id: `team-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                    userId: currentUser?.id,
+                    name: toolCall.args.teamName || 'New Team',
+                    description: toolCall.args.objective,
+                    type: 'rouge',
+                    agents: createdAgents,
+                    isSystem: false
+                };
+                await onCreateTeam(newTeam);
+
+                const updatedHistory = [...history];
+                updatedHistory[msgIndex] = {
+                    ...updatedHistory[msgIndex],
+                    content: { ...updatedHistory[msgIndex].content, text: `✅ Command Initialized: The **${newTeam.name}** squad has been deployed.`, toolCall: undefined }
+                };
+
+                const introMessage: Message = {
+                    id: `intro-${Date.now()}`,
+                    userId: currentUser?.id,
+                    agent: AGENTS.PRISM,
+                    content: { type: 'text', text: `The **${newTeam.name}** squad has been successfully deployed and synchronized. Instruct them when ready.` },
+                    type: 'agent'
+                };
+
+                useAppStore.getState().setChatHistory(prev => ({
+                    ...prev,
+                    [activeChatId]: updatedHistory,
+                    [newTeam.id]: [introMessage]
+                }));
+                setActiveChatId(newTeam.id);
+            } catch (err: any) {
+                const updatedHistory = [...history];
+                updatedHistory[msgIndex] = {
+                    ...updatedHistory[msgIndex],
+                    content: {
+                        ...updatedHistory[msgIndex].content,
+                        text: `⚠️ Team Fabrication Failed: ${err?.message || 'Unknown error'}`,
+                        toolCall: undefined
+                    }
+                };
+                useAppStore.getState().setChatHistory(prev => ({
+                    ...prev,
+                    [activeChatId]: updatedHistory
+                }));
+            }
             return;
         }
 
@@ -141,13 +196,16 @@ export const useAgentExecution = (
         };
         useAppStore.getState().setChatHistory(prev => ({ ...prev, [activeChatId]: updatedHistory }));
 
-        // Execution simulation removed (Rule #2 Compliance)
-        // In the future, the 'isExecuting' state will be managed by the actual backend/streaming response events.
-        const msgIndex = updatedHistory.findIndex(m => m.id === messageId);
-        if (msgIndex !== -1) {
-            updatedHistory[msgIndex] = {
-                ...updatedHistory[msgIndex],
-                content: { ...updatedHistory[msgIndex].content, isExecuting: false }
+        // No simulated execution for unsupported action tools.
+        const targetIndex = updatedHistory.findIndex(m => m.id === messageId);
+        if (targetIndex !== -1) {
+            updatedHistory[targetIndex] = {
+                ...updatedHistory[targetIndex],
+                content: {
+                    ...updatedHistory[targetIndex].content,
+                    isExecuting: false,
+                    text: `${updatedHistory[targetIndex].content.text || ''}\n\n⚠️ This tool call cannot be executed client-side. Please wire a backend task endpoint for this action.`
+                }
             };
             useAppStore.getState().setChatHistory(prev => ({ ...prev, [activeChatId]: updatedHistory }));
         }

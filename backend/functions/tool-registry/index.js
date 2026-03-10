@@ -6,6 +6,7 @@
  */
 
 import { listTools } from '../../shared/dynamo.js';
+import { validateToken } from '../../shared/auth.js';
 
 const CORS = {
     'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
@@ -22,6 +23,9 @@ export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') return respond(200, {});
 
     try {
+        const authHeader = event.headers?.Authorization || event.headers?.authorization;
+        await validateToken(authHeader);
+
         console.log('TOOL-REGISTRY: Listing all tools');
         const tools = await listTools();
         console.log(`TOOL-REGISTRY: ✅ Found ${tools.length} tools`);
