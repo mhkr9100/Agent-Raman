@@ -7,20 +7,14 @@
 
 import { getUserMap, updateUserMap } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
+import { buildCorsHeaders } from '../../shared/cors.js';
 
-const CORS = {
-    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,GET,POST',
-    'Content-Type': 'application/json'
-};
-
-function respond(statusCode, body) {
-    return { statusCode, headers: CORS, body: JSON.stringify(body) };
+function respond(statusCode, body, eventHeaders) {
+    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,GET,POST'), body: JSON.stringify(body) };
 }
 
 export const handler = async (event) => {
-    if (event.httpMethod === 'OPTIONS') return respond(200, {});
+    if (event.httpMethod === 'OPTIONS') return respond(200, {}, event.headers);
 
     try {
         const authHeader = event.headers?.Authorization || event.headers?.authorization;
@@ -33,7 +27,7 @@ export const handler = async (event) => {
                 userId,
                 tree: userMap.tree || null,
                 updatedAt: userMap.updatedAt || null
-            });
+            }, event.headers);
         }
 
         if (event.httpMethod === 'POST') {
@@ -41,7 +35,7 @@ export const handler = async (event) => {
             const tree = body?.tree;
             const expectedUpdatedAt = body?.expectedUpdatedAt ? String(body.expectedUpdatedAt) : null;
             if (!tree || tree.id !== 'root') {
-                return respond(400, { error: 'Missing or invalid tree payload' });
+                return respond(400, { error: 'Missing or invalid tree payload' }, event.headers);
             }
 
             const current = await getUserMap(userId);
@@ -52,7 +46,7 @@ export const handler = async (event) => {
                     message: 'UserMap has been updated from another session.',
                     currentTree: current.tree || null,
                     currentUpdatedAt
-                });
+                }, event.headers);
             }
 
             await updateUserMap(userId, { tree });
@@ -61,15 +55,15 @@ export const handler = async (event) => {
                 success: true,
                 userId,
                 updatedAt: updated?.updatedAt || null
-            });
+            }, event.headers);
         }
 
-        return respond(405, { error: 'Method Not Allowed' });
+        return respond(405, { error: 'Method Not Allowed' }, event.headers);
     } catch (error) {
         console.error('USERMAP-STORE: ❌ Error:', error);
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message });
+            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
         }
-        return respond(500, { error: 'Failed to handle user map', message: error.message });
+        return respond(500, { error: 'Failed to handle user map', message: 'An internal error occurred. Please try again.' }, event.headers);
     }
 };

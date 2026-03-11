@@ -64,7 +64,7 @@ function wrapError(table, operation, error) {
  * @param {Object} agent - { agentId, userId, name, description, blueprint, status }
  */
 export async function saveAgent({ agentId, userId, name, description, blueprint, status = 'active' }) {
-    console.log(`[dynamo] saveAgent: ${agentId} for user ${userId}`);
+    console.log(`[dynamo] saveAgent: ${agentId} for user ${userId.substring(0, 8)}***`);
     try {
         const now = new Date().toISOString();
         await docClient.send(new PutCommand({
@@ -110,7 +110,7 @@ export async function getAgent(agentId, userId) {
  * @returns {Array} List of agent records
  */
 export async function listAgentsByUser(userId) {
-    console.log(`[dynamo] listAgentsByUser: ${userId}`);
+    console.log(`[dynamo] listAgentsByUser: ${userId.substring(0, 8)}***`);
     try {
         const result = await docClient.send(new QueryCommand({
             TableName: TABLES.AGENTS,
@@ -333,7 +333,7 @@ export async function getSpecialAgent(templateId) {
  * @returns {Object}
  */
 export async function getUserMap(userId) {
-    console.log(`[dynamo] getUserMap: ${userId}`);
+    console.log(`[dynamo] getUserMap: ${userId.substring(0, 8)}***`);
     try {
         const result = await docClient.send(new GetCommand({
             TableName: TABLES.USER_MAP,
@@ -357,7 +357,7 @@ export async function getUserMap(userId) {
  * @param {Object} updates - Key-value pairs to update
  */
 export async function updateUserMap(userId, updates) {
-    console.log(`[dynamo] updateUserMap: ${userId}`, Object.keys(updates));
+    console.log(`[dynamo] updateUserMap: ${userId.substring(0, 8)}***`, Object.keys(updates));
     try {
         updates.updatedAt = new Date().toISOString();
 
@@ -441,7 +441,7 @@ export async function saveDocument({
     contentType,
     size
 }) {
-    console.log(`[dynamo] saveDocument: ${docId} for user ${userId} (${ownerType}:${ownerId})`);
+    console.log(`[dynamo] saveDocument: ${docId} for user ${userId.substring(0, 8)}*** (${ownerType}:${ownerId})`);
     try {
         const now = new Date().toISOString();
         const ownerKey = `${userId}#${ownerType}#${ownerId}`;
@@ -474,7 +474,7 @@ export async function saveDocument({
 }
 
 export async function getDocument(docId, userId) {
-    console.log(`[dynamo] getDocument: ${docId} for user ${userId}`);
+    console.log(`[dynamo] getDocument: ${docId} for user ${userId.substring(0, 8)}***`);
     try {
         const result = await docClient.send(new GetCommand({
             TableName: TABLES.DOCUMENTS,
@@ -487,7 +487,7 @@ export async function getDocument(docId, userId) {
 }
 
 export async function listDocumentsByOwner(userId, ownerType, ownerId) {
-    console.log(`[dynamo] listDocumentsByOwner: ${userId} ${ownerType}:${ownerId}`);
+    console.log(`[dynamo] listDocumentsByOwner: ${userId.substring(0, 8)}*** ${ownerType}:${ownerId}`);
     try {
         const ownerKey = `${userId}#${ownerType}#${ownerId}`;
         const result = await docClient.send(new QueryCommand({
@@ -506,7 +506,7 @@ export async function listDocumentsByOwner(userId, ownerType, ownerId) {
 }
 
 export async function deleteDocument(docId, userId) {
-    console.log(`[dynamo] deleteDocument: ${docId} for user ${userId}`);
+    console.log(`[dynamo] deleteDocument: ${docId} for user ${userId.substring(0, 8)}***`);
     try {
         await docClient.send(new DeleteCommand({
             TableName: TABLES.DOCUMENTS,
@@ -521,6 +521,69 @@ export async function deleteDocument(docId, userId) {
 // ─── Export table names for scripts that need them ────────────────
 
 export { TABLES };
+
+// ══════════════════════════════════════════════════════════════════
+//  GDPR — Cascading User Data Deletion
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Delete all data associated with a user (GDPR cascading delete).
+ * Removes agents, UserMap entry, and documents for the given userId.
+ * Note: Conversation cleanup is omitted (no userId index on conversations table).
+ * @param {string} userId
+ * @returns {{ deleted: boolean, errors: string[] }}
+ */
+export async function deleteAllUserData(userId) {
+    console.log(`[dynamo] deleteAllUserData: ${userId.substring(0, 8)}***`);
+    const errors = [];
+
+    // 1. Delete all agents
+    try {
+        const agents = await listAgentsByUser(userId);
+        for (const agent of agents) {
+            await deleteAgent(agent.agentId, userId);
+        }
+        console.log(`[dynamo] ✅ Deleted ${agents.length} agents for user`);
+    } catch (error) {
+        console.error('[dynamo] ❌ Failed to delete agents:', error.message);
+        errors.push(`agents: ${error.message}`);
+    }
+
+    // 2. Delete UserMap entry
+    try {
+        await docClient.send(new DeleteCommand({
+            TableName: TABLES.USER_MAP,
+            Key: { userId }
+        }));
+        console.log('[dynamo] ✅ Deleted UserMap for user');
+    } catch (error) {
+        console.error('[dynamo] ❌ Failed to delete UserMap:', error.message);
+        errors.push(`usermap: ${error.message}`);
+    }
+
+    // 3. Delete all documents (scan by userId filter)
+    try {
+        const result = await docClient.send(new ScanCommand({
+            TableName: TABLES.DOCUMENTS,
+            FilterExpression: 'userId = :uid',
+            ExpressionAttributeValues: { ':uid': userId }
+        }));
+        const docs = result.Items || [];
+        for (const doc of docs) {
+            await deleteDocument(doc.docId, userId);
+        }
+        console.log(`[dynamo] ✅ Deleted ${docs.length} documents for user`);
+    } catch (error) {
+        console.error('[dynamo] ❌ Failed to delete documents:', error.message);
+        errors.push(`documents: ${error.message}`);
+    }
+
+    if (errors.length > 0) {
+        console.error('[dynamo] deleteAllUserData completed with errors:', errors);
+    }
+
+    return { deleted: true, errors };
+}
 
 export default {
     // Agents
@@ -537,6 +600,8 @@ export default {
     listModels, getModelById,
     // Documents
     saveDocument, getDocument, listDocumentsByOwner, deleteDocument,
+    // GDPR
+    deleteAllUserData,
     // Constants
     TABLES
 };

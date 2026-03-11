@@ -7,20 +7,14 @@
 
 import { listTools } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
+import { buildCorsHeaders } from '../../shared/cors.js';
 
-const CORS = {
-    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,GET',
-    'Content-Type': 'application/json'
-};
-
-function respond(statusCode, body) {
-    return { statusCode, headers: CORS, body: JSON.stringify(body) };
+function respond(statusCode, body, eventHeaders) {
+    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,GET'), body: JSON.stringify(body) };
 }
 
 export const handler = async (event) => {
-    if (event.httpMethod === 'OPTIONS') return respond(200, {});
+    if (event.httpMethod === 'OPTIONS') return respond(200, {}, event.headers);
 
     try {
         const authHeader = event.headers?.Authorization || event.headers?.authorization;
@@ -30,14 +24,14 @@ export const handler = async (event) => {
         const tools = await listTools();
         console.log(`TOOL-REGISTRY: ✅ Found ${tools.length} tools`);
 
-        return respond(200, { tools });
+        return respond(200, { tools }, event.headers);
     } catch (error) {
         console.error('TOOL-REGISTRY: ❌ Error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message });
+            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
         }
 
-        return respond(500, { error: 'Failed to list tools', message: error.message });
+        return respond(500, { error: 'Failed to list tools', message: 'An internal error occurred. Please try again.' }, event.headers);
     }
 };

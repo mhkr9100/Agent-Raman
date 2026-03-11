@@ -182,10 +182,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     } catch (error: any) {
         console.error('[AI Proxy Error]', error);
         const status = (error.message || '').startsWith('Unauthorized') ? 401 : 500;
+        const safeMessage = status === 401 ? error.message : 'An internal error occurred. Please try again.';
         return {
             statusCode: status,
             headers: corsHeaders,
-            body: JSON.stringify({ error: error.message || 'Internal Server Error' })
+            body: JSON.stringify({ error: safeMessage })
         };
     }
 };
@@ -203,9 +204,7 @@ async function handleHealth(): Promise<APIGatewayProxyResult> {
             status: 'operational',
             providers: {
                 vertexAI: !!saKey,
-                bedrock: true, // Always available via Lambda IAM role
-                projectId: GCP_PROJECT_ID,
-                location: GCP_LOCATION
+                bedrock: true
             }
         })
     };

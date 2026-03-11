@@ -18,18 +18,10 @@ import {
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { normalizeToolIds } from '../../shared/tool-ids.js';
+import { buildCorsHeaders } from '../../shared/cors.js';
 
-// ─── CORS Headers ────────────────────────────────────────────────
-
-const CORS = {
-    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST',
-    'Content-Type': 'application/json'
-};
-
-function respond(statusCode, body) {
-    return { statusCode, headers: CORS, body: JSON.stringify(body) };
+function respond(statusCode, body, eventHeaders) {
+    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,POST'), body: JSON.stringify(body) };
 }
 
 // ─── Validation ──────────────────────────────────────────────────
@@ -70,7 +62,7 @@ const LEGACY_TOOL_CANDIDATES = {
 export const handler = async (event) => {
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
-        return respond(200, {});
+        return respond(200, {}, event.headers);
     }
 
     try {
@@ -82,17 +74,17 @@ export const handler = async (event) => {
         const { blueprint } = body;
 
         // Validate input
-        if (!blueprint) return respond(400, { error: 'Missing blueprint' });
+        if (!blueprint) return respond(400, { error: 'Missing blueprint' }, event.headers);
 
         const validationError = validateBlueprint(blueprint);
-        if (validationError) return respond(400, { error: validationError });
+        if (validationError) return respond(400, { error: validationError }, event.headers);
 
         const requestedToolIds = normalizeToolIds(blueprint.toolIds || blueprint.tools || []);
         const requestedDocumentIds = Array.isArray(blueprint.documentIds)
             ? blueprint.documentIds.filter(Boolean)
             : [];
 
-        console.log(`AGENT-CREATE: userId=${userId}, agentName="${blueprint.agentName}", toolIds=[${requestedToolIds.join(', ')}]`);
+        console.log(`AGENT-CREATE: agentName="${blueprint.agentName}", toolIds=[${requestedToolIds.join(', ')}]`);
 
         // 1. Generate agent ID
         const agentId = crypto.randomUUID();
@@ -117,14 +109,14 @@ export const handler = async (event) => {
             }
         }
         if (resolvedTools.length === 0) {
-            return respond(400, { error: 'No valid tools were resolved from toolIds' });
+            return respond(400, { error: 'No valid tools were resolved from toolIds' }, event.headers);
         }
 
         // 3. Resolve model from RamN_ModelRegistry
         console.log(`AGENT-CREATE: Resolving model: ${blueprint.model.modelId}`);
         const resolvedModel = await getModelById(blueprint.model.modelId);
         if (!resolvedModel) {
-            return respond(400, { error: `Model not found: ${blueprint.model.modelId}` });
+            return respond(400, { error: `Model not found: ${blueprint.model.modelId}` }, event.headers);
         }
         console.log(`  ✅ Model resolved: ${resolvedModel.name}`);
 
@@ -173,18 +165,18 @@ export const handler = async (event) => {
             name: blueprint.agentName,
             status: 'created',
             message: 'Agent created successfully'
-        });
+        }, event.headers);
 
     } catch (error) {
         console.error('AGENT-CREATE: ❌ Error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message });
+            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
         }
 
         return respond(500, {
             error: 'Failed to create agent',
-            message: error.message || 'Unknown error'
-        });
+            message: 'An internal error occurred. Please try again.'
+        }, event.headers);
     }
 };
