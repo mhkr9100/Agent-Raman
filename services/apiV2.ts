@@ -533,3 +533,22 @@ export async function extractMemory(params: ExtractMemoryRequest): Promise<{ fac
         throw error;
     }
 }
+
+export interface AddMemoryRequest {
+    content: string;
+    agentId?: string;
+    category?: string;
+}
+
+export async function addMemory(params: AddMemoryRequest): Promise<void> {
+    try {
+        await apiRequest<void>('POST', '/api/memory/add', {
+            content: params.content,
+            agentId: params.agentId,
+            category: params.category || 'general'
+        });
+    } catch (error: any) {
+        console.error('API: addMemory failed:', error.message);
+        throw error;
+    }
+}

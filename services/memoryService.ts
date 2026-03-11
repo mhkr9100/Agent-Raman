@@ -195,35 +195,17 @@ class PgVectorStore {
 }
 
 // ==========================================
-// Fact Extractor — Uses Gemini to extract facts from messages
+// Fact Extractor — Uses backend API to extract facts from messages
 // ==========================================
-async function extractFacts(messages: Array<{ role: string; content: string }>, geminiKey: string): Promise<string[]> {
-    const conversationText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
-
-    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-    const res = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: `Extract key facts, preferences, and context from this conversation. Return ONLY a JSON array of strings, each being one distinct fact. Example: ["User prefers Python", "User is building a SaaS product"]\n\nConversation:\n${conversationText}` }] }],
-            systemInstruction: { parts: [{ text: 'You are a fact extractor. Extract user preferences, goals, technical choices, business context, and personal details from conversations. Output ONLY a valid JSON array of fact strings. Be concise. Deduplicate.' }] }
-        })
-    });
-
-    if (!res.ok) {
-        console.error('[MemoryService] Fact extraction failed:', res.status);
+async function extractFactsViaBackend(messages: Array<{ role: string; content: string }>): Promise<string[]> {
+    try {
+        const { extractMemory } = await import('./apiV2');
+        const result = await extractMemory({ messages });
+        return result.facts || [];
+    } catch (error: any) {
+        console.error('[MemoryService] Fact extraction via backend failed:', error);
         return [];
     }
-
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-        try {
-            return JSON.parse(jsonMatch[0]);
-        } catch { return []; }
-    }
-    return [];
 }
 
 // ==========================================
@@ -231,11 +213,9 @@ async function extractFacts(messages: Array<{ role: string; content: string }>, 
 // ==========================================
 export class MemoryService {
     private store: InMemoryVectorStore | PgVectorStore;
-    private geminiKey: string;
     private usePgVector: boolean;
 
-    constructor(geminiKey: string, pgConfig?: { host: string; port: number; database: string; user: string; password: string }) {
-        this.geminiKey = geminiKey;
+    constructor(pgConfig?: { host: string; port: number; database: string; user: string; password: string }) {
         if (pgConfig && pgConfig.host) {
             this.store = new PgVectorStore(pgConfig);
             this.usePgVector = true;
@@ -254,10 +234,10 @@ export class MemoryService {
     }
 
     /**
-     * Ingest chat messages — extract facts and store them.
+     * Ingest chat messages — extract facts and store them via backend API.
      */
     async ingestMessages(messages: Array<{ role: string; content: string }>, userId: string, agentId?: string): Promise<string[]> {
-        const facts = await extractFacts(messages, this.geminiKey);
+        const facts = await extractFactsViaBackend(messages);
 
         for (const fact of facts) {
             const entry: MemoryEntry = {
