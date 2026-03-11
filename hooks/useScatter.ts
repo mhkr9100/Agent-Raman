@@ -39,9 +39,7 @@ export const useScatter = () => {
 
     const {
         activeChatId, setActiveChatId,
-        chatSessions, activeSessionId,
-        loadSessions, addMessage, clearChat, loadChatHistory,
-        startNewSession, resumeSession, getSessionsForEntity
+        loadSessions, addMessage, clearChat, loadChatHistory
     } = useChatSessions(currentUser);
 
     // === Rate Limit State ===
@@ -175,7 +173,7 @@ export const useScatter = () => {
                 const request = {
                     message: runtimeMessage,
                     mode: prismMode || 'ask',
-                    conversationId: activeSessionId || undefined,
+                    conversationId: chatId,
                     ...(councilConfig ? { councilConfig } : {}),
                     ...(specialAgentContext ? { specialAgentContext } : {})
                 } as const;
@@ -208,7 +206,7 @@ export const useScatter = () => {
                         const response = await agentChat({
                             agentId: targetAgent.id,
                             message: runtimeMessage,
-                            conversationId: activeSessionId || undefined
+                            conversationId: chatId
                         });
                         const responseContent = { type: 'text', text: response.response } as any;
                         if (responseContent) addMessage(chatId, { id: `msg-${Date.now()}-${targetAgent.id}`, userId: currentUser.id, agent: targetAgent, content: responseContent, type: 'agent' });
@@ -258,7 +256,7 @@ export const useScatter = () => {
                     const agentRes = await agentChat({
                         agentId: target.id,
                         message: runtimeMessage,
-                        conversationId: activeSessionId || undefined
+                        conversationId: chatId
                     });
                     // For now map string response to content interface
                     responseContent = { type: 'text', text: agentRes.response };
@@ -322,8 +320,6 @@ export const useScatter = () => {
         clearChat, loadChatHistory, recruitAgent: addDynamoAgent, deleteAgent, deleteTeam,
         createTeam: (data: any) => createTeam(data, setActiveChatId),
         rateLimitInfo,
-        // Session Management
-        chatSessions, activeSessionId, startNewSession, resumeSession, getSessionsForEntity,
         // Special Agent Flow
         sendSpecialAgentToPrism
     };

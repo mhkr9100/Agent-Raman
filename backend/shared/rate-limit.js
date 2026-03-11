@@ -6,7 +6,7 @@
 
 import { getUserMap, updateUserMap } from './dynamo.js';
 
-const HOURLY_LIMIT = Number(process.env.HOURLY_REQUEST_LIMIT || 15);
+const HOURLY_LIMIT = parseInt(process.env.HOURLY_REQUEST_LIMIT || '10', 10);
 const RETENTION_HOURS = Number(process.env.HOURLY_USAGE_RETENTION || 48);
 
 function toHourKey(date = new Date()) {

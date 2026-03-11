@@ -29,7 +29,6 @@ const App: React.FC = () => {
     activeChatId, setActiveChatId, isProcessing, typingAgent, typingAgents, prismStatus, orchestrationWeights, agentModes,
     handleSendMessage, handleExecuteCommand, injectOutputToChat, clearChat, loadChatHistory, recruitAgent, createTeam, deleteAgent, deleteTeam, processSilentDirective,
     rateLimitInfo,
-    chatSessions, activeSessionId, startNewSession, resumeSession, getSessionsForEntity,
     sendSpecialAgentToPrism
   } = useScatter();
 
@@ -275,10 +274,6 @@ const App: React.FC = () => {
                   activeAgent={activeAgent}
                   activeTeam={activeTeam}
                   rateLimitInfo={rateLimitInfo}
-                  sessions={getSessionsForEntity(activeChatId)}
-                  activeSessionId={activeSessionId || ''}
-                  onResumeSession={(sessionId) => { const s = chatSessions.find(x => x.id === sessionId); if (s) resumeSession(s); }}
-                  onStartNewSession={() => startNewSession(activeChatId)}
                   isProfileSidebarOpen={isProfileSidebarOpen}
                   onToggleProfileSidebar={() => setIsProfileSidebarOpen(!isProfileSidebarOpen)}
                 />

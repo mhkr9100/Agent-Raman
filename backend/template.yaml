@@ -263,6 +263,8 @@ Resources:
                 - bedrock:InvokeModel
               Resource:
                 - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0"
+                - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-*'
+                - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/meta.llama*'
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
@@ -407,6 +409,20 @@ Resources:
               Resource:
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+              Resource:
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_UserMap'
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Documents'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Documents/index/*'
             - Effect: Allow
               Action:
                 - s3:GetObject

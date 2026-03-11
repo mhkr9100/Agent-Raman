@@ -14,7 +14,8 @@ import {
     getUserMap,
     updateUserMap,
     getToolById,
-    getModelById
+    getModelById,
+    listAgentsByUser
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { normalizeToolIds } from '../../shared/tool-ids.js';
@@ -78,6 +79,18 @@ export const handler = async (event) => {
 
         const validationError = validateBlueprint(blueprint);
         if (validationError) return respond(400, { error: validationError }, event.headers);
+
+        // Check beta agent limit
+        const existingAgents = await listAgentsByUser(userId);
+        const MAX_AGENTS = parseInt(process.env.MAX_AGENTS_PER_USER || '5', 10);
+        if (existingAgents.length >= MAX_AGENTS) {
+            return respond(429, {
+                error: 'Agent limit reached',
+                message: `Beta accounts are limited to ${MAX_AGENTS} agents. Please delete an existing agent to create a new one.`,
+                limit: MAX_AGENTS,
+                current: existingAgents.length
+            }, event.headers);
+        }
 
         const requestedToolIds = normalizeToolIds(blueprint.toolIds || blueprint.tools || []);
         const requestedDocumentIds = Array.isArray(blueprint.documentIds)

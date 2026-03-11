@@ -163,7 +163,13 @@ async function getAccessToken() {
 
 // ─── Build Vertex AI Request Payload ────────────────────────────
 
-function buildPayload({ systemPrompt, userMessage, history = [], tools, temperature }) {
+const MODEL_TOKEN_LIMITS = {
+    'gemini-2.5-flash-lite': 2048,
+    'gemini-2.5-flash': 4096,
+    'gemini-2.5-pro': 8192
+};
+
+function buildPayload({ systemPrompt, userMessage, history = [], tools, temperature, modelName }) {
     const contents = [];
 
     // Convert history: [{role: 'user'|'model', content: string}] → Vertex format
@@ -187,7 +193,7 @@ function buildPayload({ systemPrompt, userMessage, history = [], tools, temperat
         generationConfig: {
             temperature: temperature ?? DEFAULT_TEMPERATURE,
             topP: 0.95,
-            maxOutputTokens: 8192
+            maxOutputTokens: MODEL_TOKEN_LIMITS[modelName] || 4096
         }
     };
 
@@ -369,7 +375,7 @@ export async function callAI({
         throw new Error('[vertex-ai] callAI requires at least userMessage or history');
     }
 
-    const payload = buildPayload({ systemPrompt, userMessage, history, tools, temperature });
+    const payload = buildPayload({ systemPrompt, userMessage, history, tools, temperature, modelName });
     return sendVertexRequest(payload, modelName);
 }
 
@@ -401,7 +407,7 @@ export async function callAIWithTools({
         throw new Error('[vertex-ai] callAIWithTools requires at least one tool definition');
     }
 
-    const payload = buildPayload({ systemPrompt, userMessage, history, tools, temperature });
+    const payload = buildPayload({ systemPrompt, userMessage, history, tools, temperature, modelName });
     return sendVertexRequest(payload, modelName);
 }
 

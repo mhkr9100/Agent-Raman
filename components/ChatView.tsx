@@ -8,12 +8,6 @@ import { RateLimitInfo } from '../hooks/useScatter';
 import { useAppStore } from '../store/useAppStore';
 import { PrismIcon } from './icons/PrismIcon';
 
-interface ChatSession {
-  id: string;
-  title: string;
-  updatedAt: number;
-}
-
 interface ChatViewProps {
   isLoading: boolean;
   typingAgent?: AgentType | null;
@@ -45,11 +39,6 @@ interface ChatViewProps {
   activeAgent?: AgentType;
   activeTeam?: Team;
   rateLimitInfo?: RateLimitInfo;
-  // Session controls
-  sessions?: ChatSession[];
-  activeSessionId?: string;
-  onResumeSession?: (sessionId: string) => void;
-  onStartNewSession?: () => void;
   // Profile sidebar controls
   isProfileSidebarOpen?: boolean;
   onToggleProfileSidebar?: () => void;
@@ -58,7 +47,6 @@ interface ChatViewProps {
 export const ChatView: React.FC<ChatViewProps> = ({
   isLoading, typingAgent, typingAgents = [], onSubmit, onAddAgent, onCreateTeam, onExecuteCommand, onSaveToTasks, onInjectSystemMessage, mentionCandidates, onConfigureNewAgent, onDeployCustomTeam, prismStatus, isGroup = false, orchestrationWeights = {}, agentModes = {}, activeChatId, activeAgent, activeTeam,
   rateLimitInfo,
-  sessions = [], activeSessionId = '', onResumeSession, onStartNewSession,
   isProfileSidebarOpen, onToggleProfileSidebar
 }) => {
   const isDispatching = prismStatus !== "";
@@ -89,23 +77,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          {sessions.length > 1 && onResumeSession && (
-            <select
-              value={activeSessionId}
-              onChange={(e) => onResumeSession(e.target.value)}
-              className="bg-transparent border border-black/10 dark:border-white/10 rounded-lg px-2 py-1.5 text-[9px] font-bold text-gray-600 dark:text-white/40 uppercase tracking-wider outline-none cursor-pointer hover:border-black/20 dark:hover:border-white/20 transition-all appearance-none"
-            >
-              {sessions.map((s, i) => (
-                <option key={s.id} value={s.id} className="bg-white dark:bg-[#1A1A1A] text-gray-900 dark:text-white">
-                  {s.title === 'New Chat' ? `Session ${sessions.length - i}` : s.title}
-                </option>
-              ))}
-            </select>
-          )}
-
-
-
-          {/* Info Button beside + button */}
+          {/* Info Button */}
           <button
             onClick={onToggleProfileSidebar}
             className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all cursor-help ${isProfileSidebarOpen
