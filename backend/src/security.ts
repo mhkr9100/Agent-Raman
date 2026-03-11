@@ -2,8 +2,12 @@ import { CognitoJwtVerifier } from 'aws-jwt-verify';
 
 type HeaderMap = Record<string, string | undefined> | null | undefined;
 
-const USER_POOL_ID = process.env.USER_POOL_ID || 'us-east-1_R2j2oAqLJ';
-const CLIENT_ID = process.env.CLIENT_ID || '77205lmtu8fg6t1s3sgcidf7p9';
+const USER_POOL_ID = process.env.USER_POOL_ID;
+const CLIENT_ID = process.env.CLIENT_ID;
+
+if (!USER_POOL_ID || !CLIENT_ID) {
+    throw new Error('FATAL: USER_POOL_ID and CLIENT_ID environment variables must be set.');
+}
 const DEFAULT_ALLOWED_ORIGINS = 'https://www.ramnai.com,http://localhost:3000,http://localhost:5173';
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS)
     .split(',')

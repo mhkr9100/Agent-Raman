@@ -153,7 +153,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     } catch (error: any) {
         console.error('Memory Error:', error);
         const status = (error.message || '').startsWith('Unauthorized') ? 401 : 500;
-        return { ...apiError(status, error.message || 'Internal Server Error'), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
+        const safeMessage = status === 401 ? 'Unauthorized' : 'An internal error occurred. Please try again.';
+        return { ...apiError(status, safeMessage), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
     }
 };
 

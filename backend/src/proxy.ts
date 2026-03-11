@@ -52,13 +52,20 @@ const ALLOWED_DOMAINS = [
     'www.alphavantage.co'
 ];
 
-function isDomainAllowed(url: string): boolean {
-    try {
-        const hostname = new URL(url).hostname;
-        return ALLOWED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
-    } catch {
-        return false;
+const FORBIDDEN_HEADERS = [
+    'host', 'cookie', 'authorization', 'x-forwarded-for', 'x-real-ip',
+    'set-cookie', 'proxy-authorization', 'x-forwarded-host', 'x-original-url',
+    'x-rewrite-url', 'forwarded', 'origin'
+];
+
+function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+    const safe: Record<string, string> = {};
+    for (const [key, value] of Object.entries(headers)) {
+        if (!FORBIDDEN_HEADERS.includes(key.toLowerCase())) {
+            safe[key] = value;
+        }
     }
+    return safe;
 }
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -82,13 +89,27 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'URL is required' }) };
         }
 
-        if (!isDomainAllowed(url)) {
-            return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ error: `Domain not in allowlist: ${new URL(url).hostname}` }) };
+        // Parse once; reuse for both domain check and credential check
+        let parsedUrl: URL;
+        try {
+            parsedUrl = new URL(url);
+        } catch {
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Invalid URL' }) };
+        }
+
+        const hostname = parsedUrl.hostname;
+        if (!ALLOWED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d))) {
+            return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ error: `Domain not in allowlist: ${hostname}` }) };
+        }
+
+        // Block URLs with embedded credentials (SSRF bypass vector)
+        if (parsedUrl.username || parsedUrl.password) {
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'URL credentials are not allowed' }) };
         }
 
         const fetchOptions: RequestInit = {
             method,
-            headers: { 'Content-Type': 'application/json', ...headers }
+            headers: { 'Content-Type': 'application/json', ...sanitizeHeaders(headers) }
         };
         if (payload && method !== 'GET') {
             fetchOptions.body = typeof payload === 'string' ? payload : JSON.stringify(payload);
@@ -115,11 +136,11 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
         };
 
     } catch (error: any) {
-        const statusCode = (error.message || '').startsWith('Unauthorized') ? 401 : 500;
+        const isAuthError = (error.message || '').startsWith('Unauthorized');
         return {
-            statusCode,
+            statusCode: isAuthError ? 401 : 500,
             headers: corsHeaders,
-            body: JSON.stringify({ error: error.message || 'Proxy error' })
+            body: JSON.stringify({ error: isAuthError ? 'Unauthorized' : 'Proxy request failed' })
         };
     }
 };

@@ -6,6 +6,7 @@
  */
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
+const IS_DEV = import.meta.env.DEV;
 
 // ─── Auth Helper ─────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ async function apiRequest<T>(
     body?: object
 ): Promise<T> {
     const url = `${API_BASE}${path}`;
-    console.log(`API: ${method} ${path}`);
+    if (IS_DEV) console.log(`API: ${method} ${path}`);
 
     const token = getAuthToken();
 
@@ -54,7 +55,7 @@ async function apiRequest<T>(
 
     if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-            console.warn('API: ⚠️ Unauthorized token detected. Forcing logout clearing state...');
+            if (IS_DEV) console.warn('API: ⚠️ Unauthorized token detected. Forcing logout clearing state...');
             sessionStorage.removeItem('auth_token');
             sessionStorage.removeItem('id_token');
             sessionStorage.removeItem('currentUser');
@@ -70,18 +71,18 @@ async function apiRequest<T>(
         const detail = errorData.message ? ` — ${errorData.message}` : '';
         const finalMessage = `${error}${detail}`;
 
-        console.error(`API: ❌ ${method} ${path} → ${response.status}: ${finalMessage}`);
+        if (IS_DEV) console.error(`API: ❌ ${method} ${path} → ${response.status}: ${finalMessage}`);
         throw new Error(finalMessage);
     }
 
     const data = await response.json();
-    console.log(`API: ✅ ${method} ${path} → 200`);
+    if (IS_DEV) console.log(`API: ✅ ${method} ${path} → 200`);
     return data as T;
 }
 
 async function apiDeleteRequest<T>(path: string): Promise<T> {
     const url = `${API_BASE}${path}`;
-    console.log(`API: DELETE ${path}`);
+    if (IS_DEV) console.log(`API: DELETE ${path}`);
 
     const token = getAuthToken();
     const response = await fetch(url, {
