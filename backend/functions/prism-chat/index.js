@@ -20,13 +20,21 @@ import {
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { checkAndRecordUsage } from '../../shared/rate-limit.js';
-import { buildCorsHeaders } from '../../shared/cors.js';
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,POST'), body: JSON.stringify(body) };
+// ─── CORS Headers ────────────────────────────────────────────────
+
+const CORS = {
+    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Methods': 'OPTIONS,POST',
+    'Content-Type': 'application/json'
+};
+
+function respond(statusCode, body) {
+    return { statusCode, headers: CORS, body: JSON.stringify(body) };
 }
 
-function respondSSE(body, eventHeaders) {
+function respondSSE(body) {
     const payload = [
         `data: ${JSON.stringify({ type: 'status', phase: 'accepted' })}`,
         `data: ${JSON.stringify({ type: 'final', payload: body })}`,
@@ -36,7 +44,7 @@ function respondSSE(body, eventHeaders) {
     return {
         statusCode: 200,
         headers: {
-            ...buildCorsHeaders(eventHeaders, 'OPTIONS,POST'),
+            ...CORS,
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive'
@@ -73,8 +81,8 @@ function extractJSON(text) {
 //  MODE: ASK — Conversational Q&A with Prism
 // ═══════════════════════════════════════════════════════════════════
 
-async function handleAsk({ userId, message, conversationId, eventHeaders }) {
-    console.log(`PRISM: mode=ask, conversationId=${conversationId}`);
+async function handleAsk({ userId, message, conversationId }) {
+    console.log(`PRISM: mode=ask, userId=${userId}, conversationId=${conversationId}`);
 
     // Generate or reuse conversation ID
     const convId = conversationId || crypto.randomUUID();
@@ -118,15 +126,15 @@ async function handleAsk({ userId, message, conversationId, eventHeaders }) {
         conversationId: convId,
         suggestMode,
         mode: 'ask'
-    }, eventHeaders);
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════
 //  MODE: ROUTE — Model Recommendation
 // ═══════════════════════════════════════════════════════════════════
 
-async function handleRoute({ userId, message, conversationId, eventHeaders }) {
-    console.log('PRISM: mode=route');
+async function handleRoute({ userId, message, conversationId }) {
+    console.log(`PRISM: mode=route, userId=${userId}`);
 
     const convId = conversationId || crypto.randomUUID();
 
@@ -184,7 +192,7 @@ Wrap JSON in \`\`\`json code block.`;
         recommendation: recommendation || { error: 'Could not parse model recommendation' },
         conversationId: convId,
         mode: 'route'
-    }, eventHeaders);
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -226,8 +234,8 @@ function runtimeModel(modelId) {
     return (modelId || '').startsWith('gemini-') ? modelId : 'gemini-2.5-pro';
 }
 
-async function handleCouncil({ userId, message, conversationId, councilConfig, eventHeaders }) {
-    console.log(`PRISM: mode=council, conversationId=${conversationId}`);
+async function handleCouncil({ userId, message, conversationId, councilConfig }) {
+    console.log(`PRISM: mode=council, userId=${userId}, conversationId=${conversationId}`);
 
     const convId = conversationId || crypto.randomUUID();
     const models = await listModels();
@@ -330,15 +338,15 @@ Be decisive and structured.`;
             runtimeDecisionModel: decisionRuntimeModel,
             rounds: 2
         }
-    }, eventHeaders);
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════
 //  MODE: CREATE — Agent Factory (Blueprint Designer)
 // ═══════════════════════════════════════════════════════════════════
 
-async function handleCreate({ userId, message, conversationId, specialAgentContext, eventHeaders }) {
-    console.log(`PRISM: mode=create, conversationId=${conversationId}`);
+async function handleCreate({ userId, message, conversationId, specialAgentContext }) {
+    console.log(`PRISM: mode=create, userId=${userId}, conversationId=${conversationId}`);
 
     const convId = conversationId || crypto.randomUUID();
 
@@ -610,7 +618,7 @@ RULES FOR DESIGNING AGENTS:
         toolCall: derivedToolCall || aiResult.toolCalls?.[0] || null,
         conversationId: convId,
         mode: 'create'
-    }, eventHeaders);
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -620,7 +628,7 @@ RULES FOR DESIGNING AGENTS:
 export const handler = async (event) => {
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
-        return respond(200, {}, event.headers);
+        return respond(200, {});
     }
 
     try {
@@ -637,8 +645,8 @@ export const handler = async (event) => {
         const { message, mode, conversationId, specialAgentContext, councilConfig } = body;
 
         // Validate required fields
-        if (!message) return respond(400, { error: 'Missing message' }, event.headers);
-        if (!mode) return respond(400, { error: 'Missing mode. Must be: ask, route, create, or council' }, event.headers);
+        if (!message) return respond(400, { error: 'Missing message' });
+        if (!mode) return respond(400, { error: 'Missing mode. Must be: ask, route, create, or council' });
 
         const usage = await checkAndRecordUsage(userId, 'prism');
         if (!usage.allowed) {
@@ -646,23 +654,23 @@ export const handler = async (event) => {
                 error: 'Rate limit exceeded',
                 message: `Hourly limit reached (${usage.limit}/hour).`,
                 usage
-            }, event.headers);
+            });
         }
 
-        console.log(`PRISM: ═══ Incoming request ═══ mode=${mode}, conversationId=${conversationId || 'new'}, specialAgent=${specialAgentContext?.name || 'none'}`);
+        console.log(`PRISM: ═══ Incoming request ═══ mode=${mode}, userId=${userId}, conversationId=${conversationId || 'new'}, specialAgent=${specialAgentContext?.name || 'none'}`);
 
         const runMode = async () => {
             switch (mode) {
                 case 'ask':
-                    return await handleAsk({ userId, message, conversationId, eventHeaders: event.headers });
+                    return await handleAsk({ userId, message, conversationId });
                 case 'route':
-                    return await handleRoute({ userId, message, conversationId, eventHeaders: event.headers });
+                    return await handleRoute({ userId, message, conversationId });
                 case 'create':
-                    return await handleCreate({ userId, message, conversationId, specialAgentContext, eventHeaders: event.headers });
+                    return await handleCreate({ userId, message, conversationId, specialAgentContext });
                 case 'council':
-                    return await handleCouncil({ userId, message, conversationId, councilConfig, eventHeaders: event.headers });
+                    return await handleCouncil({ userId, message, conversationId, councilConfig });
                 default:
-                    return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, create, or council` }, event.headers);
+                    return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, create, or council` });
             }
         };
 
@@ -675,15 +683,18 @@ export const handler = async (event) => {
         }
 
         const parsed = JSON.parse(modeResponse.body || '{}');
-        return respondSSE(parsed, event.headers);
+        return respondSSE(parsed);
 
     } catch (error) {
-        console.error('PRISM: ❌ Fatal error:', error.message);
+        console.error('PRISM: ❌ Fatal error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(401, { error: 'Unauthorized', message: error.message });
         }
 
-        return respond(500, { error: 'An internal error occurred. Please try again.' }, event.headers);
+        return respond(500, {
+            error: 'Internal server error',
+            message: error.message || 'Unknown error'
+        });
     }
 };

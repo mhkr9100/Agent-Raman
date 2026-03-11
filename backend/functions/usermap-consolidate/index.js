@@ -9,7 +9,6 @@
 
 import { callAI } from '../../shared/vertex-ai.js';
 import { validateToken } from '../../shared/auth.js';
-import { buildCorsHeaders } from '../../shared/cors.js';
 
 const STRUCTURING_PROMPT = `You are a Context Structurer. Given a list of raw memory facts about a user, organize them into a clean hierarchical JSON tree for the UserMap.
 
@@ -39,8 +38,15 @@ No preamble, no markdown blocks unless requested. Just pure JSON.`;
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,POST'), body: JSON.stringify(body) };
+const CORS = {
+    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Methods': 'OPTIONS,POST',
+    'Content-Type': 'application/json'
+};
+
+function respond(statusCode, body) {
+    return { statusCode, headers: CORS, body: JSON.stringify(body) };
 }
 
 // ─── Handler ─────────────────────────────────────────────────────
@@ -48,7 +54,7 @@ function respond(statusCode, body, eventHeaders) {
 export const handler = async (event) => {
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
-        return respond(200, {}, event.headers);
+        return respond(200, {});
     }
 
     try {
@@ -59,9 +65,9 @@ export const handler = async (event) => {
         const body = JSON.parse(event.body || '{}');
         const { memories, existingTree } = body;
 
-        if (!memories || !Array.isArray(memories)) return respond(400, { error: 'Missing memories array' }, event.headers);
+        if (!memories || !Array.isArray(memories)) return respond(400, { error: 'Missing memories array' });
 
-        console.log(`USERMAP-CONSOLIDATE: memories=${memories.length}`);
+        console.log(`USERMAP-CONSOLIDATE: userId=${userId}, memories=${memories.length}`);
 
         const memoryList = memories.map((m, i) => `${i + 1}. ${m}`).join('\n');
 
@@ -94,15 +100,18 @@ export const handler = async (event) => {
 
         console.log(`USERMAP-CONSOLIDATE: ✅ Tree generated with ${tree.children.length} categories`);
 
-        return respond(200, tree, event.headers);
+        return respond(200, tree);
 
     } catch (error) {
-        console.error('USERMAP-CONSOLIDATE: ❌ Error:', error.message);
+        console.error('USERMAP-CONSOLIDATE: ❌ Error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(401, { error: 'Unauthorized', message: error.message });
         }
 
-        return respond(500, { error: 'An internal error occurred. Please try again.' }, event.headers);
+        return respond(500, {
+            error: 'Failed to consolidate user map',
+            message: error.message || 'Unknown error'
+        });
     }
 };

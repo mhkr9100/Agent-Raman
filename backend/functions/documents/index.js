@@ -13,10 +13,16 @@ import {
     deleteDocument
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
-import { buildCorsHeaders } from '../../shared/cors.js';
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,GET,POST,DELETE'), body: JSON.stringify(body) };
+const CORS = {
+    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Methods': 'OPTIONS,GET,POST,DELETE',
+    'Content-Type': 'application/json'
+};
+
+function respond(statusCode, body) {
+    return { statusCode, headers: CORS, body: JSON.stringify(body) };
 }
 
 function parseOwner(ownerType, ownerId) {
@@ -32,7 +38,7 @@ function parseOwner(ownerType, ownerId) {
 }
 
 export const handler = async (event) => {
-    if (event.httpMethod === 'OPTIONS') return respond(200, {}, event.headers);
+    if (event.httpMethod === 'OPTIONS') return respond(200, {});
 
     try {
         const authHeader = event.headers?.Authorization || event.headers?.authorization;
@@ -45,7 +51,7 @@ export const handler = async (event) => {
                 event.queryStringParameters?.ownerId
             );
             const documents = await listDocumentsByOwner(userId, ownerType, ownerId);
-            return respond(200, { documents }, event.headers);
+            return respond(200, { documents });
         }
 
         if (event.httpMethod === 'POST') {
@@ -59,8 +65,8 @@ export const handler = async (event) => {
             const contentType = body.contentType ? String(body.contentType).trim() : 'application/octet-stream';
             const size = Number(body.size || 0);
 
-            if (!fileName) return respond(400, { error: 'fileName is required' }, event.headers);
-            if (!fileKey) return respond(400, { error: 'fileKey is required' }, event.headers);
+            if (!fileName) return respond(400, { error: 'fileName is required' });
+            if (!fileKey) return respond(400, { error: 'fileKey is required' });
 
             const docId = crypto.randomUUID();
             const document = await saveDocument({
@@ -77,26 +83,26 @@ export const handler = async (event) => {
                 size
             });
 
-            return respond(200, { document }, event.headers);
+            return respond(200, { document });
         }
 
         if (event.httpMethod === 'DELETE') {
             const docId = String(event.pathParameters?.docId || '').trim();
-            if (!docId) return respond(400, { error: 'docId is required' }, event.headers);
+            if (!docId) return respond(400, { error: 'docId is required' });
 
             const existing = await getDocument(docId, userId);
-            if (!existing) return respond(404, { error: 'Document not found' }, event.headers);
+            if (!existing) return respond(404, { error: 'Document not found' });
 
             await deleteDocument(docId, userId);
-            return respond(200, { success: true, docId }, event.headers);
+            return respond(200, { success: true, docId });
         }
 
-        return respond(405, { error: 'Method Not Allowed' }, event.headers);
+        return respond(405, { error: 'Method Not Allowed' });
     } catch (error) {
-        console.error('DOCUMENTS: ❌ Error:', error.message);
+        console.error('DOCUMENTS: ❌ Error:', error);
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(401, { error: 'Unauthorized', message: error.message });
         }
-        return respond(500, { error: 'An internal error occurred. Please try again.' }, event.headers);
+        return respond(500, { error: 'Failed to handle documents', message: error.message });
     }
 };

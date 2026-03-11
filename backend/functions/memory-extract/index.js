@@ -9,7 +9,6 @@
 
 import { callAI } from '../../shared/vertex-ai.js';
 import { validateToken } from '../../shared/auth.js';
-import { buildCorsHeaders } from '../../shared/cors.js';
 
 const EXTRACTION_PROMPT = `Extract key facts about the user from this conversation. 
 Each fact should be a standalone, concise sentence.
@@ -21,8 +20,15 @@ If no new facts found, return [].`;
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,POST'), body: JSON.stringify(body) };
+const CORS = {
+    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Methods': 'OPTIONS,POST',
+    'Content-Type': 'application/json'
+};
+
+function respond(statusCode, body) {
+    return { statusCode, headers: CORS, body: JSON.stringify(body) };
 }
 
 // ─── Handler ─────────────────────────────────────────────────────
@@ -30,7 +36,7 @@ function respond(statusCode, body, eventHeaders) {
 export const handler = async (event) => {
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
-        return respond(200, {}, event.headers);
+        return respond(200, {});
     }
 
     try {
@@ -43,9 +49,9 @@ export const handler = async (event) => {
         const body = JSON.parse(event.body || '{}');
         const { messages } = body;
 
-        if (!messages || !Array.isArray(messages)) return respond(400, { error: 'Missing messages array' }, event.headers);
+        if (!messages || !Array.isArray(messages)) return respond(400, { error: 'Missing messages array' });
 
-        console.log(`MEMORY-EXTRACT: messages=${messages.length}`);
+        console.log(`MEMORY-EXTRACT: userId=${userId}, messages=${messages.length}`);
 
         // 3. Prepare conversation text for extraction
         const chatText = messages
@@ -74,15 +80,18 @@ export const handler = async (event) => {
 
         console.log(`MEMORY-EXTRACT: ✅ Extracted ${facts.length} facts`);
 
-        return respond(200, { facts }, event.headers);
+        return respond(200, { facts });
 
     } catch (error) {
-        console.error('MEMORY-EXTRACT: ❌ Error:', error.message);
+        console.error('MEMORY-EXTRACT: ❌ Error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(401, { error: 'Unauthorized', message: error.message });
         }
 
-        return respond(500, { error: 'An internal error occurred. Please try again.' }, event.headers);
+        return respond(500, {
+            error: 'Failed to extract memory',
+            message: error.message || 'Unknown error'
+        });
     }
 };

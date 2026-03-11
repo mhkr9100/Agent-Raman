@@ -7,32 +7,38 @@
 
 import { listAgentsByUser } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
-import { buildCorsHeaders } from '../../shared/cors.js';
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,GET'), body: JSON.stringify(body) };
+const CORS = {
+    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Methods': 'OPTIONS,GET',
+    'Content-Type': 'application/json'
+};
+
+function respond(statusCode, body) {
+    return { statusCode, headers: CORS, body: JSON.stringify(body) };
 }
 
 export const handler = async (event) => {
-    if (event.httpMethod === 'OPTIONS') return respond(200, {}, event.headers);
+    if (event.httpMethod === 'OPTIONS') return respond(200, {});
 
     try {
         const authHeader = event.headers?.Authorization || event.headers?.authorization;
         const auth = await validateToken(authHeader);
         const userId = auth.userId;
 
-        console.log('AGENT-LIST: Listing agents');
+        console.log(`AGENT-LIST: Listing agents for userId=${userId}`);
         const agents = await listAgentsByUser(userId);
         console.log(`AGENT-LIST: ✅ Found ${agents.length} agents`);
 
-        return respond(200, { agents }, event.headers);
+        return respond(200, { agents });
     } catch (error) {
-        console.error('AGENT-LIST: ❌ Error:', error.message);
+        console.error('AGENT-LIST: ❌ Error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(401, { error: 'Unauthorized', message: error.message });
         }
 
-        return respond(500, { error: 'An internal error occurred. Please try again.' }, event.headers);
+        return respond(500, { error: 'Failed to list agents', message: error.message });
     }
 };

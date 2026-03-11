@@ -64,7 +64,7 @@ function wrapError(table, operation, error) {
  * @param {Object} agent - { agentId, userId, name, description, blueprint, status }
  */
 export async function saveAgent({ agentId, userId, name, description, blueprint, status = 'active' }) {
-    console.log(`[dynamo] saveAgent: ${agentId}`);
+    console.log(`[dynamo] saveAgent: ${agentId} for user ${userId}`);
     try {
         const now = new Date().toISOString();
         await docClient.send(new PutCommand({
@@ -110,7 +110,7 @@ export async function getAgent(agentId, userId) {
  * @returns {Array} List of agent records
  */
 export async function listAgentsByUser(userId) {
-    console.log('[dynamo] listAgentsByUser');
+    console.log(`[dynamo] listAgentsByUser: ${userId}`);
     try {
         const result = await docClient.send(new QueryCommand({
             TableName: TABLES.AGENTS,
@@ -333,7 +333,7 @@ export async function getSpecialAgent(templateId) {
  * @returns {Object}
  */
 export async function getUserMap(userId) {
-    console.log('[dynamo] getUserMap');
+    console.log(`[dynamo] getUserMap: ${userId}`);
     try {
         const result = await docClient.send(new GetCommand({
             TableName: TABLES.USER_MAP,
@@ -357,7 +357,7 @@ export async function getUserMap(userId) {
  * @param {Object} updates - Key-value pairs to update
  */
 export async function updateUserMap(userId, updates) {
-    console.log('[dynamo] updateUserMap', Object.keys(updates));
+    console.log(`[dynamo] updateUserMap: ${userId}`, Object.keys(updates));
     try {
         updates.updatedAt = new Date().toISOString();
 
@@ -380,7 +380,7 @@ export async function updateUserMap(userId, updates) {
             ExpressionAttributeNames: expressionNames,
             ExpressionAttributeValues: expressionValues
         }));
-        console.log(`[dynamo] updateUserMap ✅ UserMap updated`);
+        console.log(`[dynamo] ✅ UserMap updated for ${userId}`);
     } catch (error) {
         wrapError(TABLES.USER_MAP, 'updateUserMap', error);
     }
@@ -441,7 +441,7 @@ export async function saveDocument({
     contentType,
     size
 }) {
-    console.log(`[dynamo] saveDocument: ${docId} (${ownerType}:${ownerId})`);
+    console.log(`[dynamo] saveDocument: ${docId} for user ${userId} (${ownerType}:${ownerId})`);
     try {
         const now = new Date().toISOString();
         const ownerKey = `${userId}#${ownerType}#${ownerId}`;
@@ -474,7 +474,7 @@ export async function saveDocument({
 }
 
 export async function getDocument(docId, userId) {
-    console.log(`[dynamo] getDocument: ${docId}`);
+    console.log(`[dynamo] getDocument: ${docId} for user ${userId}`);
     try {
         const result = await docClient.send(new GetCommand({
             TableName: TABLES.DOCUMENTS,
@@ -487,7 +487,7 @@ export async function getDocument(docId, userId) {
 }
 
 export async function listDocumentsByOwner(userId, ownerType, ownerId) {
-    console.log(`[dynamo] listDocumentsByOwner: ${ownerType}:${ownerId}`);
+    console.log(`[dynamo] listDocumentsByOwner: ${userId} ${ownerType}:${ownerId}`);
     try {
         const ownerKey = `${userId}#${ownerType}#${ownerId}`;
         const result = await docClient.send(new QueryCommand({
@@ -506,7 +506,7 @@ export async function listDocumentsByOwner(userId, ownerType, ownerId) {
 }
 
 export async function deleteDocument(docId, userId) {
-    console.log(`[dynamo] deleteDocument: ${docId}`);
+    console.log(`[dynamo] deleteDocument: ${docId} for user ${userId}`);
     try {
         await docClient.send(new DeleteCommand({
             TableName: TABLES.DOCUMENTS,
@@ -521,67 +521,6 @@ export async function deleteDocument(docId, userId) {
 // ─── Export table names for scripts that need them ────────────────
 
 export { TABLES };
-
-// ══════════════════════════════════════════════════════════════════
-//  GDPR — Cascade Delete All User Data
-// ══════════════════════════════════════════════════════════════════
-
-/**
- * Delete ALL data belonging to a user across all tables.
- * Used for GDPR Article 17 (Right to Erasure) compliance.
- * @param {string} userId - The Cognito sub (user ID)
- */
-export async function deleteAllUserData(userId) {
-    console.log('[dynamo] deleteAllUserData: cascading delete initiated');
-    const errors = [];
-
-    // 1. Delete all agents
-    try {
-        const agents = await listAgentsByUser(userId);
-        for (const agent of agents) {
-            await deleteAgent(agent.agentId, userId);
-        }
-        console.log(`[dynamo] ✅ Deleted ${agents.length} agents`);
-    } catch (e) {
-        console.error('[dynamo] ❌ Failed to delete agents:', e.message);
-        errors.push(`agents: ${e.message}`);
-    }
-
-    // 2. Delete UserMap
-    try {
-        await docClient.send(new DeleteCommand({
-            TableName: TABLES.USER_MAP,
-            Key: { userId }
-        }));
-        console.log('[dynamo] ✅ Deleted UserMap');
-    } catch (e) {
-        console.error('[dynamo] ❌ Failed to delete UserMap:', e.message);
-        errors.push(`userMap: ${e.message}`);
-    }
-
-    // 3. Delete all documents owned by user
-    try {
-        const result = await docClient.send(new ScanCommand({
-            TableName: TABLES.DOCUMENTS,
-            FilterExpression: 'userId = :uid',
-            ExpressionAttributeValues: { ':uid': userId }
-        }));
-        const docs = result.Items || [];
-        for (const doc of docs) {
-            await deleteDocument(doc.docId, userId);
-        }
-        console.log(`[dynamo] ✅ Deleted ${docs.length} documents`);
-    } catch (e) {
-        console.error('[dynamo] ❌ Failed to delete documents:', e.message);
-        errors.push(`documents: ${e.message}`);
-    }
-
-    if (errors.length > 0) {
-        console.warn(`[dynamo] deleteAllUserData completed with ${errors.length} errors:`, errors);
-    }
-
-    return { deletedFor: 'user', errors };
-}
 
 export default {
     // Agents
@@ -598,8 +537,6 @@ export default {
     listModels, getModelById,
     // Documents
     saveDocument, getDocument, listDocumentsByOwner, deleteDocument,
-    // GDPR
-    deleteAllUserData,
     // Constants
     TABLES
 };
