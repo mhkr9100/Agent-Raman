@@ -238,29 +238,15 @@ export const useUserMap = (currentUser: UserProfile | null) => {
             storedCount += 1;
 
             if (BACKEND_URL) {
-                const token = sessionStorage.getItem('id_token')
-                    || sessionStorage.getItem('auth_token')
-                    || localStorage.getItem('id_token')
-                    || localStorage.getItem('auth_token');
-                const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
                 try {
-                    const response = await fetch(`${BACKEND_URL}/api/memory/add`, {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify({
-                            agentId,
-                            content: cleaned,
-                            category: source === 'external-import' ? 'profile' : 'general'
-                        })
+                    const { addMemory } = await import('../services/apiV2');
+                    await addMemory({
+                        content: cleaned,
+                        agentId,
+                        category: source === 'external-import' ? 'profile' : 'general'
                     });
-                    if (!response.ok) {
-                        const body = await response.text();
-                        failures.push(`memory/add failed (${response.status}): ${body || 'no response body'}`);
-                    }
                 } catch (error: any) {
-                    failures.push(`memory/add network error: ${error?.message || 'unknown error'}`);
+                    failures.push(`memory/add error: ${error?.message || 'unknown error'}`);
                 }
             }
         }
