@@ -33,6 +33,11 @@ import { buildCorsHeaders } from '../../shared/cors.js';
 const MAX_REACT_ITERATIONS = 5;
 const DOC_READER_MAX_FILES = 3;
 const DOC_READER_MAX_CHARS = 1800;
+const SUPPORTED_VERTEX_MODELS = new Set([
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash-lite'
+]);
 const s3Client = new S3Client({ region: process.env.S3_BUCKET_REGION || process.env.AWS_REGION || 'us-east-2' });
 
 function respond(event, statusCode, body) {
@@ -356,6 +361,12 @@ function resolveRuntimeModel(requestedModelId) {
         return {
             ok: false,
             error: `Model "${requested}" is not supported in this deployment. Only Vertex Gemini models are allowed.`
+        };
+    }
+    if (!SUPPORTED_VERTEX_MODELS.has(requested)) {
+        return {
+            ok: false,
+            error: `Model "${requested}" is not enabled in this deployment. Supported models: ${Array.from(SUPPORTED_VERTEX_MODELS).join(', ')}`
         };
     }
 

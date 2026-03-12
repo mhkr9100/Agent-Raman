@@ -55,8 +55,14 @@ function respondSSE(body, requestHeaders) {
     };
 }
 
+const SUPPORTED_VERTEX_MODELS = new Set([
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash-lite'
+]);
+
 function isVertexModelId(modelId) {
-    return String(modelId || '').startsWith('gemini-');
+    return SUPPORTED_VERTEX_MODELS.has(String(modelId || ''));
 }
 
 function filterVertexModels(models) {

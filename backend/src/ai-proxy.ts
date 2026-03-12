@@ -13,6 +13,7 @@ import { buildCorsHeaders, requireAuth } from './security.js';
 const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID || 'ramn-ai';
 const GCP_LOCATION = process.env.GCP_LOCATION || 'us-central1';
 const GCP_SERVICE_ACCOUNT_SECRET_ARN = process.env.GCP_SERVICE_ACCOUNT_SECRET_ARN || '';
+const SUPPORTED_VERTEX_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite']);
 
 // ─── Decode Service Account Key ───
 
@@ -194,6 +195,15 @@ async function handleGenerate(
             headers: corsHeaders,
             body: JSON.stringify({
                 error: `Model "${model}" is not supported in this deployment. Only Vertex Gemini models are allowed.`
+            })
+        };
+    }
+    if (!SUPPORTED_VERTEX_MODELS.has(String(model || ''))) {
+        return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({
+                error: `Model "${model}" is not enabled in this deployment. Supported models: ${Array.from(SUPPORTED_VERTEX_MODELS).join(', ')}`
             })
         };
     }

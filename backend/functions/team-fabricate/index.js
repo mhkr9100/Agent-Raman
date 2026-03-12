@@ -24,6 +24,7 @@ const LEGACY_TOOL_CANDIDATES = {
     thinking: ['thinking']
 };
 const ALLOWED_TOOL_IDS = new Set(['web-search', 'thinking', 'image-generation']);
+const SUPPORTED_VERTEX_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite']);
 
 function respond(event, statusCode, body) {
     return {
@@ -88,6 +89,11 @@ export const handler = async (event) => {
                     error: `specialists[${i}].modelId "${requestedModelId}" is not supported. Only Vertex Gemini models are allowed.`
                 });
             }
+            if (!SUPPORTED_VERTEX_MODELS.has(requestedModelId)) {
+                return respond(event, 400, {
+                    error: `specialists[${i}].modelId "${requestedModelId}" is not enabled. Supported models: ${Array.from(SUPPORTED_VERTEX_MODELS).join(', ')}`
+                });
+            }
 
             const toolIds = normalizeToolIds(spec.capabilities || spec.toolIds || spec.tools || [])
                 .filter((toolId) => ALLOWED_TOOL_IDS.has(toolId));
@@ -109,6 +115,11 @@ export const handler = async (event) => {
             if (!String(resolvedModel.modelId || requestedModelId).startsWith('gemini-')) {
                 return respond(event, 400, {
                     error: `specialists[${i}] model "${requestedModelId}" is not supported. Only Vertex Gemini models are allowed.`
+                });
+            }
+            if (!SUPPORTED_VERTEX_MODELS.has(String(resolvedModel.modelId || requestedModelId))) {
+                return respond(event, 400, {
+                    error: `specialists[${i}] model "${requestedModelId}" is not enabled. Supported models: ${Array.from(SUPPORTED_VERTEX_MODELS).join(', ')}`
                 });
             }
 

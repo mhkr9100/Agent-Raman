@@ -28,6 +28,7 @@ const GCP_SERVICE_ACCOUNT_SECRET_ARN = process.env.GCP_SERVICE_ACCOUNT_SECRET_AR
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_TEMPERATURE = 0.3;
 const MAX_RETRIES = 3;
+const SUPPORTED_VERTEX_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite']);
 
 // ─── Cached Credentials ─────────────────────────────────────────
 
@@ -237,6 +238,9 @@ async function sendVertexRequest(payload, modelName) {
     const model = modelName || DEFAULT_MODEL;
     if (!String(model).startsWith('gemini-')) {
         throw new Error(`[vertex-ai] Model "${model}" is not supported. Only Vertex Gemini models are allowed.`);
+    }
+    if (!SUPPORTED_VERTEX_MODELS.has(String(model))) {
+        throw new Error(`[vertex-ai] Model "${model}" is not enabled. Supported models: ${Array.from(SUPPORTED_VERTEX_MODELS).join(', ')}`);
     }
     // Ensure credentials are loaded and validated before generating token.
     await getServiceAccountKey();

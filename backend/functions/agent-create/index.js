@@ -67,6 +67,7 @@ const LEGACY_TOOL_CANDIDATES = {
 };
 
 const ALLOWED_TOOL_IDS = new Set(['web-search', 'thinking', 'image-generation']);
+const SUPPORTED_VERTEX_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite']);
 
 // ─── Handler ─────────────────────────────────────────────────────
 
@@ -135,6 +136,11 @@ export const handler = async (event) => {
         if (!String(resolvedModel.modelId || blueprint.model.modelId).startsWith('gemini-')) {
             return respond(event, 400, {
                 error: `Model "${blueprint.model.modelId}" is not supported in this deployment. Only Vertex Gemini models are allowed.`
+            });
+        }
+        if (!SUPPORTED_VERTEX_MODELS.has(String(resolvedModel.modelId || blueprint.model.modelId))) {
+            return respond(event, 400, {
+                error: `Model "${blueprint.model.modelId}" is not enabled in this deployment. Supported models: ${Array.from(SUPPORTED_VERTEX_MODELS).join(', ')}`
             });
         }
         console.log(`  ✅ Model resolved: ${resolvedModel.name}`);
