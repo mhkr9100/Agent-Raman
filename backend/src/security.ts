@@ -4,16 +4,16 @@ type HeaderMap = Record<string, string | undefined> | null | undefined;
 
 const USER_POOL_ID = process.env.USER_POOL_ID;
 const CLIENT_ID = process.env.CLIENT_ID;
-
-if (!USER_POOL_ID || !CLIENT_ID) {
-    throw new Error('FATAL: USER_POOL_ID and CLIENT_ID environment variables must be set.');
-}
 const DEFAULT_ALLOWED_ORIGINS = 'https://www.ramnai.com,http://localhost:3000,http://localhost:5173';
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS)
     .split(',')
     .map(v => v.trim())
     .filter(Boolean);
 const fallbackOrigin = allowedOrigins[0] || 'https://www.ramnai.com';
+
+if (!USER_POOL_ID || !CLIENT_ID) {
+    throw new Error('Missing required auth env vars: USER_POOL_ID and CLIENT_ID');
+}
 
 const verifier = CognitoJwtVerifier.create({
     userPoolId: USER_POOL_ID,

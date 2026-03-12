@@ -14,15 +14,23 @@ import {
     getUserMap,
     updateUserMap,
     getToolById,
-    getModelById,
-    listAgentsByUser
+    getModelById
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { normalizeToolIds } from '../../shared/tool-ids.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,POST'), body: JSON.stringify(body) };
+// ─── CORS Headers ────────────────────────────────────────────────
+
+function respond(event, statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            ...buildCorsHeaders(event?.headers, 'OPTIONS,POST'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    };
 }
 
 // ─── Validation ──────────────────────────────────────────────────
@@ -63,7 +71,7 @@ const LEGACY_TOOL_CANDIDATES = {
 export const handler = async (event) => {
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
-        return respond(200, {}, event.headers);
+        return respond(event, 200, {});
     }
 
     try {
@@ -75,29 +83,17 @@ export const handler = async (event) => {
         const { blueprint } = body;
 
         // Validate input
-        if (!blueprint) return respond(400, { error: 'Missing blueprint' }, event.headers);
+        if (!blueprint) return respond(event, 400, { error: 'Missing blueprint' });
 
         const validationError = validateBlueprint(blueprint);
-        if (validationError) return respond(400, { error: validationError }, event.headers);
-
-        // Check beta agent limit
-        const existingAgents = await listAgentsByUser(userId);
-        const MAX_AGENTS = parseInt(process.env.MAX_AGENTS_PER_USER || '5', 10);
-        if (existingAgents.length >= MAX_AGENTS) {
-            return respond(429, {
-                error: 'Agent limit reached',
-                message: `Beta accounts are limited to ${MAX_AGENTS} agents. Please delete an existing agent to create a new one.`,
-                limit: MAX_AGENTS,
-                current: existingAgents.length
-            }, event.headers);
-        }
+        if (validationError) return respond(event, 400, { error: validationError });
 
         const requestedToolIds = normalizeToolIds(blueprint.toolIds || blueprint.tools || []);
         const requestedDocumentIds = Array.isArray(blueprint.documentIds)
             ? blueprint.documentIds.filter(Boolean)
             : [];
 
-        console.log(`AGENT-CREATE: agentName="${blueprint.agentName}", toolIds=[${requestedToolIds.join(', ')}]`);
+        console.log(`AGENT-CREATE: userId=${userId}, agentName="${blueprint.agentName}", toolIds=[${requestedToolIds.join(', ')}]`);
 
         // 1. Generate agent ID
         const agentId = crypto.randomUUID();
@@ -122,14 +118,14 @@ export const handler = async (event) => {
             }
         }
         if (resolvedTools.length === 0) {
-            return respond(400, { error: 'No valid tools were resolved from toolIds' }, event.headers);
+            return respond(event, 400, { error: 'No valid tools were resolved from toolIds' });
         }
 
         // 3. Resolve model from RamN_ModelRegistry
         console.log(`AGENT-CREATE: Resolving model: ${blueprint.model.modelId}`);
         const resolvedModel = await getModelById(blueprint.model.modelId);
         if (!resolvedModel) {
-            return respond(400, { error: `Model not found: ${blueprint.model.modelId}` }, event.headers);
+            return respond(event, 400, { error: `Model not found: ${blueprint.model.modelId}` });
         }
         console.log(`  ✅ Model resolved: ${resolvedModel.name}`);
 
@@ -173,23 +169,23 @@ export const handler = async (event) => {
         console.log(`AGENT-CREATE: ✅ Agent created: ${blueprint.agentName} (${agentId})`);
 
         // 7. Return success
-        return respond(200, {
+        return respond(event, 200, {
             agentId,
             name: blueprint.agentName,
             status: 'created',
             message: 'Agent created successfully'
-        }, event.headers);
+        });
 
     } catch (error) {
         console.error('AGENT-CREATE: ❌ Error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(event, 401, { error: 'Unauthorized', message: error.message });
         }
 
-        return respond(500, {
+        return respond(event, 500, {
             error: 'Failed to create agent',
-            message: 'An internal error occurred. Please try again.'
-        }, event.headers);
+            message: error.message || 'Unknown error'
+        });
     }
 };

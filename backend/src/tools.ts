@@ -2,12 +2,14 @@ import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { buildCorsHeaders } from './security.js';
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': process.env.CORS_ALLOW_ORIGIN || 'https://www.ramnai.com',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Content-Type': 'application/json'
-};
+function responseHeaders(event: any, methods: string) {
+    return {
+        ...buildCorsHeaders(event?.headers, methods),
+        'Content-Type': 'application/json'
+    };
+}
 
 // Load tool catalog
 let catalog: any[] = [];
@@ -23,6 +25,14 @@ try {
  * Optional query: ?category=Finance&q=crypto
  */
 export const listHandler: APIGatewayProxyHandlerV2 = async (event) => {
+    if (event.requestContext.http.method === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers: responseHeaders(event, 'OPTIONS,GET'),
+            body: ''
+        };
+    }
+
     const params = event.queryStringParameters || {};
     let filtered = [...catalog];
 
@@ -40,7 +50,7 @@ export const listHandler: APIGatewayProxyHandlerV2 = async (event) => {
 
     return {
         statusCode: 200,
-        headers: corsHeaders,
+        headers: responseHeaders(event, 'OPTIONS,GET'),
         body: JSON.stringify({ total: filtered.length, tools: filtered })
     };
 };
@@ -50,6 +60,14 @@ export const listHandler: APIGatewayProxyHandlerV2 = async (event) => {
  * Body: { toolId, endpoint, params, headers? }
  */
 export const executeHandler: APIGatewayProxyHandlerV2 = async (event) => {
+    if (event.requestContext.http.method === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers: responseHeaders(event, 'OPTIONS,POST'),
+            body: ''
+        };
+    }
+
     try {
         const body = JSON.parse(event.body || '{}');
         const { toolId, endpoint, params = {}, headers = {} } = body;
@@ -57,13 +75,13 @@ export const executeHandler: APIGatewayProxyHandlerV2 = async (event) => {
         // Find the tool
         const tool = catalog.find(t => t.id === toolId);
         if (!tool) {
-            return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: `Tool not found: ${toolId}` }) };
+            return { statusCode: 404, headers: responseHeaders(event, 'OPTIONS,POST'), body: JSON.stringify({ error: `Tool not found: ${toolId}` }) };
         }
 
         // Find the endpoint
         const ep = tool.endpoints.find((e: any) => e.name === endpoint);
         if (!ep) {
-            return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: `Endpoint not found: ${endpoint}` }) };
+            return { statusCode: 404, headers: responseHeaders(event, 'OPTIONS,POST'), body: JSON.stringify({ error: `Endpoint not found: ${endpoint}` }) };
         }
 
         // Build URL
@@ -92,14 +110,14 @@ export const executeHandler: APIGatewayProxyHandlerV2 = async (event) => {
 
         return {
             statusCode: response.status,
-            headers: corsHeaders,
+            headers: responseHeaders(event, 'OPTIONS,POST'),
             body: JSON.stringify({ toolId, endpoint, status: response.status, data })
         };
 
     } catch (error: any) {
         return {
             statusCode: 500,
-            headers: corsHeaders,
+            headers: responseHeaders(event, 'OPTIONS,POST'),
             body: JSON.stringify({ error: error.message || 'Tool execution failed' })
         };
     }

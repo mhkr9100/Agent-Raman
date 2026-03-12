@@ -7,12 +7,11 @@
 
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 
-// REQUIRED: Cognito credentials must be set via environment variables.
 const USER_POOL_ID = process.env.USER_POOL_ID;
 const CLIENT_ID = process.env.CLIENT_ID;
 
 if (!USER_POOL_ID || !CLIENT_ID) {
-    throw new Error('FATAL: USER_POOL_ID and CLIENT_ID environment variables must be set.');
+    throw new Error('Missing required auth env vars: USER_POOL_ID and CLIENT_ID');
 }
 
 // Create the verifier
@@ -29,6 +28,7 @@ const verifier = CognitoJwtVerifier.create({
  */
 export async function validateToken(authHeader) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.warn('AUTH: Missing or invalid Authorization header');
         throw new Error('Unauthorized: Missing token');
     }
 
@@ -36,7 +36,7 @@ export async function validateToken(authHeader) {
 
     try {
         const payload = await verifier.verify(token);
-        // Token verified successfully — avoid logging PII (sub/email) in production
+        console.log(`AUTH: ✅ Token verified for sub: ${payload.sub}`);
 
         return {
             userId: payload.sub,

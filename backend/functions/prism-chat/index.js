@@ -24,11 +24,18 @@ import { buildCorsHeaders } from '../../shared/cors.js';
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,POST'), body: JSON.stringify(body) };
+function respond(statusCode, body, requestHeaders) {
+    return {
+        statusCode,
+        headers: {
+            ...buildCorsHeaders(requestHeaders, 'OPTIONS,POST'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    };
 }
 
-function respondSSE(body, eventHeaders) {
+function respondSSE(body, requestHeaders) {
     const payload = [
         `data: ${JSON.stringify({ type: 'status', phase: 'accepted' })}`,
         `data: ${JSON.stringify({ type: 'final', payload: body })}`,
@@ -38,7 +45,7 @@ function respondSSE(body, eventHeaders) {
     return {
         statusCode: 200,
         headers: {
-            ...buildCorsHeaders(eventHeaders, 'OPTIONS,POST'),
+            ...buildCorsHeaders(requestHeaders, 'OPTIONS,POST'),
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive'
@@ -75,8 +82,8 @@ function extractJSON(text) {
 //  MODE: ASK — Conversational Q&A with Prism
 // ═══════════════════════════════════════════════════════════════════
 
-async function handleAsk({ userId, message, conversationId, headers }) {
-    console.log(`PRISM: mode=ask, conversationId=${conversationId}`);
+async function handleAsk({ userId, message, conversationId, requestHeaders }) {
+    console.log(`PRISM: mode=ask, userId=${userId}, conversationId=${conversationId}`);
 
     // Generate or reuse conversation ID
     const convId = conversationId || crypto.randomUUID();
@@ -120,15 +127,15 @@ async function handleAsk({ userId, message, conversationId, headers }) {
         conversationId: convId,
         suggestMode,
         mode: 'ask'
-    }, headers);
+    }, requestHeaders);
 }
 
 // ═══════════════════════════════════════════════════════════════════
 //  MODE: ROUTE — Model Recommendation
 // ═══════════════════════════════════════════════════════════════════
 
-async function handleRoute({ userId, message, conversationId, headers }) {
-    console.log(`PRISM: mode=route`);
+async function handleRoute({ userId, message, conversationId, requestHeaders }) {
+    console.log(`PRISM: mode=route, userId=${userId}`);
 
     const convId = conversationId || crypto.randomUUID();
 
@@ -186,7 +193,7 @@ Wrap JSON in \`\`\`json code block.`;
         recommendation: recommendation || { error: 'Could not parse model recommendation' },
         conversationId: convId,
         mode: 'route'
-    }, headers);
+    }, requestHeaders);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -228,8 +235,8 @@ function runtimeModel(modelId) {
     return (modelId || '').startsWith('gemini-') ? modelId : 'gemini-2.5-pro';
 }
 
-async function handleCouncil({ userId, message, conversationId, councilConfig, headers }) {
-    console.log(`PRISM: mode=council, conversationId=${conversationId}`);
+async function handleCouncil({ userId, message, conversationId, councilConfig, requestHeaders }) {
+    console.log(`PRISM: mode=council, userId=${userId}, conversationId=${conversationId}`);
 
     const convId = conversationId || crypto.randomUUID();
     const models = await listModels();
@@ -332,15 +339,15 @@ Be decisive and structured.`;
             runtimeDecisionModel: decisionRuntimeModel,
             rounds: 2
         }
-    }, headers);
+    }, requestHeaders);
 }
 
 // ═══════════════════════════════════════════════════════════════════
 //  MODE: CREATE — Agent Factory (Blueprint Designer)
 // ═══════════════════════════════════════════════════════════════════
 
-async function handleCreate({ userId, message, conversationId, specialAgentContext, headers }) {
-    console.log(`PRISM: mode=create, conversationId=${conversationId}`);
+async function handleCreate({ userId, message, conversationId, specialAgentContext, requestHeaders }) {
+    console.log(`PRISM: mode=create, userId=${userId}, conversationId=${conversationId}`);
 
     const convId = conversationId || crypto.randomUUID();
 
@@ -612,7 +619,7 @@ RULES FOR DESIGNING AGENTS:
         toolCall: derivedToolCall || aiResult.toolCalls?.[0] || null,
         conversationId: convId,
         mode: 'create'
-    }, headers);
+    }, requestHeaders);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -651,18 +658,18 @@ export const handler = async (event) => {
             }, event.headers);
         }
 
-        console.log(`PRISM: ═══ Incoming request ═══ mode=${mode}, conversationId=${conversationId || 'new'}, specialAgent=${specialAgentContext?.name || 'none'}`);
+        console.log(`PRISM: ═══ Incoming request ═══ mode=${mode}, userId=${userId}, conversationId=${conversationId || 'new'}, specialAgent=${specialAgentContext?.name || 'none'}`);
 
         const runMode = async () => {
             switch (mode) {
                 case 'ask':
-                    return await handleAsk({ userId, message, conversationId, headers: event.headers });
+                    return await handleAsk({ userId, message, conversationId, requestHeaders: event.headers });
                 case 'route':
-                    return await handleRoute({ userId, message, conversationId, headers: event.headers });
+                    return await handleRoute({ userId, message, conversationId, requestHeaders: event.headers });
                 case 'create':
-                    return await handleCreate({ userId, message, conversationId, specialAgentContext, headers: event.headers });
+                    return await handleCreate({ userId, message, conversationId, specialAgentContext, requestHeaders: event.headers });
                 case 'council':
-                    return await handleCouncil({ userId, message, conversationId, councilConfig, headers: event.headers });
+                    return await handleCouncil({ userId, message, conversationId, councilConfig, requestHeaders: event.headers });
                 default:
                     return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, create, or council` }, event.headers);
             }
@@ -688,7 +695,7 @@ export const handler = async (event) => {
 
         return respond(500, {
             error: 'Internal server error',
-            message: 'An internal error occurred. Please try again.'
+            message: error.message || 'Unknown error'
         }, event.headers);
     }
 };

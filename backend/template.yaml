@@ -54,6 +54,7 @@ Globals:
         ALLOWED_ORIGINS: !Ref AllowedOrigins
         S3_BUCKET_NAME: !Ref S3BucketName
         S3_BUCKET_REGION: !Ref S3BucketRegion
+        USAGE_TABLE_NAME: !Ref UsageTable
   Api:
     Cors:
       AllowMethods: "'OPTIONS,GET,POST,PUT,DELETE'"
@@ -106,6 +107,21 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+
+  UsageTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: RamN_Usage
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: usageKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: usageKey
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
 
   # ──── Secrets Manager ────
   GcpServiceAccountSecret:

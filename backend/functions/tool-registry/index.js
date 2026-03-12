@@ -9,12 +9,19 @@ import { listTools } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,GET'), body: JSON.stringify(body) };
+function respond(event, statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            ...buildCorsHeaders(event?.headers, 'OPTIONS,GET'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    };
 }
 
 export const handler = async (event) => {
-    if (event.httpMethod === 'OPTIONS') return respond(200, {}, event.headers);
+    if (event.httpMethod === 'OPTIONS') return respond(event, 200, {});
 
     try {
         const authHeader = event.headers?.Authorization || event.headers?.authorization;
@@ -24,14 +31,14 @@ export const handler = async (event) => {
         const tools = await listTools();
         console.log(`TOOL-REGISTRY: ✅ Found ${tools.length} tools`);
 
-        return respond(200, { tools }, event.headers);
+        return respond(event, 200, { tools });
     } catch (error) {
         console.error('TOOL-REGISTRY: ❌ Error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(event, 401, { error: 'Unauthorized', message: error.message });
         }
 
-        return respond(500, { error: 'Failed to list tools', message: 'An internal error occurred. Please try again.' }, event.headers);
+        return respond(event, 500, { error: 'Failed to list tools', message: error.message });
     }
 };

@@ -5,10 +5,16 @@ import {
     CognitoUserAttribute
 } from 'amazon-cognito-identity-js';
 
-// Load from environment with robust fallbacks
+const USER_POOL_ID = import.meta.env.VITE_AWS_USER_POOL_ID || import.meta.env.VITE_COGNITO_USER_POOL_ID;
+const CLIENT_ID = import.meta.env.VITE_AWS_CLIENT_ID || import.meta.env.VITE_COGNITO_CLIENT_ID;
+
+if (!USER_POOL_ID || !CLIENT_ID) {
+    throw new Error('Missing required frontend auth env vars: VITE_AWS_USER_POOL_ID and VITE_AWS_CLIENT_ID');
+}
+
 const POOL_DATA = {
-    UserPoolId: import.meta.env.VITE_AWS_USER_POOL_ID || import.meta.env.VITE_COGNITO_USER_POOL_ID || 'us-east-1_R2j2oAqLJ',
-    ClientId: import.meta.env.VITE_AWS_CLIENT_ID || import.meta.env.VITE_COGNITO_CLIENT_ID || '77205lmtu8fg6t1s3sgcidf7p9'
+    UserPoolId: USER_POOL_ID,
+    ClientId: CLIENT_ID
 };
 
 const userPool = new CognitoUserPool(POOL_DATA);

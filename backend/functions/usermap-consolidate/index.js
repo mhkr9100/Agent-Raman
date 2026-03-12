@@ -39,8 +39,15 @@ No preamble, no markdown blocks unless requested. Just pure JSON.`;
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,POST'), body: JSON.stringify(body) };
+function respond(event, statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            ...buildCorsHeaders(event?.headers, 'OPTIONS,POST'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    };
 }
 
 // ─── Handler ─────────────────────────────────────────────────────
@@ -48,7 +55,7 @@ function respond(statusCode, body, eventHeaders) {
 export const handler = async (event) => {
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
-        return respond(200, {}, event.headers);
+        return respond(event, 200, {});
     }
 
     try {
@@ -59,9 +66,9 @@ export const handler = async (event) => {
         const body = JSON.parse(event.body || '{}');
         const { memories, existingTree } = body;
 
-        if (!memories || !Array.isArray(memories)) return respond(400, { error: 'Missing memories array' }, event.headers);
+        if (!memories || !Array.isArray(memories)) return respond(event, 400, { error: 'Missing memories array' });
 
-        console.log(`USERMAP-CONSOLIDATE: memories=${memories.length}`);
+        console.log(`USERMAP-CONSOLIDATE: userId=${userId}, memories=${memories.length}`);
 
         const memoryList = memories.map((m, i) => `${i + 1}. ${m}`).join('\n');
 
@@ -94,18 +101,18 @@ export const handler = async (event) => {
 
         console.log(`USERMAP-CONSOLIDATE: ✅ Tree generated with ${tree.children.length} categories`);
 
-        return respond(200, tree, event.headers);
+        return respond(event, 200, tree);
 
     } catch (error) {
         console.error('USERMAP-CONSOLIDATE: ❌ Error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(event, 401, { error: 'Unauthorized', message: error.message });
         }
 
-        return respond(500, {
+        return respond(event, 500, {
             error: 'Failed to consolidate user map',
-            message: 'An internal error occurred. Please try again.'
-        }, event.headers);
+            message: error.message || 'Unknown error'
+        });
     }
 };

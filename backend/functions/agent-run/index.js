@@ -24,9 +24,9 @@ import {
     listDocumentsByOwner
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
-import { buildCorsHeaders } from '../../shared/cors.js';
 import { checkAndRecordUsage } from '../../shared/rate-limit.js';
 import { deriveToolIdsFromBlueprint, toCanonicalToolId } from '../../shared/tool-ids.js';
+import { buildCorsHeaders } from '../../shared/cors.js';
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -35,8 +35,15 @@ const DOC_READER_MAX_FILES = 3;
 const DOC_READER_MAX_CHARS = 1800;
 const s3Client = new S3Client({ region: process.env.S3_BUCKET_REGION || process.env.AWS_REGION || 'us-east-2' });
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,POST'), body: JSON.stringify(body) };
+function respond(event, statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            ...buildCorsHeaders(event?.headers, 'OPTIONS,POST'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    };
 }
 
 async function streamToString(stream) {
@@ -442,7 +449,7 @@ function toolToFunctionDeclaration(tool) {
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
-        return respond(200, {}, event.headers);
+        return respond(event, 200, {});
     }
 
     try {
@@ -453,16 +460,16 @@ export const handler = async (event) => {
         const body = JSON.parse(event.body || '{}');
         const { agentId, message, conversationId } = body;
 
-        if (!agentId) return respond(400, { error: 'Missing agentId' }, event.headers);
-        if (!message) return respond(400, { error: 'Missing message' }, event.headers);
+        if (!agentId) return respond(event, 400, { error: 'Missing agentId' });
+        if (!message) return respond(event, 400, { error: 'Missing message' });
 
         const usage = await checkAndRecordUsage(userId, 'agent');
         if (!usage.allowed) {
-            return respond(429, {
+            return respond(event, 429, {
                 error: 'Rate limit exceeded',
                 message: `Hourly limit reached (${usage.limit}/hour).`,
                 usage
-            }, event.headers);
+            });
         }
 
         console.log(`AGENT-RUN: agentId=${agentId}, userId=${userId}, conversationId=${conversationId || 'new'}`);
@@ -472,18 +479,18 @@ export const handler = async (event) => {
 
         if (!agent) {
             console.warn(`AGENT-RUN: Agent not found: ${agentId}`);
-            return respond(404, { error: 'Agent not found' }, event.headers);
+            return respond(event, 404, { error: 'Agent not found' });
         }
 
         if (agent.userId !== userId) {
             console.warn(`AGENT-RUN: Forbidden — agent belongs to ${agent.userId}, not ${userId}`);
-            return respond(403, { error: 'You do not have access to this agent' }, event.headers);
+            return respond(event, 403, { error: 'You do not have access to this agent' });
         }
 
         console.log(`AGENT-RUN: Loaded agent "${agent.name}" (status: ${agent.status})`);
 
         if (agent.status !== 'active') {
-            return respond(400, { error: `Agent is ${agent.status}. Only active agents can be run.` }, event.headers);
+            return respond(event, 400, { error: `Agent is ${agent.status}. Only active agents can be run.` });
         }
 
         // 2. Load conversation history
@@ -678,7 +685,7 @@ export const handler = async (event) => {
         console.log(`AGENT-RUN: ✅ Response saved to conversation ${convId} (${iteration} iterations, ${allToolCalls.length} tool calls)`);
 
         // 7. Return
-        return respond(200, {
+        return respond(event, 200, {
             response: finalText,
             conversationId: convId,
             agentId,
@@ -688,18 +695,18 @@ export const handler = async (event) => {
             modelFallbackApplied: modelResolution.fallback,
             toolsUsed: allToolCalls.map(tc => tc.name),
             iterations: iteration
-        }, event.headers);
+        });
 
     } catch (error) {
         console.error('AGENT-RUN: ❌ Error:', error);
 
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(event, 401, { error: 'Unauthorized', message: error.message });
         }
 
-        return respond(500, {
+        return respond(event, 500, {
             error: 'Failed to run agent',
             message: error.message || 'Unknown error'
-        }, event.headers);
+        });
     }
 };

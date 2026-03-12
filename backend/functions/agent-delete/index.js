@@ -8,12 +8,19 @@ import { deleteAgent, getAgent, getUserMap, updateUserMap } from '../../shared/d
 import { validateToken } from '../../shared/auth.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
 
-function respond(statusCode, body, eventHeaders) {
-    return { statusCode, headers: buildCorsHeaders(eventHeaders, 'OPTIONS,DELETE'), body: JSON.stringify(body) };
+function respond(event, statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            ...buildCorsHeaders(event?.headers, 'OPTIONS,DELETE'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    };
 }
 
 export const handler = async (event) => {
-    if (event.httpMethod === 'OPTIONS') return respond(200, {}, event.headers);
+    if (event.httpMethod === 'OPTIONS') return respond(event, 200, {});
 
     try {
         const authHeader = event.headers?.Authorization || event.headers?.authorization;
@@ -21,11 +28,11 @@ export const handler = async (event) => {
         const userId = auth.userId;
 
         const agentId = event.pathParameters?.agentId || event.queryStringParameters?.agentId;
-        if (!agentId) return respond(400, { error: 'Missing agentId' }, event.headers);
+        if (!agentId) return respond(event, 400, { error: 'Missing agentId' });
 
         const existing = await getAgent(agentId, userId);
         if (!existing) {
-            return respond(404, { error: 'Agent not found for this user', agentId }, event.headers);
+            return respond(event, 404, { error: 'Agent not found for this user', agentId });
         }
 
         await deleteAgent(agentId, userId);
@@ -35,12 +42,12 @@ export const handler = async (event) => {
         const nextHistory = (userMap.agentHistory || []).filter((entry) => entry.agentId !== agentId);
         await updateUserMap(userId, { agentHistory: nextHistory });
 
-        return respond(200, { success: true, agentId }, event.headers);
+        return respond(event, 200, { success: true, agentId });
     } catch (error) {
         console.error('AGENT-DELETE: ❌ Error:', error);
         if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(401, { error: 'Unauthorized', message: error.message }, event.headers);
+            return respond(event, 401, { error: 'Unauthorized', message: error.message });
         }
-        return respond(500, { error: 'Failed to delete agent', message: 'An internal error occurred. Please try again.' }, event.headers);
+        return respond(event, 500, { error: 'Failed to delete agent', message: error.message });
     }
 };

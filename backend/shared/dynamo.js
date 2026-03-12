@@ -10,6 +10,7 @@
  *   RamN_ToolRegistry    - Available tools (PK: toolId)
  *   RamN_SpecialAgents   - Special agent templates (PK: templateId)
  *   RamN_UserMap          - User context/preferences (PK: userId)
+ *   RamN_Usage           - Per-user hourly usage counters (PK: usageKey)
  *   RamN_ModelRegistry   - Available AI models (PK: modelId)
  */
 
@@ -41,6 +42,7 @@ const TABLES = {
     TOOL_REGISTRY: `${PREFIX}ToolRegistry`,
     SPECIAL_AGENTS: `${PREFIX}SpecialAgents`,
     USER_MAP: `${PREFIX}UserMap`,
+    USAGE: `${PREFIX}Usage`,
     MODEL_REGISTRY: `${PREFIX}ModelRegistry`,
     DOCUMENTS: `${PREFIX}Documents`
 };
