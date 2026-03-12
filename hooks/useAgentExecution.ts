@@ -4,13 +4,11 @@ import { AGENTS } from '../constants';
 // import { generateSingleAgentResponse, generatePrismResponse, executeInterceptedCommand } from '../services/aiService';
 import { useAppStore } from '../store/useAppStore';
 
-import { createAgent } from '../services/apiV2';
+import { createAgent, fabricateTeam as fabricateTeamApi } from '../services/apiV2';
 import { normalizeToolIds } from '../services/toolIds';
 
 export const useAgentExecution = (
-    currentUser: UserProfile | null,
-    getUserKeys: () => { openAiKey?: string, anthropicKey?: string, geminiKey?: string },
-    addMessage: (chatId: string, message: Message) => void
+    currentUser: UserProfile | null
 ) => {
     const [activeRequests, setActiveRequests] = useState(0);
     const isProcessing = activeRequests > 0;
@@ -42,50 +40,47 @@ export const useAgentExecution = (
                     throw new Error('No specialists provided for team fabrication.');
                 }
 
-                const createdAgents: Agent[] = [];
-                for (const spec of specialists) {
-                    const toolIds = normalizeToolIds(spec.capabilities || spec.toolIds || spec.tools || []);
-                    const response = await createAgent({
-                        agentName: spec.name || spec.agentName,
-                        role: spec.role || 'Specialist',
-                        agentDescription: spec.jobDescription || spec.description || `A specialized ${spec.role || 'AI'} agent.`,
-                        systemPrompt: spec.jobDescription || spec.systemPrompt || `You are a ${spec.role || 'Specialist'} agent.`,
-                        icon: spec.icon || '🤖',
-                        model: {
-                            modelId: spec.modelId || 'gemini-2.5-flash',
-                            temperature: 0.3
-                        },
-                        toolIds
-                    });
+                const fabricatorResponse = await fabricateTeamApi({
+                    teamName: toolCall.args.teamName || 'New Team',
+                    objective: toolCall.args.objective || '',
+                    specialists
+                });
 
-                    const newAgent: Agent = {
-                        id: response.agentId,
-                        userId: currentUser?.id,
-                        name: response.name,
-                        type: 'agent',
-                        role: spec.role || 'Specialist',
-                        jobDescription: spec.jobDescription || spec.description || `A specialized ${spec.role || 'AI'} agent.`,
-                        icon: spec.icon || '🤖',
-                        provider: 'google',
-                        model: spec.modelId || 'gemini-2.5-flash',
-                        capabilities: toolIds as any,
-                        isDeletable: true,
-                        isSystem: false
-                    };
-                    onRecruitAgent(newAgent);
-                    createdAgents.push(newAgent);
-                }
-
-                const newTeam: Team = {
-                    id: `team-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                const createdAgents: Agent[] = (fabricatorResponse.agents || []).map((agentRecord) => ({
+                    id: agentRecord.agentId,
                     userId: currentUser?.id,
-                    name: toolCall.args.teamName || 'New Team',
-                    description: toolCall.args.objective,
+                    name: agentRecord.name,
+                    type: 'agent',
+                    role: agentRecord.role || 'Specialist',
+                    jobDescription: agentRecord.blueprint?.agentDescription || `A specialized ${agentRecord.role || 'AI'} agent.`,
+                    icon: agentRecord.icon || '🤖',
+                    provider: 'google',
+                    model: agentRecord.modelId || 'gemini-2.5-flash',
+                    capabilities: normalizeToolIds(agentRecord.toolIds || []) as any,
+                    blueprint: agentRecord.blueprint,
+                    status: agentRecord.status || 'active',
+                    isDeletable: true,
+                    isSystem: false
+                }));
+
+                createdAgents.forEach((agent) => onRecruitAgent(agent));
+
+                const teamPayload: Team = {
+                    id: fabricatorResponse.team.teamId,
+                    userId: fabricatorResponse.team.userId || currentUser?.id,
+                    name: fabricatorResponse.team.name || toolCall.args.teamName || 'New Team',
+                    description: fabricatorResponse.team.description || toolCall.args.objective,
                     type: 'rouge',
                     agents: createdAgents,
                     isSystem: false
                 };
-                await onCreateTeam(newTeam);
+                const persistedTeam = await onCreateTeam(teamPayload);
+                const newTeam = (persistedTeam && (persistedTeam as Team).id)
+                    ? persistedTeam as Team
+                    : null;
+                if (!newTeam) {
+                    throw new Error('Team could not be persisted by backend.');
+                }
 
                 const updatedHistory = [...history];
                 updatedHistory[msgIndex] = {

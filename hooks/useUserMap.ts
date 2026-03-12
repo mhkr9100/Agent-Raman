@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { UserProfile } from '../types';
-import { dbService, STORES_ENUM } from '../services/db';
 
 export interface PageNode {
     id: string;
@@ -8,13 +7,6 @@ export interface PageNode {
     value?: string;
     source?: string;
     children: PageNode[];
-}
-
-interface StoredUserMapRecord {
-    id: string;
-    userId: string;
-    tree: PageNode;
-    updatedAt: string | null;
 }
 
 const EMPTY_TREE: PageNode = {
@@ -31,39 +23,6 @@ export const useUserMap = (currentUser: UserProfile | null) => {
 
     const latestTreeRef = useRef<PageNode>(EMPTY_TREE);
     const latestUpdatedAtRef = useRef<string | null>(null);
-
-    const persistLocalCache = useCallback(async (userId: string, tree: PageNode, updatedAt: string | null) => {
-        const key = `usermap-${userId}`;
-        const payload: StoredUserMapRecord = {
-            id: key,
-            userId,
-            tree,
-            updatedAt
-        };
-        await dbService.put(STORES_ENUM.USERMAP, payload, key);
-    }, []);
-
-    const readLocalCache = useCallback(async (userId: string): Promise<StoredUserMapRecord | null> => {
-        const keyPrimary = `usermap-${userId}`;
-        const keyLegacy = `usermap_${userId}`;
-        let saved = await dbService.get<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, keyPrimary, userId);
-        if (!saved) saved = await dbService.get<StoredUserMapRecord | PageNode>(STORES_ENUM.USERMAP, keyLegacy, userId);
-
-        if (saved && (saved as StoredUserMapRecord).tree) {
-            return saved as StoredUserMapRecord;
-        }
-
-        if (saved && (saved as PageNode).id === 'root') {
-            return {
-                id: keyPrimary,
-                userId,
-                tree: saved as PageNode,
-                updatedAt: null
-            };
-        }
-
-        return null;
-    }, []);
 
     useEffect(() => {
         if (!currentUser) return;
@@ -82,19 +41,13 @@ export const useUserMap = (currentUser: UserProfile | null) => {
                 latestTreeRef.current = tree;
                 setServerUpdatedAt(updatedAt);
                 latestUpdatedAtRef.current = updatedAt;
-
-                await persistLocalCache(currentUser.id, tree, updatedAt);
             } catch (error) {
-                console.warn('[useUserMap] Remote load failed, using local cache:', error);
-                const local = await readLocalCache(currentUser.id);
-                const fallbackTree = local?.tree && local.tree.id === 'root' ? local.tree : EMPTY_TREE;
-                const fallbackUpdatedAt = local?.updatedAt || null;
-
+                console.warn('[useUserMap] Remote load failed, resetting to empty tree:', error);
                 if (!mounted) return;
-                setUserMapTree(fallbackTree);
-                latestTreeRef.current = fallbackTree;
-                setServerUpdatedAt(fallbackUpdatedAt);
-                latestUpdatedAtRef.current = fallbackUpdatedAt;
+                setUserMapTree(EMPTY_TREE);
+                latestTreeRef.current = EMPTY_TREE;
+                setServerUpdatedAt(null);
+                latestUpdatedAtRef.current = null;
             } finally {
                 if (mounted) setIsLoading(false);
             }
@@ -103,7 +56,7 @@ export const useUserMap = (currentUser: UserProfile | null) => {
         return () => {
             mounted = false;
         };
-    }, [currentUser, persistLocalCache, readLocalCache]);
+    }, [currentUser]);
 
     const saveTree = useCallback(async (tree: PageNode) => {
         if (!currentUser) return;
@@ -113,7 +66,6 @@ export const useUserMap = (currentUser: UserProfile | null) => {
 
         setUserMapTree(tree);
         latestTreeRef.current = tree;
-        await persistLocalCache(currentUser.id, tree, previousUpdatedAt);
 
         try {
             const { saveUserMapTree } = await import('../services/apiV2');
@@ -122,7 +74,6 @@ export const useUserMap = (currentUser: UserProfile | null) => {
 
             setServerUpdatedAt(nextUpdatedAt);
             latestUpdatedAtRef.current = nextUpdatedAt;
-            await persistLocalCache(currentUser.id, tree, nextUpdatedAt);
         } catch (error: any) {
             if (error?.code === 'CONFLICT' && error.currentTree?.id === 'root') {
                 const remoteTree = error.currentTree as PageNode;
@@ -131,7 +82,6 @@ export const useUserMap = (currentUser: UserProfile | null) => {
                 latestTreeRef.current = remoteTree;
                 setServerUpdatedAt(remoteUpdatedAt);
                 latestUpdatedAtRef.current = remoteUpdatedAt;
-                await persistLocalCache(currentUser.id, remoteTree, remoteUpdatedAt);
                 return;
             }
 
@@ -140,9 +90,9 @@ export const useUserMap = (currentUser: UserProfile | null) => {
             latestTreeRef.current = previousTree;
             setServerUpdatedAt(previousUpdatedAt);
             latestUpdatedAtRef.current = previousUpdatedAt;
-            await persistLocalCache(currentUser.id, previousTree, previousUpdatedAt);
+            throw error;
         }
-    }, [currentUser, persistLocalCache]);
+    }, [currentUser]);
 
     const updateNode = useCallback((nodeId: string, updates: Partial<PageNode>) => {
         const updateInTree = (node: PageNode): PageNode => {
@@ -186,14 +136,16 @@ export const useUserMap = (currentUser: UserProfile | null) => {
 
         setIsConsolidating(true);
         try {
-            const stored = await dbService.getAll<{ id: string; content: string }>(STORES_ENUM.MEMORIES, currentUser.id);
-            const memoryStrings = stored.map(m => m.content || m.id).filter(Boolean);
+            const { listMemories, consolidateUserMap } = await import('../services/apiV2');
+            const memoriesResponse = await listMemories(500);
+            const memoryStrings = (memoriesResponse.memories || [])
+                .map((m) => (m.content || '').trim())
+                .filter(Boolean);
 
             if (memoryStrings.length === 0) {
                 throw new Error('No memories to consolidate. Chat with agents first to build your memory.');
             }
 
-            const { consolidateUserMap } = await import('../services/apiV2');
             const tree = await consolidateUserMap({
                 memories: memoryStrings,
                 existingTree: latestTreeRef.current.children.length > 0 ? latestTreeRef.current : undefined
@@ -212,56 +164,43 @@ export const useUserMap = (currentUser: UserProfile | null) => {
         requireCloudAck: boolean = false
     ) => {
         if (!currentUser || facts.length === 0) return 0;
-        const timestamp = Date.now();
         const BACKEND_URL = import.meta.env.VITE_API_V2_URL || import.meta.env.VITE_BACKEND_URL || '';
         const failures: string[] = [];
 
-        if (requireCloudAck && !BACKEND_URL) {
-            throw new Error('Cloud memory endpoint is not configured. External memory import requires backend sync.');
+        if (!BACKEND_URL) {
+            throw new Error('Cloud memory endpoint is not configured.');
         }
 
         let storedCount = 0;
+        const token = sessionStorage.getItem('id_token')
+            || sessionStorage.getItem('auth_token')
+            || localStorage.getItem('id_token')
+            || localStorage.getItem('auth_token');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = `Bearer ${token}`;
+
         for (const fact of facts) {
             const cleaned = (fact || '').trim();
             if (!cleaned) continue;
 
-            const id = `mem_${timestamp}_${Math.random().toString(36).slice(2, 8)}`;
-
-            await dbService.put(STORES_ENUM.MEMORIES, {
-                id,
-                userId: currentUser.id,
-                agentId,
-                source,
-                content: cleaned,
-                createdAt: new Date().toISOString()
-            });
-            storedCount += 1;
-
-            if (BACKEND_URL) {
-                const token = sessionStorage.getItem('id_token')
-                    || sessionStorage.getItem('auth_token')
-                    || localStorage.getItem('id_token')
-                    || localStorage.getItem('auth_token');
-                const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                try {
-                    const response = await fetch(`${BACKEND_URL}/api/memory/add`, {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify({
-                            agentId,
-                            content: cleaned,
-                            category: source === 'external-import' ? 'profile' : 'general'
-                        })
-                    });
-                    if (!response.ok) {
-                        const body = await response.text();
-                        failures.push(`memory/add failed (${response.status}): ${body || 'no response body'}`);
-                    }
-                } catch (error: any) {
-                    failures.push(`memory/add network error: ${error?.message || 'unknown error'}`);
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/memory/add`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        agentId,
+                        content: cleaned,
+                        category: source === 'external-import' ? 'profile' : 'general'
+                    })
+                });
+                if (!response.ok) {
+                    const body = await response.text();
+                    failures.push(`memory/add failed (${response.status}): ${body || 'no response body'}`);
+                    continue;
                 }
+                storedCount += 1;
+            } catch (error: any) {
+                failures.push(`memory/add network error: ${error?.message || 'unknown error'}`);
             }
         }
 

@@ -108,6 +108,29 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  TeamsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: RamN_Teams
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: teamId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: teamId
+          KeyType: HASH
+        - AttributeName: userId
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: userId-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
   UsageTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -252,13 +275,18 @@ Resources:
           Properties:
             Path: /api/memory/search
             Method: POST
+        MemoryList:
+          Type: Api
+          Properties:
+            Path: /api/memory/list
+            Method: GET
         MemoryOptions:
           Type: Api
           Properties:
             Path: /api/memory/{proxy+}
             Method: OPTIONS
 
-  # ──── AI Proxy (Vertex AI + AI Studio + Bedrock) ────
+  # ──── AI Proxy (Vertex AI only) ────
   AIProxyFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -271,16 +299,8 @@ Resources:
           GCP_PROJECT_ID: ramn-ai
           GCP_LOCATION: us-central1
           GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
-          AWS_BEDROCK_REGION: us-east-1
       Policies:
         - Statement:
-            - Effect: Allow
-              Action:
-                - bedrock:InvokeModel
-              Resource:
-                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0"
-                - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-*'
-                - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/meta.llama*'
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
@@ -491,6 +511,131 @@ Resources:
           Type: Api
           Properties:
             Path: /api/v2/agents
+            Method: OPTIONS
+
+  # ──── Team APIs ────
+  TeamListFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/team-list/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Teams"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Teams/index/*"
+      Events:
+        TeamList:
+          Type: Api
+          Properties:
+            Path: /api/v2/teams
+            Method: GET
+        TeamListOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/teams
+            Method: OPTIONS
+
+  TeamUpsertFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/team-upsert/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 20
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Teams"
+      Events:
+        TeamUpsert:
+          Type: Api
+          Properties:
+            Path: /api/v2/teams
+            Method: POST
+
+  TeamDeleteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/team-delete/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:DeleteItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Teams"
+      Events:
+        TeamDelete:
+          Type: Api
+          Properties:
+            Path: /api/v2/teams/{teamId}
+            Method: DELETE
+        TeamDeleteOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/teams/{teamId}
+            Method: OPTIONS
+
+  TeamFabricateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/team-fabricate/index.handler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Agents"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Teams"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_UserMap"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_ToolRegistry"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_ModelRegistry"
+      Events:
+        TeamFabricate:
+          Type: Api
+          Properties:
+            Path: /api/v2/teams/fabricate
+            Method: POST
+        TeamFabricateOptions:
+          Type: Api
+          Properties:
+            Path: /api/v2/teams/fabricate
             Method: OPTIONS
 
   # ──── Agent Delete ────

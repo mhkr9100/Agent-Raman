@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Key, ArrowRight, X } from 'lucide-react';
+import { Sparkles, ArrowRight, X } from 'lucide-react';
 
 interface Props {
     isOpen: boolean;
@@ -64,24 +64,11 @@ export const OnboardingModal: React.FC<Props> = ({ isOpen, onClose, onOpenProfil
                         background: 'rgba(255,255,255,0.03)', borderRadius: '12px',
                         padding: '20px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.06)'
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                            <div style={{
-                                width: '32px', height: '32px', borderRadius: '8px',
-                                background: 'rgba(255,255,255,0.05)', display: 'flex',
-                                alignItems: 'center', justifyContent: 'center',
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                color: 'rgba(255,255,255,0.5)'
-                            }}>
-                                <Key size={16} />
-                            </div>
-                            <div>
-                                <div style={{ fontWeight: 600, fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>Add Your API Key</div>
-                                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>Google Gemini, OpenAI, or Anthropic</div>
-                            </div>
+                        <div style={{ fontWeight: 600, fontSize: '14px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>
+                            Bring Your Context
                         </div>
                         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', lineHeight: 1.5, margin: 0 }}>
-                            RamN AI connects directly to AI providers using your API key.
-                            Your key stays in your browser — we never store it on our servers.
+                            Import your context from other AI tools into UserMap so Prism and your agents can personalize responses from the start.
                         </p>
                     </div>
 
@@ -93,9 +80,9 @@ export const OnboardingModal: React.FC<Props> = ({ isOpen, onClose, onOpenProfil
                             Quick Start
                         </div>
                         <ol style={{ margin: 0, paddingLeft: '20px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', lineHeight: 2 }}>
-                            <li>Open <b style={{ color: 'rgba(255,255,255,0.7)' }}>User Profile</b> and add at least one API key</li>
-                            <li>Chat with <b style={{ color: 'rgba(255,255,255,0.7)' }}>Prism</b> — describe your workflow</li>
-                            <li>Prism creates <b style={{ color: 'rgba(255,255,255,0.7)' }}>specialized agents</b> for you</li>
+                            <li>Open <b style={{ color: 'rgba(255,255,255,0.7)' }}>UserMap</b> and import your memory/context</li>
+                            <li>Chat with <b style={{ color: 'rgba(255,255,255,0.7)' }}>Prism</b> and describe your objective</li>
+                            <li>Approve suggested blueprints to deploy <b style={{ color: 'rgba(255,255,255,0.7)' }}>specialized agents</b></li>
                         </ol>
                     </div>
 
@@ -112,12 +99,8 @@ export const OnboardingModal: React.FC<Props> = ({ isOpen, onClose, onOpenProfil
                         onMouseEnter={(e: React.MouseEvent) => { const t = e.currentTarget as HTMLElement; t.style.background = 'rgba(255,255,255,0.12)'; t.style.borderColor = 'rgba(255,255,255,0.25)'; }}
                         onMouseLeave={(e: React.MouseEvent) => { const t = e.currentTarget as HTMLElement; t.style.background = 'rgba(255,255,255,0.08)'; t.style.borderColor = 'rgba(255,255,255,0.15)'; }}
                     >
-                        Set Up API Key <ArrowRight size={16} />
+                        Open UserMap <ArrowRight size={16} />
                     </button>
-
-                    <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '12px', color: 'rgba(255,255,255,0.25)' }}>
-                        Need a free key? Visit <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'underline' }}>Google AI Studio</a>
-                    </p>
                 </motion.div>
             </motion.div>
         </AnimatePresence>

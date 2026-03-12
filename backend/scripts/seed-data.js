@@ -2,9 +2,9 @@
  * RamN AI — Seed Data Script
  * 
  * Populates DynamoDB tables with initial data:
- *   - RamN_ToolRegistry    (7 tools)
+ *   - RamN_ToolRegistry    (core tool set)
  *   - RamN_ModelRegistry   (3 models)
- *   - RamN_SpecialAgents   (3 templates)
+ *   - RamN_SpecialAgents   (starter templates)
  * 
  * Uses DynamoDB DocumentClient directly.
  * Checks if items exist before inserting (idempotent).
@@ -59,7 +59,7 @@ async function putIfNotExists(tableName, keyFields, item) {
 
 const TOOLS = [
     {
-        toolId: 'webSearch',
+        toolId: 'web-search',
         name: 'Google Search API',
         type: 'plugin',
         category: 'research',
@@ -68,12 +68,30 @@ const TOOLS = [
         status: 'active'
     },
     {
-        toolId: 'data-analyzer',
-        name: 'Data Analyzer',
+        toolId: 'thinking',
+        name: 'Deep Thinking',
         type: 'plugin',
         category: 'analysis',
-        description: 'Analyze CSV and JSON data sets',
-        capabilities: ['csv_analysis', 'statistics', 'charting'],
+        description: 'Structured multi-step reasoning for complex tasks',
+        capabilities: ['reasoning', 'planning'],
+        status: 'active'
+    },
+    {
+        toolId: 'image-generation',
+        name: 'Image Generation',
+        type: 'plugin',
+        category: 'creative',
+        description: 'Generate images from text prompts',
+        capabilities: ['text_to_image'],
+        status: 'active'
+    },
+    {
+        toolId: 'doc-reader',
+        name: 'Document Reader',
+        type: 'plugin',
+        category: 'knowledge',
+        description: 'Retrieve relevant snippets from uploaded documents',
+        capabilities: ['document_retrieval', 'snippet_extraction'],
         status: 'active'
     }
 ];
@@ -104,44 +122,14 @@ const MODELS = [
         temperature_default: 0.2
     },
     {
-        modelId: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
-        provider: 'anthropic',
-        name: 'Claude 3.5 Sonnet',
-        strengths: 'Nuance, Human-like',
-        contextWindow: 200000,
-        costTier: 'medium',
-        bestFor: ['Architecture', 'Logic'],
-        temperature_default: 0.3
-    },
-    {
-        modelId: 'meta.llama3-1-405b-instruct-v1:0',
-        provider: 'meta',
-        name: 'Llama 3.1 405B',
-        strengths: 'Reasoning, Vast data',
-        contextWindow: 128000,
-        costTier: 'high',
-        bestFor: ['Research'],
-        temperature_default: 0.4
-    },
-    {
-        modelId: 'gpt-4o',
-        provider: 'openai',
-        name: 'GPT-4o',
-        strengths: 'Nuance, Human-like',
-        contextWindow: 128000,
-        costTier: 'high',
-        bestFor: ['Interaction'],
-        temperature_default: 0.5
-    },
-    {
-        modelId: 'o1',
-        provider: 'openai',
-        name: 'OpenAI o1',
-        strengths: 'Reasoning, Complex logic',
-        contextWindow: 128000,
-        costTier: 'highest',
-        bestFor: ['Math', 'Coding'],
-        temperature_default: 1.0
+        modelId: 'gemini-2.5-flash-lite',
+        provider: 'google',
+        name: 'Gemini 2.5 Flash Lite',
+        strengths: 'Ultra-fast, cost-efficient',
+        contextWindow: 1000000,
+        costTier: 'lowest',
+        bestFor: ['High-volume utility tasks'],
+        temperature_default: 0.2
     }
 ];
 
@@ -177,7 +165,7 @@ Your goal is to provide comprehensive, accurate research on {{TOPIC}}.
 
 ### OUTPUT FORMAT:
 Structured report with: Summary, Key Findings, Details, Sources, Recommendations`,
-        tools: ['webSearch', 'doc-reader'],
+        tools: ['web-search', 'doc-reader'],
         model: { provider: 'google', modelId: 'gemini-2.5-pro', temperature: 0.3 },
         contextSlots: ['DOMAIN', 'TOPIC'],
         category: 'research'
@@ -203,7 +191,7 @@ Structured report with: Summary, Key Findings, Details, Sources, Recommendations
 
 ### OUTPUT FORMAT:
 {{FORMAT}}`,
-        tools: ['webSearch'],
+        tools: ['web-search'],
         model: { provider: 'google', modelId: 'gemini-2.5-flash', temperature: 0.7 },
         contextSlots: ['CONTENT_TYPE', 'AUDIENCE', 'FORMAT'],
         category: 'content'

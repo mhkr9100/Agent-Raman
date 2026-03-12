@@ -27,11 +27,14 @@ export const handler = async (event) => {
         const authHeader = event.headers?.Authorization || event.headers?.authorization;
         await validateToken(authHeader);
 
-        console.log('MODEL-REGISTRY: Listing all models');
+        console.log('MODEL-REGISTRY: Listing Vertex-supported models');
         const models = await listModels();
-        console.log(`MODEL-REGISTRY: ✅ Found ${models.length} models`);
+        const vertexModels = (models || []).filter((model) =>
+            String(model?.modelId || '').startsWith('gemini-')
+        );
+        console.log(`MODEL-REGISTRY: ✅ Found ${vertexModels.length} Vertex models (from ${models.length} total)`);
 
-        return respond(event, 200, { models });
+        return respond(event, 200, { models: vertexModels });
     } catch (error) {
         console.error('MODEL-REGISTRY: ❌ Error:', error);
         if (error.message && error.message.startsWith('Unauthorized')) {

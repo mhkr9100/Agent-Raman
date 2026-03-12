@@ -62,11 +62,8 @@ export const useAuth = () => {
         setIsInitializing(false);
     }, []);
 
-    // Platform-managed: no user API keys. Returns empty object for backward compat with any callers.
-    const getUserKeys = useCallback(() => ({}), []);
-
     return {
         currentUser, setCurrentUser, isInitializing, setIsInitializing,
-        login, logout, getUserKeys
+        login, logout
     };
 };

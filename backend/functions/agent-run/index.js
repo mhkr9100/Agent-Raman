@@ -347,35 +347,21 @@ function resolveRuntimeModel(requestedModelId) {
 
     if (!requested) {
         return {
-            runtimeModelId: 'gemini-2.5-flash',
-            fallback: true,
-            reason: 'missing_model'
+            ok: false,
+            error: 'Missing modelId in agent blueprint. Set blueprint.model.modelId to a Vertex Gemini model.'
         };
     }
 
-    if (requested.startsWith('gemini-3.0') || requested.startsWith('gemini-2.0')) {
+    if (!requested.startsWith('gemini-')) {
         return {
-            runtimeModelId: 'gemini-2.5-flash',
-            fallback: true,
-            reason: 'deprecated_gemini_alias'
+            ok: false,
+            error: `Model "${requested}" is not supported in this deployment. Only Vertex Gemini models are allowed.`
         };
     }
 
-    if (requested.startsWith('gemini-')) {
-        return {
-            runtimeModelId: requested,
-            fallback: false,
-            reason: 'native_gemini'
-        };
-    }
-
-    // Current shared runtime path is Vertex Gemini.
-    // For now, non-Gemini model IDs are mapped to a strong Gemini fallback
-    // to avoid hard failures in production conversations.
     return {
-        runtimeModelId: 'gemini-2.5-pro',
-        fallback: true,
-        reason: 'non_gemini_not_supported_in_vertex_path'
+        ok: true,
+        runtimeModelId: requested
     };
 }
 
@@ -512,12 +498,10 @@ export const handler = async (event) => {
         // Resolve selected model to a runtime-supported model.
         const requestedModelId = blueprint.model?.modelId || 'gemini-2.5-flash';
         const modelResolution = resolveRuntimeModel(requestedModelId);
-        const modelId = modelResolution.runtimeModelId;
-        if (modelResolution.fallback) {
-            console.warn(
-                `AGENT-RUN: ⚠️ Requested model "${requestedModelId}" mapped to runtime model "${modelId}" (${modelResolution.reason})`
-            );
+        if (!modelResolution.ok) {
+            return respond(event, 400, { error: modelResolution.error });
         }
+        const modelId = modelResolution.runtimeModelId;
 
         const temperature = blueprint.model?.temperature ?? 0.3;
 
@@ -692,7 +676,7 @@ export const handler = async (event) => {
             agentName: agent.name,
             requestedModelId,
             runtimeModelId: modelId,
-            modelFallbackApplied: modelResolution.fallback,
+            modelFallbackApplied: false,
             toolsUsed: allToolCalls.map(tc => tc.name),
             iterations: iteration
         });

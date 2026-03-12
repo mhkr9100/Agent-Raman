@@ -6,6 +6,7 @@
  * 
  * Tables (prefix: RamN_):
  *   RamN_Agents          - Agent blueprints (PK: agentId, SK: userId)
+ *   RamN_Teams           - Team blueprints (PK: teamId, SK: userId)
  *   RamN_Conversations   - Chat history (PK: conversationId, SK: timestamp)
  *   RamN_ToolRegistry    - Available tools (PK: toolId)
  *   RamN_SpecialAgents   - Special agent templates (PK: templateId)
@@ -38,6 +39,7 @@ const PREFIX = process.env.TABLE_PREFIX || '';
 
 const TABLES = {
     AGENTS: `${PREFIX}Agents`,
+    TEAMS: `${PREFIX}Teams`,
     CONVERSATIONS: `${PREFIX}Conversations`,
     TOOL_REGISTRY: `${PREFIX}ToolRegistry`,
     SPECIAL_AGENTS: `${PREFIX}SpecialAgents`,
@@ -178,6 +180,77 @@ export async function deleteAgent(agentId, userId) {
         console.log(`[dynamo] ✅ Agent deleted: ${agentId}`);
     } catch (error) {
         wrapError(TABLES.AGENTS, 'deleteAgent', error);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  TEAMS — RamN_Teams (PK: teamId, SK: userId)
+// ══════════════════════════════════════════════════════════════════
+
+export async function saveTeam({ teamId, userId, name, description, agentIds = [], status = 'active' }) {
+    console.log(`[dynamo] saveTeam: ${teamId} for user ${userId.substring(0, 8)}***`);
+    try {
+        const now = new Date().toISOString();
+        const existing = await getTeam(teamId, userId);
+        await docClient.send(new PutCommand({
+            TableName: TABLES.TEAMS,
+            Item: {
+                teamId,
+                userId,
+                name,
+                description: description || '',
+                agentIds: Array.isArray(agentIds) ? agentIds : [],
+                status,
+                createdAt: existing?.createdAt || now,
+                updatedAt: now
+            }
+        }));
+        console.log(`[dynamo] ✅ Team saved: ${name} (${teamId})`);
+        return { teamId, status: existing ? 'updated' : 'created' };
+    } catch (error) {
+        wrapError(TABLES.TEAMS, 'saveTeam', error);
+    }
+}
+
+export async function getTeam(teamId, userId) {
+    console.log(`[dynamo] getTeam: ${teamId}`);
+    try {
+        const result = await docClient.send(new GetCommand({
+            TableName: TABLES.TEAMS,
+            Key: { teamId, userId }
+        }));
+        return result.Item || null;
+    } catch (error) {
+        wrapError(TABLES.TEAMS, 'getTeam', error);
+    }
+}
+
+export async function listTeamsByUser(userId) {
+    console.log(`[dynamo] listTeamsByUser: ${userId.substring(0, 8)}***`);
+    try {
+        const result = await docClient.send(new QueryCommand({
+            TableName: TABLES.TEAMS,
+            IndexName: 'userId-index',
+            KeyConditionExpression: 'userId = :uid',
+            ExpressionAttributeValues: { ':uid': userId }
+        }));
+        console.log(`[dynamo] ✅ Found ${result.Items?.length || 0} teams for user`);
+        return result.Items || [];
+    } catch (error) {
+        wrapError(TABLES.TEAMS, 'listTeamsByUser', error);
+    }
+}
+
+export async function deleteTeam(teamId, userId) {
+    console.log(`[dynamo] deleteTeam: ${teamId}`);
+    try {
+        await docClient.send(new DeleteCommand({
+            TableName: TABLES.TEAMS,
+            Key: { teamId, userId }
+        }));
+        console.log(`[dynamo] ✅ Team deleted: ${teamId}`);
+    } catch (error) {
+        wrapError(TABLES.TEAMS, 'deleteTeam', error);
     }
 }
 
@@ -551,6 +624,18 @@ export async function deleteAllUserData(userId) {
         errors.push(`agents: ${error.message}`);
     }
 
+    // 1b. Delete all teams
+    try {
+        const teams = await listTeamsByUser(userId);
+        for (const team of teams) {
+            await deleteTeam(team.teamId, userId);
+        }
+        console.log(`[dynamo] ✅ Deleted ${teams.length} teams for user`);
+    } catch (error) {
+        console.error('[dynamo] ❌ Failed to delete teams:', error.message);
+        errors.push(`teams: ${error.message}`);
+    }
+
     // 2. Delete UserMap entry
     try {
         await docClient.send(new DeleteCommand({
@@ -590,6 +675,8 @@ export async function deleteAllUserData(userId) {
 export default {
     // Agents
     saveAgent, getAgent, listAgentsByUser, updateAgent, deleteAgent,
+    // Teams
+    saveTeam, getTeam, listTeamsByUser, deleteTeam,
     // Conversations
     saveMessage, getConversation,
     // Tool Registry

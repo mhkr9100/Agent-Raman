@@ -134,7 +134,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     if (event.httpMethod === 'OPTIONS') {
-        return { statusCode: 200, headers: buildCorsHeaders(event.headers, 'OPTIONS,POST'), body: '' };
+        return { statusCode: 200, headers: buildCorsHeaders(event.headers, 'OPTIONS,POST,GET'), body: '' };
     }
 
     try {
@@ -147,14 +147,19 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         if (event.httpMethod === 'POST') {
             if (path.endsWith('/add')) return await handleAdd(event, userId);
             if (path.endsWith('/search')) return await handleSearch(event, userId);
+            if (path.endsWith('/list')) return await handleList(event, userId);
         }
 
-        return { ...apiError(404, 'Not Found'), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
+        if (event.httpMethod === 'GET') {
+            if (path.endsWith('/list')) return await handleList(event, userId);
+        }
+
+        return { ...apiError(404, 'Not Found'), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST,GET') };
     } catch (error: any) {
         console.error('Memory Error:', error);
         const status = (error.message || '').startsWith('Unauthorized') ? 401 : 500;
         const safeMessage = status === 401 ? 'Unauthorized' : 'An internal error occurred. Please try again.';
-        return { ...apiError(status, safeMessage), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST') };
+        return { ...apiError(status, safeMessage), headers: buildCorsHeaders(event.headers, 'OPTIONS,POST,GET') };
     }
 };
 
@@ -274,5 +279,37 @@ async function handleSearch(event: APIGatewayProxyEvent, userId: string): Promis
         count: items.length
         }),
         headers: buildCorsHeaders(event.headers, 'OPTIONS,POST')
+    };
+}
+
+/**
+ * /api/memory/list (GET or POST)
+ * Returns latest user memories from DynamoDB.
+ */
+async function handleList(event: APIGatewayProxyEvent, userId: string): Promise<APIGatewayProxyResult> {
+    let limit = 300;
+    if (event.httpMethod === 'GET') {
+        limit = Math.min(500, Math.max(1, Number(event.queryStringParameters?.limit || 300)));
+    } else {
+        const body = JSON.parse(event.body || '{}');
+        limit = Math.min(500, Math.max(1, Number(body.limit || 300)));
+    }
+
+    const pk = `USER#${userId}`;
+    const response = await docClient.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :skPrefix)',
+        ExpressionAttributeValues: {
+            ':pk': pk,
+            ':skPrefix': 'memories#'
+        },
+        ScanIndexForward: false,
+        Limit: limit
+    }));
+
+    const items = (response.Items || []).map((item) => item.data).filter(Boolean);
+    return {
+        ...apiSuccess({ memories: items, count: items.length }),
+        headers: buildCorsHeaders(event.headers, 'OPTIONS,POST,GET')
     };
 }

@@ -4,18 +4,15 @@ import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-sec
 import { buildCorsHeaders, requireAuth } from './security.js';
 
 /**
- * AI Proxy Lambda — Server-Side AI Provider Gateway
- * 
- * 3-Tier Fallback:
+ * AI Proxy Lambda — Server-Side Vertex Gateway
+ *
+ * Strict provider policy:
  * 1. Google Vertex AI (service account OAuth2)
- * 2. Google AI Studio (API key)
- * 3. AWS Bedrock Claude (IAM credentials from Lambda execution role)
  */
 
 const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID || 'ramn-ai';
 const GCP_LOCATION = process.env.GCP_LOCATION || 'us-central1';
 const GCP_SERVICE_ACCOUNT_SECRET_ARN = process.env.GCP_SERVICE_ACCOUNT_SECRET_ARN || '';
-const AWS_BEDROCK_REGION = process.env.AWS_BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
 
 // ─── Decode Service Account Key ───
 
@@ -112,50 +109,6 @@ async function getAccessToken(): Promise<string> {
     return tokenData.access_token;
 }
 
-// ─── AWS Bedrock (Server-Side — no CORS issues) ───
-
-async function callBedrock(contents: any[], systemInstruction?: string): Promise<any> {
-    // Use AWS SDK v3 — dynamically import to keep cold starts fast when not needed
-    const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
-
-    const client = new BedrockRuntimeClient({ region: AWS_BEDROCK_REGION });
-
-    const messages = contents.map((c: any) => ({
-        role: c.role === 'model' ? 'assistant' : 'user',
-        content: c.parts?.[0]?.text || ''
-    }));
-
-    const bedrockPayload = {
-        anthropic_version: 'bedrock-2023-05-31',
-        max_tokens: 4096,
-        messages,
-        system: systemInstruction || undefined,
-        temperature: 0.7,
-        top_p: 0.95
-    };
-
-    const command = new InvokeModelCommand({
-        modelId: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
-        body: JSON.stringify(bedrockPayload),
-        contentType: 'application/json',
-        accept: 'application/json'
-    });
-
-    const response = await client.send(command);
-    const result = JSON.parse(new TextDecoder().decode(response.body));
-    const text = result.content?.[0]?.text || '';
-
-    // Return in Gemini-compatible format so the frontend doesn't need to change
-    return {
-        candidates: [{
-            content: {
-                parts: [{ text }],
-                role: 'model'
-            }
-        }]
-    };
-}
-
 // ─── Main Handler ───
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
@@ -203,8 +156,7 @@ async function handleHealth(): Promise<APIGatewayProxyResult> {
         body: JSON.stringify({
             status: 'operational',
             providers: {
-                vertexAI: !!saKey,
-                bedrock: true
+                vertexAI: !!saKey
             }
         })
     };
@@ -212,10 +164,9 @@ async function handleHealth(): Promise<APIGatewayProxyResult> {
 
 /**
  * POST /api/ai/generate
- * 
- * 3-Tier Strategy:
- * 1. Vertex AI (service account) — highest quota, enterprise
- * 2. AWS Bedrock (Claude 3.5) — pay-per-use, always available
+ *
+ * Strict strategy:
+ * 1. Vertex AI (service account)
  */
 async function handleGenerate(
     event: APIGatewayProxyEvent,
@@ -235,6 +186,15 @@ async function handleGenerate(
             statusCode: 400,
             headers: corsHeaders,
             body: JSON.stringify({ error: 'contents array is required' })
+        };
+    }
+    if (!String(model || '').startsWith('gemini-')) {
+        return {
+            statusCode: 400,
+            headers: corsHeaders,
+            body: JSON.stringify({
+                error: `Model "${model}" is not supported in this deployment. Only Vertex Gemini models are allowed.`
+            })
         };
     }
 
@@ -291,27 +251,12 @@ async function handleGenerate(
         errors.push('Vertex: no key');
     }
 
-    // ═══════════ TIER 2: AWS Bedrock (Claude 3.5) ═══════════
-    try {
-        console.info('[AI Proxy] TIER 2: AWS Bedrock (Claude 3.5 Sonnet)');
-        const bedrockData = await callBedrock(contents, systemInstruction);
-        console.info('[AI Proxy] ✅ Bedrock succeeded');
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({ source: 'bedrock', ...bedrockData })
-        };
-    } catch (bedrockErr: any) {
-        console.error('[AI Proxy] ❌ Bedrock error:', bedrockErr.message);
-        errors.push(`Bedrock: ${bedrockErr.message}`);
-    }
-
-    // ═══════════ ALL FAILED ═══════════
+    // ═══════════ VERTEX FAILED ═══════════
     return {
         statusCode: 503,
         headers: corsHeaders,
         body: JSON.stringify({
-            error: 'All AI providers failed',
+            error: 'Vertex AI request failed',
             details: errors
         })
     };

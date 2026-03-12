@@ -21,6 +21,7 @@ import {
 import { validateToken } from '../../shared/auth.js';
 import { checkAndRecordUsage } from '../../shared/rate-limit.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
+import { toCanonicalToolId } from '../../shared/tool-ids.js';
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
@@ -52,6 +53,24 @@ function respondSSE(body, requestHeaders) {
         },
         body: payload
     };
+}
+
+function isVertexModelId(modelId) {
+    return String(modelId || '').startsWith('gemini-');
+}
+
+function filterVertexModels(models) {
+    return (models || []).filter((model) => isVertexModelId(model?.modelId));
+}
+
+const ALLOWED_CREATE_TOOL_IDS = new Set(['web-search', 'thinking', 'image-generation']);
+
+function filterCreateTools(tools) {
+    const mapped = (tools || []).map((tool) => ({
+        ...tool,
+        toolId: toCanonicalToolId(tool?.toolId)
+    }));
+    return mapped.filter((tool) => ALLOWED_CREATE_TOOL_IDS.has(tool.toolId));
 }
 
 // ─── JSON Extraction Helper ──────────────────────────────────────
@@ -140,7 +159,12 @@ async function handleRoute({ userId, message, conversationId, requestHeaders }) 
     const convId = conversationId || crypto.randomUUID();
 
     // 1. Load available models from DB
-    const models = await listModels();
+    const models = filterVertexModels(await listModels());
+    if (models.length === 0) {
+        return respond(503, {
+            error: 'No Vertex models available in ModelRegistry'
+        }, requestHeaders);
+    }
     const modelsJSON = JSON.stringify(models.map(m => ({
         modelId: m.modelId,
         name: m.name,
@@ -203,6 +227,7 @@ Wrap JSON in \`\`\`json code block.`;
 function normalizeCouncilSelection({ councilConfig, availableModels }) {
     const defaultPanel = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
     const availableIds = new Set((availableModels || []).map(m => m.modelId));
+    const availableOrder = (availableModels || []).map((m) => m.modelId).filter(Boolean);
 
     const requestedPanel = Array.isArray(councilConfig?.councilModelIds)
         ? councilConfig.councilModelIds.filter(Boolean)
@@ -215,12 +240,17 @@ function normalizeCouncilSelection({ councilConfig, availableModels }) {
         if (!selectedPanel.includes(fallbackId)) selectedPanel.push(fallbackId);
     }
 
-    const finalPanel = selectedPanel.slice(0, 3).map(modelId => (
-        availableIds.has(modelId) ? modelId : 'gemini-2.5-pro'
-    ));
+    const finalPanel = selectedPanel
+        .filter(modelId => availableIds.has(modelId))
+        .slice(0, 3);
+    while (finalPanel.length < 3 && availableOrder.length > 0) {
+        const next = availableOrder.find((id) => !finalPanel.includes(id));
+        if (!next) break;
+        finalPanel.push(next);
+    }
 
-    const requestedDecision = councilConfig?.decisionModelId || finalPanel[0] || 'gemini-2.5-pro';
-    const decisionModelId = availableIds.has(requestedDecision) ? requestedDecision : 'gemini-2.5-pro';
+    const requestedDecision = councilConfig?.decisionModelId || finalPanel[0] || availableOrder[0];
+    const decisionModelId = availableIds.has(requestedDecision) ? requestedDecision : finalPanel[0];
 
     return {
         requestedPanel: requestedPanel.slice(0, 3),
@@ -231,15 +261,38 @@ function normalizeCouncilSelection({ councilConfig, availableModels }) {
 }
 
 function runtimeModel(modelId) {
-    // Current shared runtime supports Gemini endpoints directly.
-    return (modelId || '').startsWith('gemini-') ? modelId : 'gemini-2.5-pro';
+    if (!isVertexModelId(modelId)) {
+        throw new Error(`Model "${modelId}" is not supported in this deployment. Only Vertex Gemini models are allowed.`);
+    }
+    return modelId;
 }
 
 async function handleCouncil({ userId, message, conversationId, councilConfig, requestHeaders }) {
     console.log(`PRISM: mode=council, userId=${userId}, conversationId=${conversationId}`);
 
     const convId = conversationId || crypto.randomUUID();
-    const models = await listModels();
+    const models = filterVertexModels(await listModels());
+    if (models.length === 0) {
+        return respond(503, {
+            error: 'No Vertex models available in ModelRegistry'
+        }, requestHeaders);
+    }
+    const availableIds = new Set(models.map((m) => m.modelId));
+    const requestedPanel = Array.isArray(councilConfig?.councilModelIds)
+        ? councilConfig.councilModelIds.filter(Boolean)
+        : [];
+    const invalidPanel = requestedPanel.filter((modelId) => !availableIds.has(modelId));
+    if (invalidPanel.length > 0) {
+        return respond(400, {
+            error: `Unsupported council model(s): ${invalidPanel.join(', ')}. Only Vertex Gemini models from /api/v2/models are allowed.`
+        }, requestHeaders);
+    }
+    const requestedDecision = councilConfig?.decisionModelId;
+    if (requestedDecision && !availableIds.has(requestedDecision)) {
+        return respond(400, {
+            error: `Unsupported decision model: ${requestedDecision}. Only Vertex Gemini models from /api/v2/models are allowed.`
+        }, requestHeaders);
+    }
     const userMap = await getUserMap(userId);
 
     const selection = normalizeCouncilSelection({ councilConfig, availableModels: models });
@@ -316,13 +369,7 @@ Be decisive and structured.`;
         temperature: 0.2
     });
 
-    let finalText = decisionResult.text || 'Council completed, but no final output was generated.';
-    const usedFallback =
-        selection.panelModelIds.some(m => runtimeModel(m) !== m) ||
-        runtimeModel(selection.decisionModelId) !== selection.decisionModelId;
-    if (usedFallback) {
-        finalText += `\n\n_Note: Non-Gemini selections currently execute on Gemini runtime in this backend deployment._`;
-    }
+    const finalText = decisionResult.text || 'Council completed, but no final output was generated.';
 
     await saveMessage({ conversationId: convId, role: 'user', content: message, agentId: null, userId });
     await saveMessage({ conversationId: convId, role: 'assistant', content: finalText, agentId: null, userId });
@@ -334,7 +381,7 @@ Be decisive and structured.`;
         mode: 'council',
         councilTrace: {
             requestedCouncilModels: selection.requestedPanel,
-            runtimeCouncilModels: selection.panelModelIds.map(runtimeModel),
+            runtimeCouncilModels: selection.panelModelIds,
             requestedDecisionModel: selection.requestedDecision,
             runtimeDecisionModel: decisionRuntimeModel,
             rounds: 2
@@ -374,7 +421,12 @@ async function handleCreate({ userId, message, conversationId, specialAgentConte
     }, null, 2);
 
     // 3. Load available tools
-    const tools = await listTools();
+    const tools = filterCreateTools(await listTools());
+    if (tools.length === 0) {
+        return respond(503, {
+            error: 'No allowed tools available in ToolRegistry for Create mode'
+        }, requestHeaders);
+    }
     const toolsJSON = JSON.stringify(tools.map(t => ({
         toolId: t.toolId,
         name: t.name,
@@ -385,7 +437,12 @@ async function handleCreate({ userId, message, conversationId, specialAgentConte
     })), null, 2);
 
     // 4. Load available models
-    const models = await listModels();
+    const models = filterVertexModels(await listModels());
+    if (models.length === 0) {
+        return respond(503, {
+            error: 'No Vertex models available in ModelRegistry'
+        }, requestHeaders);
+    }
     const modelsJSON = JSON.stringify(models.map(m => ({
         modelId: m.modelId,
         name: m.name,
@@ -575,7 +632,11 @@ RULES FOR DESIGNING AGENTS:
                     description: spec.description || spec.agentDescription || `Handles ${spec.role || 'specialized'} tasks.`,
                     jobDescription: spec.jobDescription || spec.systemPrompt || '',
                     icon: spec.icon || fallbackIcons[index % fallbackIcons.length],
-                    capabilities: Array.isArray(spec.capabilities) ? spec.capabilities : (Array.isArray(spec.tools) ? spec.tools : []),
+                    capabilities: Array.from(new Set(
+                        (Array.isArray(spec.capabilities) ? spec.capabilities : (Array.isArray(spec.tools) ? spec.tools : []))
+                            .map((toolId) => toCanonicalToolId(toolId))
+                            .filter((toolId) => ALLOWED_CREATE_TOOL_IDS.has(toolId))
+                    )),
                     modelId: spec.modelId || spec.model?.modelId || 'gemini-2.5-flash',
                     suggestedModel: spec.suggestedModel || spec.model?.name || spec.modelId || 'gemini-2.5-flash'
                 }));
@@ -591,8 +652,20 @@ RULES FOR DESIGNING AGENTS:
                 };
             }
         } else {
-            if (parsed.agentName && parsed.role && (Array.isArray(parsed.tools) || Array.isArray(parsed.toolIds))) {
-                derivedToolCall = { name: 'fabricateAgent', args: parsed };
+            const normalizedAgentToolIds = Array.from(new Set(
+                (Array.isArray(parsed?.toolIds) ? parsed.toolIds : (Array.isArray(parsed?.tools) ? parsed.tools : []))
+                    .map((toolId) => toCanonicalToolId(toolId))
+                    .filter((toolId) => ALLOWED_CREATE_TOOL_IDS.has(toolId))
+            ));
+            if (parsed.agentName && parsed.role && normalizedAgentToolIds.length > 0) {
+                derivedToolCall = {
+                    name: 'fabricateAgent',
+                    args: {
+                        ...parsed,
+                        toolIds: normalizedAgentToolIds,
+                        tools: normalizedAgentToolIds
+                    }
+                };
             }
         }
     }

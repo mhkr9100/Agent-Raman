@@ -8,6 +8,9 @@
 import { listTools } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
+import { toCanonicalToolId } from '../../shared/tool-ids.js';
+
+const ALLOWED_TOOL_IDS = new Set(['web-search', 'thinking', 'image-generation']);
 
 function respond(event, statusCode, body) {
     return {
@@ -29,9 +32,16 @@ export const handler = async (event) => {
 
         console.log('TOOL-REGISTRY: Listing all tools');
         const tools = await listTools();
-        console.log(`TOOL-REGISTRY: ✅ Found ${tools.length} tools`);
+        const filtered = (tools || [])
+            .map((tool) => ({
+                ...tool,
+                toolId: toCanonicalToolId(tool.toolId)
+            }))
+            .filter((tool) => ALLOWED_TOOL_IDS.has(tool.toolId));
+        const deduped = Array.from(new Map(filtered.map((tool) => [tool.toolId, tool])).values());
+        console.log(`TOOL-REGISTRY: ✅ Found ${deduped.length} tools (from ${tools.length} total)`);
 
-        return respond(event, 200, { tools });
+        return respond(event, 200, { tools: deduped });
     } catch (error) {
         console.error('TOOL-REGISTRY: ❌ Error:', error);
 

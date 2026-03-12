@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Agent, Team, Message, UserProfile, MessageContent, Task, ToolCall, GlobalTask } from '../types';
 import { AGENTS } from '../constants';
 import { prismChat, prismChatStream, agentChat } from '../services/apiV2';
-import { useAppStore } from '../store/useAppStore';
 
 // Composed Hooks
 import { useAuth } from './useAuth';
@@ -29,7 +28,7 @@ export const useScatter = () => {
     // === Composed Hooks ===
     const {
         currentUser, setCurrentUser, isInitializing, setIsInitializing,
-        login, logout, getUserKeys
+        login, logout
     } = useAuth();
 
     const {
@@ -79,7 +78,7 @@ export const useScatter = () => {
         orchestrationWeights, setOrchestrationWeights,
         agentModes, setAgentModes,
         handleExecuteCommand
-    } = useAgentExecution(currentUser, getUserKeys, addMessage);
+    } = useAgentExecution(currentUser);
 
     // === Background Directives ===
     const processSilentDirective = useCallback(async (task: GlobalTask) => {
@@ -91,7 +90,7 @@ export const useScatter = () => {
             conversationId: task.teamId // Or appropriate conversation ID
         });
         return response ? response.response : undefined;
-    }, [agents, currentUser, getUserKeys]);
+    }, [agents, currentUser]);
 
     const injectOutputToChat = useCallback((task: GlobalTask) => {
         if (!task.output) return;
@@ -139,18 +138,6 @@ export const useScatter = () => {
         };
 
         addMessage(chatId, newMessage);
-        let currentSnapshot = [...(useAppStore.getState().chatHistory[chatId] || []), newMessage];
-
-        if (createEnabled && chatId === 'prism-core') {
-            const lastMsg = currentSnapshot[currentSnapshot.length - 1];
-            currentSnapshot[currentSnapshot.length - 1] = {
-                ...lastMsg,
-                content: {
-                    ...lastMsg.content, type: 'text',
-                    text: `${(lastMsg.content as any).text}\n\n[SYSTEM DIRECTIVE: The user has toggled 'Create Agents'. You MUST analyze the request and output a deployable command. If the user asks for a single specialist, use 'fabricateAgent'. If the user asks for a team/group/squad, use 'fabricateTeam'. Do NOT respond with conversational-only output.]`
-                }
-            };
-        }
 
         const team = teams.find(g => g.id === chatId);
         const agent = agents.find(e => e.id === chatId);
@@ -298,7 +285,7 @@ export const useScatter = () => {
             setTypingAgent(null);
             setOrchestrationWeights({});
         }
-    }, [currentUser, activeChatId, agents, teams, addMessage, getUserKeys, addTeam]);
+    }, [currentUser, activeChatId, agents, teams, addMessage, addTeam]);
 
     // === Special Agent → Prism Flow ===
     const sendSpecialAgentToPrism = useCallback((template: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string }) => {

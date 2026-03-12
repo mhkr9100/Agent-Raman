@@ -319,6 +319,112 @@ export async function deleteAgent(agentId: string): Promise<DeleteAgentResponse>
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  Teams
+// ═══════════════════════════════════════════════════════════════
+
+export interface TeamRecord {
+    teamId: string;
+    userId: string;
+    name: string;
+    description?: string;
+    agentIds: string[];
+    status?: string;
+}
+
+export interface ListTeamsResponse {
+    teams: TeamRecord[];
+}
+
+export interface UpsertTeamRequest {
+    teamId?: string;
+    name: string;
+    description?: string;
+    agentIds: string[];
+}
+
+export interface UpsertTeamResponse {
+    team: TeamRecord;
+}
+
+export interface FabricateTeamSpecialist {
+    name: string;
+    role: string;
+    description?: string;
+    jobDescription?: string;
+    icon?: string;
+    capabilities?: string[];
+    toolIds?: string[];
+    tools?: string[];
+    modelId?: string;
+}
+
+export interface FabricateTeamRequest {
+    teamName: string;
+    objective: string;
+    specialists: FabricateTeamSpecialist[];
+}
+
+export interface FabricateTeamResponse {
+    team: TeamRecord;
+    agents: Array<{
+        agentId: string;
+        name: string;
+        role: string;
+        icon: string;
+        modelId: string;
+        toolIds: string[];
+        status: string;
+        blueprint: any;
+    }>;
+    message: string;
+}
+
+export async function listTeams(): Promise<ListTeamsResponse> {
+    try {
+        return await apiRequest<ListTeamsResponse>('GET', '/api/v2/teams');
+    } catch (error: any) {
+        console.error('API: listTeams failed:', error.message);
+        throw error;
+    }
+}
+
+export async function upsertTeam(params: UpsertTeamRequest): Promise<UpsertTeamResponse> {
+    try {
+        return await apiRequest<UpsertTeamResponse>('POST', '/api/v2/teams', {
+            teamId: params.teamId || null,
+            name: params.name,
+            description: params.description || '',
+            agentIds: Array.isArray(params.agentIds) ? params.agentIds : []
+        });
+    } catch (error: any) {
+        console.error('API: upsertTeam failed:', error.message);
+        throw error;
+    }
+}
+
+export async function deleteTeamApi(teamId: string): Promise<{ success: boolean; teamId: string }> {
+    try {
+        return await apiDeleteRequest<{ success: boolean; teamId: string }>(`/api/v2/teams/${encodeURIComponent(teamId)}`);
+    } catch (error: any) {
+        console.error('API: deleteTeam failed:', error.message);
+        throw error;
+    }
+}
+
+export async function fabricateTeam(params: FabricateTeamRequest): Promise<FabricateTeamResponse> {
+    try {
+        return await apiRequest<FabricateTeamResponse>('POST', '/api/v2/teams/fabricate', {
+            teamName: params.teamName,
+            objective: params.objective,
+            specialists: params.specialists
+        });
+    } catch (error: any) {
+        console.error('API: fabricateTeam failed:', error.message);
+        throw error;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  Special Agents (Templates from DynamoDB)
 // ═══════════════════════════════════════════════════════════════
 
@@ -520,6 +626,35 @@ export async function consolidateUserMap(params: ConsolidateUserMapRequest): Pro
 
 export interface ExtractMemoryRequest {
     messages: Array<{ role: string; content: string }>;
+}
+
+export interface MemoryRecord {
+    id: string;
+    userId: string;
+    agentId?: string | null;
+    content: string;
+    category?: string;
+    createdAt?: string;
+}
+
+export async function listMemories(limit: number = 300): Promise<{ memories: MemoryRecord[]; count: number }> {
+    const token = getAuthToken();
+    const response = await fetch(`${API_BASE}/api/memory/list?limit=${encodeURIComponent(String(limit))}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText, message: '' }));
+        const error = errorData.error || `Request failed: ${response.status}`;
+        const detail = errorData.message ? ` — ${errorData.message}` : '';
+        throw new Error(`${error}${detail}`);
+    }
+
+    return await response.json() as { memories: MemoryRecord[]; count: number };
 }
 
 export async function extractMemory(params: ExtractMemoryRequest): Promise<{ facts: string[] }> {

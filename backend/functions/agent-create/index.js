@@ -66,6 +66,8 @@ const LEGACY_TOOL_CANDIDATES = {
     thinking: ['thinking']
 };
 
+const ALLOWED_TOOL_IDS = new Set(['web-search', 'thinking', 'image-generation']);
+
 // ─── Handler ─────────────────────────────────────────────────────
 
 export const handler = async (event) => {
@@ -88,7 +90,8 @@ export const handler = async (event) => {
         const validationError = validateBlueprint(blueprint);
         if (validationError) return respond(event, 400, { error: validationError });
 
-        const requestedToolIds = normalizeToolIds(blueprint.toolIds || blueprint.tools || []);
+        const requestedToolIds = normalizeToolIds(blueprint.toolIds || blueprint.tools || [])
+            .filter((toolId) => ALLOWED_TOOL_IDS.has(toolId));
         const requestedDocumentIds = Array.isArray(blueprint.documentIds)
             ? blueprint.documentIds.filter(Boolean)
             : [];
@@ -118,7 +121,9 @@ export const handler = async (event) => {
             }
         }
         if (resolvedTools.length === 0) {
-            return respond(event, 400, { error: 'No valid tools were resolved from toolIds' });
+            return respond(event, 400, {
+                error: `No allowed tools were resolved from toolIds. Allowed: ${Array.from(ALLOWED_TOOL_IDS).join(', ')}`
+            });
         }
 
         // 3. Resolve model from RamN_ModelRegistry
@@ -126,6 +131,11 @@ export const handler = async (event) => {
         const resolvedModel = await getModelById(blueprint.model.modelId);
         if (!resolvedModel) {
             return respond(event, 400, { error: `Model not found: ${blueprint.model.modelId}` });
+        }
+        if (!String(resolvedModel.modelId || blueprint.model.modelId).startsWith('gemini-')) {
+            return respond(event, 400, {
+                error: `Model "${blueprint.model.modelId}" is not supported in this deployment. Only Vertex Gemini models are allowed.`
+            });
         }
         console.log(`  ✅ Model resolved: ${resolvedModel.name}`);
 

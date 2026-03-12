@@ -93,23 +93,13 @@ async function getServiceAccountKey() {
         }
     }
 
-    // ── MODE 3: Generic API Key (for local/testing with AI Studio) ──
-    const apiKey = process.env.GCP_API_KEY || process.env.GEMINI_API_KEY;
-    if (apiKey) {
-        console.log('[vertex-ai] Using Gemini API Key (AI Studio mode)');
-        return { apiKey };
-    }
-
-    throw new Error('[vertex-ai] No credentials configured. Set GCP_SERVICE_ACCOUNT_KEY_FILE, GCP_API_KEY, or GCP_SERVICE_ACCOUNT_SECRET_ARN');
+    throw new Error('[vertex-ai] No credentials configured. Set GCP_SERVICE_ACCOUNT_KEY_FILE or GCP_SERVICE_ACCOUNT_SECRET_ARN');
 }
 
 // ─── OAuth2 Access Token via JWT Assertion ──────────────────────
 
 async function getAccessToken() {
     const sa = await getServiceAccountKey();
-
-    // If it's just an API Key, we don't need OAuth token exchange
-    if (sa.apiKey) return sa.apiKey;
 
     // Return cached token if still valid (with 60s buffer)
     if (cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
@@ -245,26 +235,24 @@ function parseResponse(data) {
 
 async function sendVertexRequest(payload, modelName) {
     const model = modelName || DEFAULT_MODEL;
-    const sa = await getServiceAccountKey();
-
-    let url;
-    let headers = { 'Content-Type': 'application/json' };
-
-    if (sa.apiKey) {
-        // AI Studio Mode
-        url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${sa.apiKey}`;
-    } else {
-        // Vertex AI Mode
-        url = `https://${GCP_LOCATION}-aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${GCP_LOCATION}/publishers/google/models/${model}:generateContent`;
-        const accessToken = await getAccessToken();
-        headers['Authorization'] = `Bearer ${accessToken}`;
+    if (!String(model).startsWith('gemini-')) {
+        throw new Error(`[vertex-ai] Model "${model}" is not supported. Only Vertex Gemini models are allowed.`);
     }
+    // Ensure credentials are loaded and validated before generating token.
+    await getServiceAccountKey();
+
+    const url = `https://${GCP_LOCATION}-aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${GCP_LOCATION}/publishers/google/models/${model}:generateContent`;
+    const accessToken = await getAccessToken();
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+    };
 
     let lastError;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            console.log(`[vertex-ai] Request → model: ${model}, mode: ${sa.apiKey ? 'AI Studio' : 'Vertex'}, attempt: ${attempt}/${MAX_RETRIES}`);
+            console.log(`[vertex-ai] Request → model: ${model}, mode: Vertex, attempt: ${attempt}/${MAX_RETRIES}`);
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -298,12 +286,7 @@ async function sendVertexRequest(payload, modelName) {
                 if (status === 429 && model !== 'gemini-2.5-flash-lite') {
                     console.warn(`[vertex-ai] 🚨 429 Quota Exhausted for ${model}. Attempting EMERGENCY FALLBACK to gemini-2.5-flash-lite...`);
                     const fallbackModel = 'gemini-2.5-flash-lite';
-                    let fallbackUrl = url;
-                    if (sa.apiKey) {
-                        fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${sa.apiKey}`;
-                    } else {
-                        fallbackUrl = `https://${GCP_LOCATION}-aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${GCP_LOCATION}/publishers/google/models/${fallbackModel}:generateContent`;
-                    }
+                    const fallbackUrl = `https://${GCP_LOCATION}-aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${GCP_LOCATION}/publishers/google/models/${fallbackModel}:generateContent`;
 
                     const fallbackResponse = await fetch(fallbackUrl, {
                         method: 'POST',
