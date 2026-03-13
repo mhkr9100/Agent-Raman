@@ -75,7 +75,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           const isTaskMode = typingAgents.length > 0;
           return (
             <div key={`${typerState.agent.id}-${idx}`} className="flex items-start gap-3 justify-start animate-fade-in mb-6">
-              <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-xl flex-shrink-0 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.08)]">
+              <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-900 flex items-center justify-center text-xl flex-shrink-0 border border-black/10 dark:border-white/10 shadow-[0_8px_24px_rgba(15,23,42,0.08)] dark:shadow-[0_0_15px_rgba(255,255,255,0.08)]">
                 {typerState.agent.icon}
               </div>
               <div className="flex flex-col gap-2 max-w-[80%]">
@@ -90,11 +90,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   )}
                 </div>
 
-                <div className={`p-3 px-4 rounded-2xl w-fit bg-slate-900 border border-white/10 rounded-bl-none shadow-md flex items-center min-h-[44px]`}>
+                <div className={`p-3 px-4 rounded-2xl w-fit bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-bl-none shadow-md flex items-center min-h-[44px]`}>
                   {isTaskMode ? (
                     <div className="flex items-center gap-2">
                       <LoadingSpinner width={24} height={12} />
-                      <span className="text-xs text-slate-500 italic">Thinking...</span>
+                      <span className="text-xs text-gray-500 dark:text-slate-500 italic">Thinking...</span>
                     </div>
                   ) : (
                     <div className="flex gap-1 py-1">

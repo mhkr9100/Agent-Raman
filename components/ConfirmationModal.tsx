@@ -14,19 +14,19 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4" aria-modal="true" role="dialog">
-      <div className="bg-[#2a2b32] rounded-2xl shadow-xl w-full max-w-sm border border-gray-700">
+    <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 backdrop-blur-sm" aria-modal="true" role="dialog">
+      <div className="w-full max-w-sm rounded-2xl border border-black/10 bg-white shadow-xl dark:border-white/10 dark:bg-[#15171a]">
         <div className="p-6">
-          <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
-          <p className="text-gray-300 text-sm">{message}</p>
+          <h3 className="mb-2 text-lg font-bold text-gray-900 dark:text-white">{title}</h3>
+          <p className="text-sm text-gray-600 dark:text-white/60">{message}</p>
         </div>
-        <div className="flex items-center justify-end p-4 bg-[#202123] rounded-b-2xl space-x-2">
-          <button onClick={onClose} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition">
+        <div className="flex items-center justify-end space-x-2 rounded-b-2xl border-t border-black/10 bg-black/[0.03] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <button onClick={onClose} className="rounded-lg bg-gray-100 px-4 py-2 font-bold text-gray-900 transition hover:bg-gray-200 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">
             Cancel
           </button>
           <button 
             onClick={onConfirm} 
-            className="bg-red-600/80 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition"
+            className="rounded-lg bg-red-600 px-4 py-2 font-bold text-white transition hover:bg-red-500"
           >
             {confirmText}
           </button>

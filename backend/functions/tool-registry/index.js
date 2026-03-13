@@ -9,8 +9,7 @@ import { listTools } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
 import { toCanonicalToolId } from '../../shared/tool-ids.js';
-
-const ALLOWED_TOOL_IDS = new Set(['web-search', 'thinking', 'image-generation']);
+import { PUBLIC_TOOL_IDS } from '../../shared/runtime-policy.js';
 
 function respond(event, statusCode, body) {
     return {
@@ -37,7 +36,7 @@ export const handler = async (event) => {
                 ...tool,
                 toolId: toCanonicalToolId(tool.toolId)
             }))
-            .filter((tool) => ALLOWED_TOOL_IDS.has(tool.toolId));
+            .filter((tool) => PUBLIC_TOOL_IDS.has(tool.toolId));
         const deduped = Array.from(new Map(filtered.map((tool) => [tool.toolId, tool])).values());
         console.log(`TOOL-REGISTRY: ✅ Found ${deduped.length} tools (from ${tools.length} total)`);
 

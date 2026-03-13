@@ -18,9 +18,8 @@ interface ChatViewProps {
     attachments?: File[],
     searchEnabled?: boolean,
     createEnabled?: boolean,
-    prismMode?: 'ask' | 'create' | 'council',
-    specialAgentContext?: any,
-    councilConfig?: { councilModelIds: string[]; decisionModelId: string }
+    prismMode?: 'ask' | 'create',
+    specialAgentContext?: any
   ) => void;
   onAddAgent: (agentData: Omit<AgentType, 'id' | 'type'>) => void;
   onCreateTeam: (teamData: { name: string, agentIds: string[] }) => void;
@@ -61,7 +60,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   return (
     <div className="flex flex-col h-full w-full relative">
       {/* HEADER: Moved session controls and + button here */}
-      <div className="h-16 flex items-center justify-between pl-16 md:pl-6 pr-6 border-b border-black/10 dark:border-white/5 bg-white/80 dark:bg-[#1A1A1A]/80 backdrop-blur-xl z-20 flex-shrink-0">
+      <div className="h-16 flex items-center justify-between pl-16 pr-6 md:pl-6 border-b border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#141619]/90 backdrop-blur-xl z-20 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center text-sm">
             {isPrism ? <PrismIcon size={18} className="text-gray-900 dark:text-white" /> : (activeAgent?.icon || (activeTeam ? '👥' : '🤖'))}
@@ -71,7 +70,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               {isPrism ? 'Prism Core' : activeAgent?.name || activeTeam?.name || 'Active Session'}
             </h2>
             <span className="text-[8px] font-bold text-gray-500 dark:text-white/30 uppercase tracking-widest mt-0.5">
-              {isPrism ? 'Meta Agent' : activeAgent?.role || 'Squad'}
+              {isPrism ? 'Meta Architect' : activeAgent?.role || 'Team'}
             </span>
           </div>
         </div>
@@ -84,14 +83,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
               ? 'bg-gray-900 dark:bg-white border-transparent text-white dark:text-black'
               : 'border-black/10 dark:border-white/10 text-gray-500 dark:text-white/20 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/5 dark:hover:bg-white/5'
               }`}
-            title="Agent Intelligence Details"
+            title={isPrism ? 'Prism Profile' : activeTeam ? 'Team Profile' : 'ChatBot Profile'}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex flex-col relative bg-[#F8F9FA] dark:bg-[#1A1A1A]">
+      <div className="flex-1 overflow-hidden flex flex-col relative bg-[#F8F9FA] dark:bg-[#111315]">
         <ChatInterface
           messages={messages}
           isLoading={isLoading}

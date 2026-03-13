@@ -19,6 +19,10 @@ import {
 import { validateToken } from '../../shared/auth.js';
 import { normalizeToolIds } from '../../shared/tool-ids.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
+import {
+    SUPPORTED_TOOL_IDS,
+    SUPPORTED_VERTEX_MODELS
+} from '../../shared/runtime-policy.js';
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
@@ -66,9 +70,6 @@ const LEGACY_TOOL_CANDIDATES = {
     thinking: ['thinking']
 };
 
-const ALLOWED_TOOL_IDS = new Set(['web-search', 'thinking', 'image-generation']);
-const SUPPORTED_VERTEX_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite']);
-
 // ─── Handler ─────────────────────────────────────────────────────
 
 export const handler = async (event) => {
@@ -92,7 +93,7 @@ export const handler = async (event) => {
         if (validationError) return respond(event, 400, { error: validationError });
 
         const requestedToolIds = normalizeToolIds(blueprint.toolIds || blueprint.tools || [])
-            .filter((toolId) => ALLOWED_TOOL_IDS.has(toolId));
+            .filter((toolId) => SUPPORTED_TOOL_IDS.has(toolId));
         const requestedDocumentIds = Array.isArray(blueprint.documentIds)
             ? blueprint.documentIds.filter(Boolean)
             : [];
@@ -123,7 +124,7 @@ export const handler = async (event) => {
         }
         if (resolvedTools.length === 0) {
             return respond(event, 400, {
-                error: `No allowed tools were resolved from toolIds. Allowed: ${Array.from(ALLOWED_TOOL_IDS).join(', ')}`
+                error: `No allowed tools were resolved from toolIds. Allowed: ${Array.from(SUPPORTED_TOOL_IDS).join(', ')}`
             });
         }
 
@@ -189,7 +190,7 @@ export const handler = async (event) => {
             agentId,
             name: blueprint.agentName,
             status: 'created',
-            message: 'Agent created successfully'
+            message: 'ChatBot created successfully'
         });
 
     } catch (error) {
@@ -200,7 +201,7 @@ export const handler = async (event) => {
         }
 
         return respond(event, 500, {
-            error: 'Failed to create agent',
+            error: 'Failed to create chatbot',
             message: error.message || 'Unknown error'
         });
     }

@@ -26,4 +26,3 @@ export function normalizeToolIds(values: any[]): string[] {
         .filter(Boolean);
     return Array.from(new Set(normalized));
 }
-

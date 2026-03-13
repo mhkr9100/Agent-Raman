@@ -93,6 +93,15 @@ const TOOLS = [
         description: 'Retrieve relevant snippets from uploaded documents',
         capabilities: ['document_retrieval', 'snippet_extraction'],
         status: 'active'
+    },
+    {
+        toolId: 'canvas',
+        name: 'Canvas',
+        type: 'plugin',
+        category: 'workspace',
+        description: 'Persist structured notes and artifacts into the chatbot knowledge space',
+        capabilities: ['artifact_write', 'workspace_canvas'],
+        status: 'active'
     }
 ];
 

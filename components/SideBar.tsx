@@ -119,7 +119,7 @@ export function SideBar({
             <button
               onClick={() => onViewChange('chats')}
               className={`flex flex-col items-center gap-1 group p-2 rounded-xl transition-all ${activeView === 'chats' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white/80'}`}
-              title="Agent Chats"
+            title="ChatBot Chats"
             >
               <ChatIcon />
               {!isRailCollapsed && <span className="text-[8px] font-bold uppercase tracking-widest mt-1">Chats</span>}
@@ -171,24 +171,24 @@ export function SideBar({
       </div>
 
       {activeView === 'chats' && (
-        <div className={`bg-[#F8F9FA] dark:bg-[#1A1A1A] border-r border-black/10 dark:border-white/5 flex flex-col transition-all duration-300 ${isChatSubSidebarCollapsed ? 'w-0 overflow-hidden border-r-0' : 'w-64'}`}>
+            <div className={`bg-[#F8F9FA] dark:bg-[#111315] border-r border-black/10 dark:border-white/10 flex flex-col transition-all duration-300 ${isChatSubSidebarCollapsed ? 'w-0 overflow-hidden border-r-0' : 'w-72'}`}>
           <div className="h-16 flex items-center justify-between px-4 border-b border-black/5 dark:border-white/5 flex-shrink-0">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/80">Active Chats</h2>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/80">Live Chats</h2>
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-6">
             {agents.filter(a => a.id !== 'prism-core').length === 0 && teams.length === 0 && (
               <div className="flex flex-col items-center text-center p-6 bg-white dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-2xl mx-2 shadow-sm dark:shadow-none">
-                <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 rounded-xl flex items-center justify-center mb-4">
+                <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 rounded-xl flex items-center justify-center mb-4">
                   <ChatIcon size={20} />
                 </div>
                 <h4 className="text-gray-900 dark:text-white font-black text-[10px] uppercase tracking-widest mb-2">No Conversations</h4>
                 <p className="text-gray-500 dark:text-white/40 text-[9px] leading-relaxed mb-4">
-                  Your communication matrix is clear. Instantiate an agent from the Spectrum to begin an operation.
+                  Your workspace is clear. Create a chatbot in Spectrum to begin a conversation.
                 </p>
                 <button
                   onClick={() => onViewChange('spectrum')}
-                  className="w-full py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 dark:hover:bg-indigo-400 transition-colors shadow-md shadow-indigo-500/20"
+                  className="w-full py-2 bg-gray-900 dark:bg-white text-white dark:text-black rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white/90 transition-colors"
                 >
                   Open Spectrum
                 </button>
@@ -197,7 +197,7 @@ export function SideBar({
 
             {agents.length > 0 && (
               <div>
-                <h3 className="text-[8px] font-black text-gray-400 dark:text-white/20 uppercase tracking-[0.3em] mb-3 px-2">Agents</h3>
+                <h3 className="text-[8px] font-black text-gray-400 dark:text-white/20 uppercase tracking-[0.3em] mb-3 px-2">ChatBots</h3>
                 <div className="space-y-0.5">
                   {agents.filter(a => a.id !== 'prism-core').map(agent => (
                     <ChatListItem key={agent.id} id={agent.id} name={agent.name} isSystem={agent.isSystem} isActive={activeChatId === agent.id} onClick={onSelectChat} onDelete={onDeleteAgent} />

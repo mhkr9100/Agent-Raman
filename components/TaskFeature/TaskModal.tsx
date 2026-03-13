@@ -109,7 +109,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               required
               rows={3}
               disabled={isReadOnly}
-              placeholder="Input specialized instructions for the agent..."
+              placeholder="Input specialized instructions for the chatbot..."
               className="w-full bg-black border border-white/10 rounded-xl p-4 text-sm focus:border-white/30 outline-none text-white resize-none disabled:opacity-50 transition-all font-medium"
             />
           </div>
@@ -138,7 +138,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Executing Specialist</label>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Executing ChatBot</label>
             <select
               value={selectedAgentId}
               onChange={e => setSelectedAgentId(e.target.value)}

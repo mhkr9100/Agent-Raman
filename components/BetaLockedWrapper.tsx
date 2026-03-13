@@ -33,7 +33,7 @@ export const BetaLockedWrapper: React.FC<BetaLockedWrapperProps> = ({
         <div className={`absolute ${positionClasses[position]} z-[100] pointer-events-none animate-in fade-in zoom-in-95 duration-200`}>
           <div className="bg-[#1A1A1A] border border-white/10 px-3 py-1.5 rounded-lg shadow-2xl backdrop-blur-xl whitespace-nowrap">
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">
                 Feature Locked in Beta
               </span>

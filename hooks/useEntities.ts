@@ -8,6 +8,7 @@ import {
     upsertTeam,
     deleteTeamApi
 } from '../services/apiV2';
+import { normalizeToolIds } from '../services/toolIds';
 
 export const useEntities = (currentUser: UserProfile | null) => {
     const [agents, setAgents] = useState<Agent[]>([]);
@@ -35,6 +36,7 @@ export const useEntities = (currentUser: UserProfile | null) => {
                 icon: a.blueprint?.icon || '🤖',
                 model: a.blueprint?.model?.modelId || 'gemini-2.5-flash',
                 provider: 'google',
+                capabilities: normalizeToolIds(a.blueprint?.toolIds || a.blueprint?.tools || []) as any,
                 type: 'agent',
                 userId: a.userId,
                 status: a.status,
@@ -79,7 +81,7 @@ export const useEntities = (currentUser: UserProfile | null) => {
         const newAgent: Agent = {
             id: data.id || data.agentId,
             name: data.name,
-            jobDescription: data.jobDescription || data.description || data.agentDescription || `A specialized ${data.role || 'AI'} agent.`,
+            jobDescription: data.jobDescription || data.description || data.agentDescription || `A specialized ${data.role || 'AI'} chatbot.`,
             role: data.role || 'Specialist',
             systemPrompt: data.systemPrompt || data.blueprint?.systemPrompt,
             icon: data.icon || '🤖',

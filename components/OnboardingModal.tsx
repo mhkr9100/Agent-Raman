@@ -55,7 +55,7 @@ export const OnboardingModal: React.FC<Props> = ({ isOpen, onClose, onOpenProfil
                             Welcome to RamN AI
                         </h2>
                         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', lineHeight: 1.6 }}>
-                            Your AI workspace for agents, teams, and automation.
+                            Your AI workspace for chatbots, teams, and automation.
                             <br />Get started in 30 seconds.
                         </p>
                     </div>
@@ -68,7 +68,7 @@ export const OnboardingModal: React.FC<Props> = ({ isOpen, onClose, onOpenProfil
                             Bring Your Context
                         </div>
                         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', lineHeight: 1.5, margin: 0 }}>
-                            Import your context from other AI tools into UserMap so Prism and your agents can personalize responses from the start.
+                            Import your context from other AI tools into UserMap so Prism and your chatbots can personalize responses from the start.
                         </p>
                     </div>
 
@@ -82,7 +82,7 @@ export const OnboardingModal: React.FC<Props> = ({ isOpen, onClose, onOpenProfil
                         <ol style={{ margin: 0, paddingLeft: '20px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', lineHeight: 2 }}>
                             <li>Open <b style={{ color: 'rgba(255,255,255,0.7)' }}>UserMap</b> and import your memory/context</li>
                             <li>Chat with <b style={{ color: 'rgba(255,255,255,0.7)' }}>Prism</b> and describe your objective</li>
-                            <li>Approve suggested blueprints to deploy <b style={{ color: 'rgba(255,255,255,0.7)' }}>specialized agents</b></li>
+                            <li>Approve suggested blueprints to deploy <b style={{ color: 'rgba(255,255,255,0.7)' }}>specialized chatbots</b></li>
                         </ol>
                     </div>
 

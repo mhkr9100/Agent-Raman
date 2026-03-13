@@ -358,6 +358,11 @@ Resources:
               Action:
                 - secretsmanager:GetSecretValue
               Resource: !Ref GcpServiceAccountSecret
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${S3BucketName}/knowledge-base/*"
       Events:
         PrismChat:
           Type: Api

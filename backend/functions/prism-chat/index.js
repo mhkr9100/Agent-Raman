@@ -1,7 +1,7 @@
 /**
  * RamN AI — Prism Chat Lambda
  * 
- * The Meta Agent Brain of RamN AI.
+ * The Prism runtime of RamN AI.
  * Handles three modes: ask, route, create
  * 
  * POST /api/prism/chat
@@ -22,6 +22,11 @@ import { validateToken } from '../../shared/auth.js';
 import { checkAndRecordUsage } from '../../shared/rate-limit.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
 import { toCanonicalToolId } from '../../shared/tool-ids.js';
+import {
+    PUBLIC_TOOL_IDS,
+    SUPPORTED_VERTEX_MODELS
+} from '../../shared/runtime-policy.js';
+import { getRelevantDocumentContext } from '../../shared/document-context.js';
 
 // ─── CORS Headers ────────────────────────────────────────────────
 
@@ -55,12 +60,6 @@ function respondSSE(body, requestHeaders) {
     };
 }
 
-const SUPPORTED_VERTEX_MODELS = new Set([
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-2.5-flash-lite'
-]);
-
 function isVertexModelId(modelId) {
     return SUPPORTED_VERTEX_MODELS.has(String(modelId || ''));
 }
@@ -69,14 +68,12 @@ function filterVertexModels(models) {
     return (models || []).filter((model) => isVertexModelId(model?.modelId));
 }
 
-const ALLOWED_CREATE_TOOL_IDS = new Set(['web-search', 'thinking', 'image-generation']);
-
 function filterCreateTools(tools) {
     const mapped = (tools || []).map((tool) => ({
         ...tool,
         toolId: toCanonicalToolId(tool?.toolId)
     }));
-    return mapped.filter((tool) => ALLOWED_CREATE_TOOL_IDS.has(tool.toolId));
+    return mapped.filter((tool) => PUBLIC_TOOL_IDS.has(tool.toolId));
 }
 
 // ─── JSON Extraction Helper ──────────────────────────────────────
@@ -123,8 +120,21 @@ async function handleAsk({ userId, message, conversationId, requestHeaders }) {
         }));
     }
 
-    // 2. Call Vertex AI
-    const systemPrompt = `You are Prism, the intelligent assistant of RamN AI. Answer the user question clearly and helpfully. If the user has asked more than 2 questions on the same topic, suggest they try Create mode to build a specialized agent or Route mode to find the best AI model.`;
+    let systemPrompt = `You are Prism, the intelligent assistant of RamN AI. Answer the user question clearly and helpfully. If the user has asked more than 2 questions on the same topic, suggest they try Create mode to build a specialized chatbot or Route mode to find the best AI model.`;
+
+    try {
+        const documentContext = await getRelevantDocumentContext({
+            userId,
+            query: message,
+            maxFiles: 2,
+            maxChars: 1100
+        });
+        if (documentContext.text) {
+            systemPrompt = `${systemPrompt}\n\n# RETRIEVED USER DOCUMENT CONTEXT\nThese snippets were retrieved from documents already attached to the user's account. Use them as high-priority context without claiming anything not present in the snippets.\n${documentContext.text}`;
+        }
+    } catch (docErr) {
+        console.warn('PRISM: ask document retrieval failed (non-fatal):', docErr.message);
+    }
 
     const aiResult = await callAI({
         systemPrompt,
@@ -227,176 +237,7 @@ Wrap JSON in \`\`\`json code block.`;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  MODE: COUNCIL — Multi-Model Deliberation Framework
-// ═══════════════════════════════════════════════════════════════════
-
-function normalizeCouncilSelection({ councilConfig, availableModels }) {
-    const defaultPanel = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
-    const availableIds = new Set((availableModels || []).map(m => m.modelId));
-    const availableOrder = (availableModels || []).map((m) => m.modelId).filter(Boolean);
-
-    const requestedPanel = Array.isArray(councilConfig?.councilModelIds)
-        ? councilConfig.councilModelIds.filter(Boolean)
-        : [];
-    const uniquePanel = Array.from(new Set(requestedPanel));
-    const selectedPanel = [...uniquePanel];
-
-    for (const fallbackId of defaultPanel) {
-        if (selectedPanel.length >= 3) break;
-        if (!selectedPanel.includes(fallbackId)) selectedPanel.push(fallbackId);
-    }
-
-    const finalPanel = selectedPanel
-        .filter(modelId => availableIds.has(modelId))
-        .slice(0, 3);
-    while (finalPanel.length < 3 && availableOrder.length > 0) {
-        const next = availableOrder.find((id) => !finalPanel.includes(id));
-        if (!next) break;
-        finalPanel.push(next);
-    }
-
-    const requestedDecision = councilConfig?.decisionModelId || finalPanel[0] || availableOrder[0];
-    const decisionModelId = availableIds.has(requestedDecision) ? requestedDecision : finalPanel[0];
-
-    return {
-        requestedPanel: requestedPanel.slice(0, 3),
-        panelModelIds: finalPanel,
-        requestedDecision,
-        decisionModelId
-    };
-}
-
-function runtimeModel(modelId) {
-    if (!isVertexModelId(modelId)) {
-        throw new Error(`Model "${modelId}" is not supported in this deployment. Only Vertex Gemini models are allowed.`);
-    }
-    return modelId;
-}
-
-async function handleCouncil({ userId, message, conversationId, councilConfig, requestHeaders }) {
-    console.log(`PRISM: mode=council, userId=${userId}, conversationId=${conversationId}`);
-
-    const convId = conversationId || crypto.randomUUID();
-    const models = filterVertexModels(await listModels());
-    if (models.length === 0) {
-        return respond(503, {
-            error: 'No Vertex models available in ModelRegistry'
-        }, requestHeaders);
-    }
-    const availableIds = new Set(models.map((m) => m.modelId));
-    const requestedPanel = Array.isArray(councilConfig?.councilModelIds)
-        ? councilConfig.councilModelIds.filter(Boolean)
-        : [];
-    const invalidPanel = requestedPanel.filter((modelId) => !availableIds.has(modelId));
-    if (invalidPanel.length > 0) {
-        return respond(400, {
-            error: `Unsupported council model(s): ${invalidPanel.join(', ')}. Only Vertex Gemini models from /api/v2/models are allowed.`
-        }, requestHeaders);
-    }
-    const requestedDecision = councilConfig?.decisionModelId;
-    if (requestedDecision && !availableIds.has(requestedDecision)) {
-        return respond(400, {
-            error: `Unsupported decision model: ${requestedDecision}. Only Vertex Gemini models from /api/v2/models are allowed.`
-        }, requestHeaders);
-    }
-    const userMap = await getUserMap(userId);
-
-    const selection = normalizeCouncilSelection({ councilConfig, availableModels: models });
-
-    const userContext = JSON.stringify({
-        preferences: userMap.preferences || {},
-        agentHistory: userMap.agentHistory || [],
-        orgContext: userMap.orgContext || {}
-    }, null, 2);
-
-    const independentPrompt = `You are a council member in Prism Council mode.
-Provide an independent recommendation for the user request.
-Focus on tradeoffs, risks, and a concrete execution path.
-Keep answer concise, specific, and actionable.
-
-User context:
-${userContext}`;
-
-    const independentOutputs = await Promise.all(
-        selection.panelModelIds.map(async (modelId, index) => {
-            const runtime = runtimeModel(modelId);
-            const result = await callAI({
-                systemPrompt: independentPrompt,
-                userMessage: `Council Seat ${index + 1} — User objective:\n${message}`,
-                modelName: runtime,
-                temperature: 0.3
-            });
-            return {
-                seat: index + 1,
-                requestedModel: modelId,
-                runtimeModel: runtime,
-                output: result.text || ''
-            };
-        })
-    );
-
-    const peerBundle = independentOutputs
-        .map(item => `Seat ${item.seat} (${item.requestedModel})\n${item.output}`)
-        .join('\n\n---\n\n');
-
-    const rebuttalPrompt = `You are a council member revising your recommendation after seeing peer outputs.
-Do three things:
-1) Keep or revise your original stance.
-2) Mention one thing peers got right.
-3) Mention one risk peers underweighted.
-Return a concise final council statement.`;
-
-    const revisedOutputs = await Promise.all(
-        independentOutputs.map(async (item) => {
-            const result = await callAI({
-                systemPrompt: rebuttalPrompt,
-                userMessage: `User objective:\n${message}\n\nPeer drafts:\n${peerBundle}\n\nYour prior draft:\n${item.output}`,
-                modelName: item.runtimeModel,
-                temperature: 0.2
-            });
-            return { ...item, revised: result.text || item.output };
-        })
-    );
-
-    const decisionPrompt = `You are the final decision-maker in Prism Council mode.
-Given three revised council responses, produce one final answer for the user.
-Synthesize agreements, resolve conflicts, and output a single implementation-ready recommendation.
-Be decisive and structured.`;
-
-    const decisionRuntimeModel = runtimeModel(selection.decisionModelId);
-    const revisedBundle = revisedOutputs
-        .map(item => `Seat ${item.seat} (${item.requestedModel})\n${item.revised}`)
-        .join('\n\n---\n\n');
-
-    const decisionResult = await callAI({
-        systemPrompt: decisionPrompt,
-        userMessage: `User objective:\n${message}\n\nRevised council responses:\n${revisedBundle}`,
-        modelName: decisionRuntimeModel,
-        temperature: 0.2
-    });
-
-    const finalText = decisionResult.text || 'Council completed, but no final output was generated.';
-
-    await saveMessage({ conversationId: convId, role: 'user', content: message, agentId: null, userId });
-    await saveMessage({ conversationId: convId, role: 'assistant', content: finalText, agentId: null, userId });
-
-    return respond(200, {
-        text: finalText,
-        toolCall: null,
-        conversationId: convId,
-        mode: 'council',
-        councilTrace: {
-            requestedCouncilModels: selection.requestedPanel,
-            runtimeCouncilModels: selection.panelModelIds,
-            requestedDecisionModel: selection.requestedDecision,
-            runtimeDecisionModel: decisionRuntimeModel,
-            rounds: 2
-        }
-    }, requestHeaders);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  MODE: CREATE — Agent Factory (Blueprint Designer)
+//  MODE: CREATE — ChatBot Factory (Blueprint Designer)
 // ═══════════════════════════════════════════════════════════════════
 
 async function handleCreate({ userId, message, conversationId, specialAgentContext, requestHeaders }) {
@@ -425,6 +266,21 @@ async function handleCreate({ userId, message, conversationId, specialAgentConte
         agentHistory: userMap.agentHistory || [],
         orgContext: userMap.orgContext || {}
     }, null, 2);
+
+    let documentContextBlock = '';
+    try {
+        const documentContext = await getRelevantDocumentContext({
+            userId,
+            query: message,
+            maxFiles: 2,
+            maxChars: 1100
+        });
+        if (documentContext.text) {
+            documentContextBlock = `\nUSER DOCUMENT CONTEXT (retrieved from uploaded files):\n${documentContext.text}\n`;
+        }
+    } catch (docErr) {
+        console.warn('PRISM: create document retrieval failed (non-fatal):', docErr.message);
+    }
 
     // 3. Load available tools
     const tools = filterCreateTools(await listTools());
@@ -469,7 +325,7 @@ ${specialAgentContext.predefinedPrompt}
 Default Tools: ${(specialAgentContext.defaultTools || []).join(', ')}
 Suggested Model: ${specialAgentContext.suggestedModel || 'gemini-2.5-flash'}
 
-IMPORTANT: This is a pre-built Special Agent template. The user clicked "Add via Prism" to personalize it. You MUST:
+IMPORTANT: This is a pre-built Special ChatBot template. The user clicked "Add via Prism" to personalize it. You MUST:
 1. Set blueprintReady: true immediately — do NOT ask clarifying questions.
 2. Set blueprintType: "agent" (do NOT return team blueprints for this flow).
 3. Use the predefined prompt as the BASE, but ENRICH the BACKSTORY section with the USER CONTEXT below.
@@ -477,10 +333,10 @@ IMPORTANT: This is a pre-built Special Agent template. The user clicked "Add via
 5. Keep explanation to 2-3 SHORT sentences.
 ` : '';
 
-    const systemPrompt = `You are Prism, the Meta Agent of RamN AI platform.
+    const systemPrompt = `You are Prism, the Meta Architect of RamN AI platform.
 You are an expert AI architect, prompt engineer, and tool strategist.
 
-Your job: Understand the user objective and design either an AI Agent Blueprint or a Team Blueprint.
+Your job: Understand the user objective and design either an AI ChatBot Blueprint or a Team Blueprint.
 
 AVAILABLE TOOLS (select ONLY from these):
 ${toolsJSON}
@@ -490,6 +346,7 @@ ${modelsJSON}
 
 USER CONTEXT (from their history):
 ${userContext}
+${documentContextBlock}
 
 ${conversationContext ? `CONVERSATION SO FAR:\n${conversationContext}` : ''}
 ${specialAgentBlock}
@@ -501,13 +358,13 @@ A. If the objective is vague, ask 1-3 clarifying questions. Do NOT generate a bl
 B. If you have enough info, generate a blueprint.
    Set blueprintReady: true
 
-When generating a SINGLE AGENT blueprint, respond with this JSON shape:
+When generating a SINGLE CHATBOT blueprint, respond with this JSON shape:
 {
   "blueprintReady": true,
   "blueprintType": "agent",
   "agentName": "short descriptive name",
-  "agentDescription": "what this agent does",
-  "role": "the agent role",
+  "agentDescription": "what this chatbot does",
+  "role": "the chatbot role",
   "systemPrompt": "<STRUCTURED SYSTEM PROMPT — SEE FORMAT BELOW>",
   "tools": ["toolId1", "toolId2"],
   "model": {
@@ -525,7 +382,7 @@ When generating a TEAM blueprint, respond with this JSON shape:
   "objective": "what this team must achieve",
   "specialists": [
     {
-      "name": "short agent name",
+      "name": "short chatbot name",
       "role": "specialist role",
       "description": "what this specialist owns",
       "jobDescription": "<STRUCTURED SYSTEM PROMPT — SEE FORMAT BELOW>",
@@ -541,13 +398,13 @@ When generating a TEAM blueprint, respond with this JSON shape:
 MANDATORY SYSTEM PROMPT FORMAT (systemPrompt MUST include these sections):
 """
 # ROLE
-You are [Agent Name], a [specific role]. You specialize in [domain].
+You are [ChatBot Name], a [specific role]. You specialize in [domain].
 
 # GOAL
 Your primary objective is to [clear, measurable goal]. You exist to help the user [desired outcome].
 
 # BACKSTORY
-[2-3 sentences of rich context. IMPORTANT: Use the provided USER CONTEXT (UserMap) to personalize this backstory so the agent knows who it is working for, their history, and their preferences.]
+[2-3 sentences of rich context. IMPORTANT: Use the provided USER CONTEXT (UserMap) and USER DOCUMENT CONTEXT to personalize this backstory so the chatbot knows who it is working for, their history, and their preferences.]
 
 # TOOLS
 You have access to these tools and MUST use them when relevant instead of guessing:
@@ -574,7 +431,7 @@ MUST NOT:
 # SAFETY & ESCALATION
 - If the request involves harmful, illegal, or unethical content, refuse politely.
 - If you are uncertain, ask for clarification instead of guessing.
-- If the task exceeds your capabilities, recommend the user create a more specialized agent.
+- If the task exceeds your capabilities, recommend the user create a more specialized chatbot.
 """
 
 When asking questions, respond with this JSON shape:
@@ -584,7 +441,7 @@ When asking questions, respond with this JSON shape:
   "questionsAsked": ["q1", "q2"]
 }
 
-RULES FOR DESIGNING AGENTS:
+RULES FOR DESIGNING CHATBOTS:
 - Select MINIMAL tools (only what is needed)
 - The systemPrompt MUST follow the structured format above — no exceptions
 - Choose the cheapest model that can handle the task
@@ -613,7 +470,7 @@ RULES FOR DESIGNING AGENTS:
             conversationalText = parsed.message;
         } else if (parsed.blueprintReady === true) {
             conversationalText = parsed.explanation
-                || `Blueprint ready: ${parsed.agentName || parsed.teamName || 'New specialist'} is ready to deploy.`;
+                || `Blueprint ready: ${parsed.agentName || parsed.teamName || 'New chatbot'} is ready to deploy.`;
         }
     }
 
@@ -635,16 +492,16 @@ RULES FOR DESIGNING AGENTS:
                 .map((spec, index) => ({
                     name: spec.name || `Specialist ${index + 1}`,
                     role: spec.role || 'Specialist',
-                    description: spec.description || spec.agentDescription || `Handles ${spec.role || 'specialized'} tasks.`,
-                    jobDescription: spec.jobDescription || spec.systemPrompt || '',
-                    icon: spec.icon || fallbackIcons[index % fallbackIcons.length],
-                    capabilities: Array.from(new Set(
-                        (Array.isArray(spec.capabilities) ? spec.capabilities : (Array.isArray(spec.tools) ? spec.tools : []))
-                            .map((toolId) => toCanonicalToolId(toolId))
-                            .filter((toolId) => ALLOWED_CREATE_TOOL_IDS.has(toolId))
-                    )),
-                    modelId: spec.modelId || spec.model?.modelId || 'gemini-2.5-flash',
-                    suggestedModel: spec.suggestedModel || spec.model?.name || spec.modelId || 'gemini-2.5-flash'
+                            description: spec.description || spec.agentDescription || `Handles ${spec.role || 'specialized'} tasks.`,
+                            jobDescription: spec.jobDescription || spec.systemPrompt || '',
+                            icon: spec.icon || fallbackIcons[index % fallbackIcons.length],
+                            capabilities: Array.from(new Set(
+                                (Array.isArray(spec.capabilities) ? spec.capabilities : (Array.isArray(spec.tools) ? spec.tools : []))
+                                    .map((toolId) => toCanonicalToolId(toolId))
+                                    .filter((toolId) => PUBLIC_TOOL_IDS.has(toolId))
+                            )),
+                            modelId: spec.modelId || spec.model?.modelId || 'gemini-2.5-flash',
+                            suggestedModel: spec.suggestedModel || spec.model?.name || spec.modelId || 'gemini-2.5-flash'
                 }));
 
             if (specialists.length > 0) {
@@ -661,7 +518,7 @@ RULES FOR DESIGNING AGENTS:
             const normalizedAgentToolIds = Array.from(new Set(
                 (Array.isArray(parsed?.toolIds) ? parsed.toolIds : (Array.isArray(parsed?.tools) ? parsed.tools : []))
                     .map((toolId) => toCanonicalToolId(toolId))
-                    .filter((toolId) => ALLOWED_CREATE_TOOL_IDS.has(toolId))
+                    .filter((toolId) => PUBLIC_TOOL_IDS.has(toolId))
             ));
             if (parsed.agentName && parsed.role && normalizedAgentToolIds.length > 0) {
                 derivedToolCall = {
@@ -722,11 +579,11 @@ export const handler = async (event) => {
 
         // 2. Parse body
         const body = JSON.parse(event.body || '{}');
-        const { message, mode, conversationId, specialAgentContext, councilConfig } = body;
+        const { message, mode, conversationId, specialAgentContext } = body;
 
         // Validate required fields
         if (!message) return respond(400, { error: 'Missing message' }, event.headers);
-        if (!mode) return respond(400, { error: 'Missing mode. Must be: ask, route, create, or council' }, event.headers);
+        if (!mode) return respond(400, { error: 'Missing mode. Must be: ask, route, or create' }, event.headers);
 
         const usage = await checkAndRecordUsage(userId, 'prism');
         if (!usage.allowed) {
@@ -747,10 +604,8 @@ export const handler = async (event) => {
                     return await handleRoute({ userId, message, conversationId, requestHeaders: event.headers });
                 case 'create':
                     return await handleCreate({ userId, message, conversationId, specialAgentContext, requestHeaders: event.headers });
-                case 'council':
-                    return await handleCouncil({ userId, message, conversationId, councilConfig, requestHeaders: event.headers });
                 default:
-                    return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, create, or council` }, event.headers);
+                    return respond(400, { error: `Invalid mode: "${mode}". Must be: ask, route, or create` }, event.headers);
             }
         };
 

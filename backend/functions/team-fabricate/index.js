@@ -16,6 +16,10 @@ import {
 import { validateToken } from '../../shared/auth.js';
 import { normalizeToolIds } from '../../shared/tool-ids.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
+import {
+    SUPPORTED_TOOL_IDS,
+    SUPPORTED_VERTEX_MODELS
+} from '../../shared/runtime-policy.js';
 
 const LEGACY_TOOL_CANDIDATES = {
     'web-search': ['webSearch', 'googleSearch', 'web_search'],
@@ -23,9 +27,6 @@ const LEGACY_TOOL_CANDIDATES = {
     'doc-reader': ['docReader', 'doc_reader', 'fileManipulation'],
     thinking: ['thinking']
 };
-const ALLOWED_TOOL_IDS = new Set(['web-search', 'thinking', 'image-generation']);
-const SUPPORTED_VERTEX_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite']);
-
 function respond(event, statusCode, body) {
     return {
         statusCode,
@@ -96,10 +97,10 @@ export const handler = async (event) => {
             }
 
             const toolIds = normalizeToolIds(spec.capabilities || spec.toolIds || spec.tools || [])
-                .filter((toolId) => ALLOWED_TOOL_IDS.has(toolId));
+                .filter((toolId) => SUPPORTED_TOOL_IDS.has(toolId));
             if (toolIds.length === 0) {
                 return respond(event, 400, {
-                    error: `specialists[${i}] must include at least one allowed tool ID (${Array.from(ALLOWED_TOOL_IDS).join(', ')})`
+                    error: `specialists[${i}] must include at least one allowed tool ID (${Array.from(SUPPORTED_TOOL_IDS).join(', ')})`
                 });
             }
 

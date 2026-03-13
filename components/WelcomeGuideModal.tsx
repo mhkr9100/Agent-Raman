@@ -33,26 +33,26 @@ export const WelcomeGuideModal: React.FC<WelcomeGuideModalProps> = ({ onComplete
     const steps = [
         {
             title: "RamN AI",
-            subtitle: "AI Agents Made Simple",
-            description: "Stop managing AI. Let AI manage your work. RamN isn't just a chatbot—it's a workspace where you fabricate, deploy, and orchestrate specialized AI agents to solve complex problems.",
+            subtitle: "AI Workflows Made Clear",
+            description: "Stop juggling isolated prompts. RamN is a workspace where you design, deploy, and coordinate specialized chatbots to solve real work with persistent context.",
             icon: <RamanIcon size={64} className="text-gray-900 dark:text-white" />
         },
         {
             title: "1. Prism Core",
             subtitle: "Your Meta-Agent",
-            description: "Prism is the central architect of your workspace. Use Prism to answer questions, map out projects, and—most importantly—fabricate new specialized Custom Agents tailored exactly to your needs.",
+            description: "Prism is the central architect of your workspace. Use Prism to answer questions, map out projects, and create specialized custom chatbots tailored to your needs.",
             icon: <PrismIcon size={64} className="text-gray-900 dark:text-white" />
         },
         {
             title: "2. The Spectrum",
-            subtitle: "Agent & Tool Management",
-            description: "The Spectrum is where all your fabricated agents and pre-built blueprints live. You can organize them into Teams, swap out their underlying neural models (Gemini, Claude, GPT-4o), and equip them with specific tools like Web Search or AWS S3 files.",
+            subtitle: "ChatBot & Capability Management",
+            description: "The Spectrum is where your custom chatbots, live capabilities, and supported Vertex models live. Organize them into teams and configure the exact runtime they should use.",
             icon: <SpectrumIcon size={64} className="text-gray-900 dark:text-white" />
         },
         {
             title: "3. UserMap",
             subtitle: "Your Context Brain",
-            description: "As you interact with agents, the UserMap silently extracts key facts and preferences about you. This persists across sessions, giving your AI agents long-term memory about your projects, coding style, or business goals.",
+            description: "As you interact with Prism and your chatbots, UserMap preserves key facts and preferences about you. This persists across sessions, giving your workspace durable memory about projects, style, and goals.",
             icon: <UserMapIcon className="w-16 h-16 text-gray-900 dark:text-white" />
         }
     ];
@@ -78,7 +78,7 @@ export const WelcomeGuideModal: React.FC<WelcomeGuideModalProps> = ({ onComplete
                         <h2 className="text-2xl font-black uppercase tracking-tight text-gray-900 dark:text-white">
                             {currentStep.title}
                         </h2>
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-300">
                             {currentStep.subtitle}
                         </h3>
                     </div>
@@ -91,7 +91,7 @@ export const WelcomeGuideModal: React.FC<WelcomeGuideModalProps> = ({ onComplete
                 <div className="p-6 bg-gray-50 dark:bg-white/5 border-t border-black/5 dark:border-white/5 flex items-center justify-between">
                     <div className="flex gap-1.5">
                         {steps.map((_, i) => (
-                            <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === step ? 'w-6 bg-indigo-500' : 'w-1.5 bg-gray-300 dark:bg-white/20'}`} />
+                            <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === step ? 'w-6 bg-emerald-500' : 'w-1.5 bg-gray-300 dark:bg-white/20'}`} />
                         ))}
                     </div>
 

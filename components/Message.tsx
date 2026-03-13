@@ -74,18 +74,18 @@ const CommandProposal: React.FC<{
             generateVisualAsset: 'Visual Synthesis',
         };
         return (
-            <div className="mt-4 bg-white dark:bg-[#0a0a0a] border border-indigo-500/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-400">
-                <div className="bg-indigo-500/5 border-b border-white/5 p-3 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/80 animate-pulse" />
-                    <span className="text-[9px] font-black text-indigo-200 uppercase tracking-[0.2em]">
+            <div className="mt-4 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-400 dark:border-white/10 dark:bg-[#17191d]">
+                <div className="flex items-center gap-2 border-b border-black/5 bg-black/[0.02] p-3 dark:border-white/5 dark:bg-white/[0.03]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse" />
+                    <span className="text-[9px] font-black text-emerald-700 dark:text-emerald-300 uppercase tracking-[0.2em]">
                         {toolNameMap[toolCall.name] || toolCall.name}
                     </span>
                 </div>
                 <div className="p-4">
                     {isExecuting ? (
                         <div className="py-2 space-y-2 text-center">
-                            <LoadingSpinner width={20} height={10} className="text-indigo-400" />
-                            <p className="text-[8px] text-indigo-400/40 font-mono tracking-[0.4em] uppercase font-black">Executing...</p>
+                            <LoadingSpinner width={20} height={10} className="text-emerald-500" />
+                            <p className="text-[8px] text-emerald-600/60 dark:text-emerald-300/40 font-mono tracking-[0.4em] uppercase font-black">Executing...</p>
                         </div>
                     ) : (
                         <button onClick={() => onProceed()} className="w-full py-2.5 bg-white hover:bg-slate-100 text-black text-[9px] font-black uppercase tracking-[0.2em] rounded-lg transition-all active:scale-[0.98]">
@@ -98,13 +98,13 @@ const CommandProposal: React.FC<{
     }
 
     return (
-        <div className="mt-4 bg-white dark:bg-[#0a0a0a] border border-indigo-500/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-400">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-400 dark:border-white/10 dark:bg-[#17191d]">
             {/* Header */}
-            <div className="bg-indigo-500/5 border-b border-black/5 dark:border-white/5 p-3 flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-black/5 bg-black/[0.02] p-3 dark:border-white/5 dark:bg-white/[0.03]">
                 <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/80 animate-pulse shadow-[0_0_8px_rgba(129,140,248,0.5)]" />
-                    <span className="text-[9px] font-black text-indigo-500 dark:text-indigo-200 uppercase tracking-[0.2em]">
-                        {isSquad ? 'Squad Blueprint' : 'Agent Suggestion'}
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.35)]" />
+                    <span className="text-[9px] font-black text-emerald-700 dark:text-emerald-300 uppercase tracking-[0.2em]">
+                        {isSquad ? 'Team Blueprint' : 'ChatBot Suggestion'}
                     </span>
                 </div>
                 <span className="text-[8px] font-mono text-gray-500 dark:text-white/20 tracking-[0.1em] uppercase font-bold">READY</span>
@@ -115,20 +115,20 @@ const CommandProposal: React.FC<{
                 {isSquad && (
                     <div className="space-y-2 pb-3 border-b border-black/5 dark:border-white/5">
                         <h4 className="text-base font-bold text-gray-900 dark:text-white leading-tight">{toolCall.args.teamName}</h4>
-                        <p className="text-xs text-gray-600 dark:text-slate-400 leading-relaxed italic border-l border-indigo-500/20 pl-3">"{toolCall.args.objective}"</p>
+                        <p className="text-xs text-gray-600 dark:text-slate-400 leading-relaxed italic border-l border-emerald-500/20 pl-3">"{toolCall.args.objective}"</p>
                     </div>
                 )}
 
                 {/* Agent Cards — compact: Name + Role + Description + Tools */}
                 <div className={`grid gap-3 ${isSquad ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                     {specialists.map((spec: any, idx: number) => (
-                        <div key={idx} className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-xl p-4 space-y-3 hover:border-indigo-500/20 transition-all">
+                        <div key={idx} className="bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-xl p-4 space-y-3 hover:border-emerald-500/20 transition-all">
                             {/* Identity */}
                             <div className="flex items-center gap-3">
                                 <div className="text-xl bg-white dark:bg-black p-2 rounded-lg border border-black/10 dark:border-white/10">{spec.icon}</div>
                                 <div className="min-w-0 flex-1">
                                     <div className="text-[12px] font-bold text-gray-900 dark:text-white truncate leading-tight uppercase">{spec.name}</div>
-                                    <div className="text-[9px] text-indigo-400/50 uppercase tracking-tighter truncate font-mono">{spec.role}</div>
+                                    <div className="text-[9px] text-emerald-700/70 dark:text-emerald-300/60 uppercase tracking-tighter truncate font-mono">{spec.role}</div>
                                 </div>
                             </div>
 
@@ -141,7 +141,7 @@ const CommandProposal: React.FC<{
                             {(spec.capabilities || spec.toolIds || spec.tools) && (spec.capabilities || spec.toolIds || spec.tools).length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
                                     {(spec.capabilities || spec.toolIds || spec.tools).map((tool: string) => (
-                                        <span key={tool} className="text-[8px] px-2 py-0.5 bg-indigo-500/10 text-indigo-300/60 rounded border border-indigo-500/20 uppercase tracking-wider font-bold">
+                                        <span key={tool} className="text-[8px] px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded border border-emerald-500/20 uppercase tracking-wider font-bold">
                                             {tool}
                                         </span>
                                     ))}
@@ -150,11 +150,11 @@ const CommandProposal: React.FC<{
 
                             {/* Model selector */}
                             <div className="space-y-1.5">
-                                <label className="text-[7px] font-black text-gray-500 dark:text-white/20 uppercase tracking-[0.2em]">Select Brain Layer</label>
+                                <label className="text-[7px] font-black text-gray-500 dark:text-white/20 uppercase tracking-[0.2em]">Select Model</label>
                                 <select
                                     value={selectedModels[idx] || spec.modelId || spec.model?.modelId || ''}
                                     onChange={e => setSelectedModels(prev => ({ ...prev, [idx]: e.target.value }))}
-                                    className="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg p-2 text-[10px] text-indigo-600 dark:text-indigo-300 font-bold outline-none focus:border-indigo-500 transition-colors"
+                                    className="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg p-2 text-[10px] text-emerald-700 dark:text-emerald-300 font-bold outline-none focus:border-emerald-500 transition-colors"
                                 >
                                     <option value="" disabled>{registryModels.length > 0 ? 'Choose Model...' : 'No registry models'}</option>
                                     {registryModels.map(m => (
@@ -164,7 +164,7 @@ const CommandProposal: React.FC<{
                                     ))}
                                 </select>
                                 {spec.suggestedModel && (
-                                    <p className="text-[7px] text-indigo-500/60 font-mono uppercase tracking-tighter mt-1 italic">
+                                    <p className="text-[7px] text-emerald-700/70 dark:text-emerald-300/60 font-mono uppercase tracking-tighter mt-1 italic">
                                         Prism Suggests: {spec.suggestedModel}
                                     </p>
                                 )}
@@ -176,15 +176,15 @@ const CommandProposal: React.FC<{
                 {/* Deploy button */}
                 {isExecuting ? (
                     <div className="py-2 space-y-2 text-center">
-                        <LoadingSpinner width={20} height={10} className="text-indigo-400" />
-                        <p className="text-[8px] text-indigo-400/40 font-mono tracking-[0.4em] uppercase font-black">Deploying...</p>
+                        <LoadingSpinner width={20} height={10} className="text-emerald-500" />
+                        <p className="text-[8px] text-emerald-600/60 dark:text-emerald-300/40 font-mono tracking-[0.4em] uppercase font-black">Deploying...</p>
                     </div>
                 ) : (
                     <button
                         onClick={handleDeploy}
                         className="w-full py-2.5 bg-white hover:bg-slate-100 text-black text-[9px] font-black uppercase tracking-[0.2em] rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
                     >
-                        <span>{isSquad ? 'Deploy Team' : 'Deploy Agent'}</span>
+                        <span>{isSquad ? 'Deploy Team' : 'Deploy ChatBot'}</span>
                         <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </button>
                 )}
@@ -242,15 +242,15 @@ const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
                                 return <strong key={subIdx} className="text-gray-900 dark:text-white font-bold">{subPart.slice(2, -2)}</strong>;
                             }
                             if (subPart.startsWith('`') && subPart.endsWith('`')) {
-                                return <span key={subIdx} className="bg-black/5 dark:bg-white/5 text-indigo-600 dark:text-indigo-300 font-mono text-[11px] px-1 py-0.5 rounded border border-black/5 dark:border-white/5 font-semibold">{subPart.slice(1, -1)}</span>;
+                                return <span key={subIdx} className="bg-black/5 dark:bg-white/5 text-emerald-700 dark:text-emerald-300 font-mono text-[11px] px-1 py-0.5 rounded border border-black/5 dark:border-white/5 font-semibold">{subPart.slice(1, -1)}</span>;
                             }
                             return subPart;
                         });
 
                         return (
                             <div key={lineIdx} className={`min-h-[1.4em] ${isBullet || isNumber ? 'pl-6 relative mb-2' : 'mb-2'}`}>
-                                {isBullet && <span className="absolute left-1.5 top-2 w-1 h-1 rounded-full bg-indigo-500/30" />}
-                                {isNumber && <span className="absolute left-0 text-indigo-500/20 text-[10px] font-mono top-0.5 font-bold">{line.match(/^\d+\./)?.[0]}</span>}
+                                {isBullet && <span className="absolute left-1.5 top-2 w-1 h-1 rounded-full bg-emerald-500/30" />}
+                                {isNumber && <span className="absolute left-0 text-emerald-500/30 text-[10px] font-mono top-0.5 font-bold">{line.match(/^\d+\./)?.[0]}</span>}
                                 <span className="text-gray-700 dark:text-slate-300 leading-relaxed font-normal text-[14px]">{inlineParts}</span>
                             </div>
                         );
@@ -271,9 +271,9 @@ const MessageComponent: React.FC<MessageProps> = ({ message, onExecuteCommand })
                 return (
                     <div className="space-y-3">
                         {mode === 'SOLUTION' && (
-                            <div className="flex items-center gap-2 mb-4 bg-indigo-500/5 p-2 px-3 rounded-lg border border-indigo-500/10">
-                                <span className="w-1 h-4 bg-indigo-500/60 rounded-full" />
-                                <span className="text-[9px] font-black text-indigo-400/80 uppercase tracking-[0.2em]">Intelligence Resolution</span>
+                            <div className="flex items-center gap-2 mb-4 rounded-lg border border-emerald-500/15 bg-emerald-500/5 p-2 px-3">
+                                <span className="w-1 h-4 bg-emerald-500/60 rounded-full" />
+                                <span className="text-[9px] font-black text-emerald-700 dark:text-emerald-300 uppercase tracking-[0.2em]">Resolved Output</span>
                             </div>
                         )}
 
@@ -338,11 +338,11 @@ const MessageComponent: React.FC<MessageProps> = ({ message, onExecuteCommand })
                         </div>
                         <div className="flex flex-col">
                             <span className="font-black text-[10px] text-slate-500 uppercase tracking-[0.2em] group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors leading-none">{message.agent.name}</span>
-                            <span className="text-[8px] text-indigo-400/80 dark:text-indigo-400/40 font-black uppercase tracking-[0.05em]">{message.agent.role}</span>
+                            <span className="text-[8px] text-emerald-700/80 dark:text-emerald-300/50 font-black uppercase tracking-[0.05em]">{message.agent.role}</span>
                         </div>
                     </div>
                 )}
-                <div className={`p-2 md:p-3 rounded-2xl text-[14px] leading-relaxed transition-all duration-300 ${isUser ? 'bg-transparent text-gray-900 dark:text-white border border-black/10 dark:border-white/10 shadow-none' : 'bg-transparent text-gray-800 dark:text-slate-300 border border-black/5 dark:border-white/5'} ${mode === 'SOLUTION' ? 'border-indigo-500/20' : ''}`}>
+                <div className={`p-2 md:p-3 rounded-2xl text-[14px] leading-relaxed transition-all duration-300 ${isUser ? 'bg-transparent text-gray-900 dark:text-white border border-black/10 dark:border-white/10 shadow-none' : 'bg-transparent text-gray-800 dark:text-slate-300 border border-black/5 dark:border-white/5'} ${mode === 'SOLUTION' ? 'border-emerald-500/20' : ''}`}>
                     {renderContent()}
                 </div>
             </div>

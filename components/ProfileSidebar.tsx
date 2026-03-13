@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Agent, Team, UserProfile } from '../types';
 import { XMarkIcon } from './icons/XMarkIcon';
-import { deleteDocument, DocumentRecord, listDocuments } from '../services/apiV2';
-import { uploadAndRegisterMany } from '../services/documentService';
-import { validateDocumentFile } from '../services/documentParser';
+import { DocumentRecord, listDocuments } from '../services/apiV2';
 
 interface ProfileSidebarProps {
     isOpen: boolean;
@@ -17,18 +15,26 @@ interface ProfileSidebarProps {
     userProfile?: UserProfile;
 }
 
+function formatCapabilityLabel(capability: string) {
+    return capability
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
-    isOpen, type, data, onClose, onSaveAgent, onSaveTeam
+    isOpen,
+    type,
+    data,
+    onClose,
+    onSaveAgent,
+    onSaveTeam
 }) => {
     const [name, setName] = useState('');
-    const [jd, setJd] = useState('');
-
+    const [instructions, setInstructions] = useState('');
     const [teamName, setTeamName] = useState('');
     const [teamDesc, setTeamDesc] = useState('');
-
     const [documents, setDocuments] = useState<DocumentRecord[]>([]);
     const [isDocsLoading, setIsDocsLoading] = useState(false);
-    const [isUploadingDocs, setIsUploadingDocs] = useState(false);
     const [docError, setDocError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -37,15 +43,17 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             setTeamName(team.name);
             setTeamDesc(team.description || '');
             setDocuments([]);
+            setDocError(null);
             return;
         }
 
         const agent = data as Agent;
         setName(agent.name);
-        setJd(agent.jobDescription || '');
+        setInstructions(agent.jobDescription || '');
 
         if (type !== 'agent' || !isOpen) {
             setDocuments([]);
+            setDocError(null);
             return;
         }
 
@@ -71,182 +79,174 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         };
     }, [data, isOpen, type]);
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        if (files.length === 0 || type !== 'agent') return;
-
-        setDocError(null);
-        const selected = files.slice(0, 5);
-        if (files.length > 5) {
-            setDocError('Only 5 documents can be uploaded at once.');
-        }
-
-        const validFiles: File[] = [];
-        for (const file of selected) {
-            try {
-                validateDocumentFile(file);
-                validFiles.push(file);
-            } catch (err: any) {
-                setDocError(err?.message || 'Invalid document');
-            }
-        }
-
-        if (validFiles.length === 0) {
-            if (e.target) e.target.value = '';
-            return;
-        }
-
-        const agent = data as Agent;
-        setIsUploadingDocs(true);
-        try {
-            const created = await uploadAndRegisterMany(validFiles, 'agent', agent.id);
-            setDocuments(prev => [...created, ...prev]);
-        } catch (error: any) {
-            console.error(error);
-            setDocError(error?.message || 'Failed to upload documents');
-        } finally {
-            setIsUploadingDocs(false);
-            if (e.target) e.target.value = '';
-        }
-    };
-
-    const handleDeleteDocument = async (docId: string) => {
-        try {
-            await deleteDocument(docId);
-            setDocuments(prev => prev.filter(doc => doc.docId !== docId));
-        } catch (error: any) {
-            console.error(error);
-            setDocError(error?.message || 'Failed to delete document');
-        }
-    };
+    const agent = data as Agent;
+    const capabilityList = useMemo(
+        () => Array.isArray(agent.capabilities) ? agent.capabilities : [],
+        [agent.capabilities]
+    );
 
     const handleSave = () => {
         if (type === 'team') {
-            onSaveTeam?.({ ...data as Team, name: teamName, description: teamDesc });
+            onSaveTeam?.({ ...(data as Team), name: teamName, description: teamDesc });
         } else if (type === 'agent') {
             const existing = data as Agent;
-            onSaveAgent?.({ ...existing, name, role: existing.role, jobDescription: jd });
+            onSaveAgent?.({ ...existing, name, role: existing.role, jobDescription: instructions });
         }
         onClose();
     };
 
-    const agent = data as Agent;
+    const title = type === 'prism'
+        ? 'Prism Profile'
+        : type === 'team'
+            ? 'Team Profile'
+            : 'Profile';
 
     return (
-        <div className={`fixed top-0 right-0 h-full w-full max-w-sm md:max-w-md bg-[#1A1A1A] border-l border-white/5 shadow-2xl z-[50] transition-transform duration-300 transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="flex flex-col h-full">
-                <div className="p-6 border-b border-white/5 bg-[#1A1A1A]">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-bold text-white tracking-tight">{type === 'prism' ? 'Prism Profile' : type === 'team' ? 'Squad Profile' : 'Unit Profile'}</h2>
-                        <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg text-slate-400 transition-colors"><XMarkIcon /></button>
+        <div className={`fixed top-0 right-0 z-[50] h-full w-full max-w-sm transform border-l border-black/10 bg-white shadow-2xl transition-transform duration-300 dark:border-white/10 dark:bg-[#15171a] md:max-w-md ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="flex h-full flex-col">
+                <div className="border-b border-black/10 bg-white/90 p-6 backdrop-blur-xl dark:border-white/10 dark:bg-[#15171a]/90">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{title}</h2>
+                        <button onClick={onClose} className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-black/[0.04] hover:text-gray-900 dark:text-white/40 dark:hover:bg-white/[0.05] dark:hover:text-white">
+                            <XMarkIcon />
+                        </button>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-                    <div className="animate-in fade-in duration-500">
-                        <div className="space-y-6 mt-8">
-                            {type === 'team' ? (
-                                <>
-                                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-[0.2em]">Squad Name</label><input value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm text-white focus:border-white outline-none transition-colors" /></div>
-                                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-[0.2em]">Directive</label><textarea value={teamDesc} onChange={e => setTeamDesc(e.target.value)} rows={3} className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm text-white resize-none focus:border-white outline-none transition-colors" /></div>
-                                </>
-                            ) : (
-                                <>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-[0.2em]">Agent Name</label>
-                                        <input value={name} onChange={e => setName(e.target.value)} disabled={type === 'prism'} className="w-full bg-black border border-white/10 rounded-xl p-3 text-sm text-white focus:border-white outline-none transition-colors disabled:opacity-50" />
-                                    </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                    <div className="space-y-6">
+                        {type === 'team' ? (
+                            <>
+                                <div>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">Team Name</label>
+                                    <input
+                                        value={teamName}
+                                        onChange={e => setTeamName(e.target.value)}
+                                        className="w-full rounded-2xl border border-black/10 bg-[#F8F9FA] p-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 dark:border-white/10 dark:bg-[#101214] dark:text-white dark:focus:border-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">Directive</label>
+                                    <textarea
+                                        value={teamDesc}
+                                        onChange={e => setTeamDesc(e.target.value)}
+                                        rows={4}
+                                        className="w-full resize-none rounded-2xl border border-black/10 bg-[#F8F9FA] p-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 dark:border-white/10 dark:bg-[#101214] dark:text-white dark:focus:border-white"
+                                    />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">
+                                        {type === 'prism' ? 'Name' : 'ChatBot Name'}
+                                    </label>
+                                    <input
+                                        value={name}
+                                        onChange={e => setName(e.target.value)}
+                                        disabled={type === 'prism'}
+                                        className="w-full rounded-2xl border border-black/10 bg-[#F8F9FA] p-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 disabled:opacity-60 dark:border-white/10 dark:bg-[#101214] dark:text-white dark:focus:border-white"
+                                    />
+                                </div>
 
-                                    {type !== 'prism' && (
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-[0.2em]">AI Model</label>
-                                            <div className="w-full bg-black border border-white/10 rounded-xl p-3 text-[11px] font-mono text-white/60">
-                                                {agent.model || 'Unknown model'}
-                                            </div>
+                                {type !== 'prism' && (
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div className="rounded-2xl border border-black/10 bg-[#F8F9FA] p-4 dark:border-white/10 dark:bg-[#101214]">
+                                            <div className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-white/40">Runtime Model</div>
+                                            <div className="text-[12px] font-mono text-gray-800 dark:text-white/70">{agent.model || 'Unknown model'}</div>
                                         </div>
-                                    )}
+                                        <div className="rounded-2xl border border-black/10 bg-[#F8F9FA] p-4 dark:border-white/10 dark:bg-[#101214]">
+                                            <div className="mb-1 text-[9px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-white/40">Capabilities</div>
+                                            <div className="text-[12px] text-gray-800 dark:text-white/70">{capabilityList.length}</div>
+                                        </div>
+                                    </div>
+                                )}
 
-                                    {type !== 'prism' && (
-                                        <>
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-2">System Instructions</label>
-                                                <textarea value={jd} onChange={e => setJd(e.target.value)} rows={8} className="w-full bg-black border border-white/10 rounded-xl p-3 text-[11px] font-mono leading-relaxed text-slate-300 resize-none focus:border-white outline-none transition-colors mb-6" />
-                                            </div>
+                                {type !== 'prism' && (
+                                    <div>
+                                        <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">System Instructions</label>
+                                        <textarea
+                                            value={instructions}
+                                            onChange={e => setInstructions(e.target.value)}
+                                            rows={8}
+                                            className="w-full resize-none rounded-2xl border border-black/10 bg-[#F8F9FA] p-4 text-[11px] leading-relaxed text-gray-900 outline-none transition-colors focus:border-gray-900 dark:border-white/10 dark:bg-[#101214] dark:text-white/80 dark:focus:border-white"
+                                        />
+                                    </div>
+                                )}
 
-                                            <div>
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Agent Documents</label>
-                                                    <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider font-bold">Backend Registry</span>
-                                                </div>
+                                {type !== 'prism' && capabilityList.length > 0 && (
+                                    <div>
+                                        <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">ChatBot Capabilities</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {capabilityList.map(capability => (
+                                                <span
+                                                    key={capability}
+                                                    className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300"
+                                                >
+                                                    {formatCapabilityLabel(String(capability))}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
-                                                <div className="space-y-2 mb-6">
-                                                    {isDocsLoading && (
-                                                        <div className="text-[10px] text-white/50">Loading documents...</div>
-                                                    )}
+                                {type !== 'prism' && (
+                                    <div>
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">Knowledge Files</label>
+                                            <span className="rounded-full border border-black/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-gray-500 dark:border-white/10 dark:text-white/40">
+                                                Read Only
+                                            </span>
+                                        </div>
 
-                                                    {!isDocsLoading && documents.length === 0 && (
-                                                        <div className="text-[10px] text-white/40 border border-dashed border-white/10 rounded-lg p-3">
-                                                            No documents registered for this agent yet.
-                                                        </div>
-                                                    )}
-
-                                                    {documents.map((doc) => (
-                                                        <div key={doc.docId} className="flex items-center justify-between bg-white/[0.02] border border-white/10 rounded-lg p-3">
-                                                            <div className="flex flex-1 items-center gap-3 overflow-hidden">
-                                                                <span className="text-lg">📄</span>
-                                                                <div className="truncate pr-4">
-                                                                    <div className="text-[11px] font-bold text-slate-300 truncate">{doc.fileName}</div>
-                                                                    <div className="text-[9px] text-slate-500 uppercase tracking-widest">{((doc.size || 0) / 1024).toFixed(1)} KB</div>
-                                                                </div>
-                                                            </div>
-                                                            <button onClick={() => handleDeleteDocument(doc.docId)} className="text-red-500/50 hover:text-red-400 p-1 flex-shrink-0 relative z-10 transition-colors">
-                                                                <XMarkIcon />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-
-                                                    {docError && (
-                                                        <p className="text-[10px] text-amber-400">{docError}</p>
-                                                    )}
-
-                                                    <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${isUploadingDocs ? 'bg-white/5 border-white/20' : 'bg-black border-white/10 hover:bg-white/5 hover:border-white/30'}`}>
-                                                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                            {isUploadingDocs ? (
-                                                                <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                                            ) : (
-                                                                <>
-                                                                    <svg className="w-6 h-6 mb-2 text-white/40" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" /></svg>
-                                                                    <p className="mb-1 text-[10px] text-white/60 font-bold"><span className="text-white">Upload documents</span></p>
-                                                                    <p className="text-[8px] uppercase tracking-widest text-white/40">PDF, TXT, DOCX, CSV, MD (max 5)</p>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                        <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploadingDocs} accept=".pdf,.txt,.doc,.docx,.csv,.md,.json,.yaml,.yml,.xml" multiple />
-                                                    </label>
-                                                </div>
-                                            </div>
-
-                                            {(agent.capabilities || []).length > 0 && (
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-[0.2em]">Tools</label>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {agent.capabilities!.map(cap => (
-                                                            <span key={cap} className="px-2.5 py-1 bg-white/[0.05] border border-white/10 rounded-lg text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                                                                {cap}
-                                                            </span>
-                                                        ))}
-                                                    </div>
+                                        <div className="space-y-2">
+                                            {isDocsLoading && (
+                                                <div className="rounded-2xl border border-dashed border-black/10 p-4 text-[10px] uppercase tracking-[0.12em] text-gray-500 dark:border-white/10 dark:text-white/40">
+                                                    Loading knowledge files...
                                                 </div>
                                             )}
-                                        </>
-                                    )}
-                                </>
-                            )}
 
-                            <button onClick={handleSave} className="w-full py-4 bg-white text-black text-[11px] font-black uppercase tracking-[0.3em] rounded-xl transition-all shadow-xl active:scale-[0.98]">
-                                Update {type === 'prism' ? 'Protocol' : 'Profile'}
-                            </button>
-                        </div>
+                                            {!isDocsLoading && documents.length === 0 && !docError && (
+                                                <div className="rounded-2xl border border-dashed border-black/10 p-4 text-[10px] uppercase tracking-[0.12em] text-gray-500 dark:border-white/10 dark:text-white/40">
+                                                    No files registered for this chatbot yet.
+                                                </div>
+                                            )}
+
+                                            {documents.map(doc => (
+                                                <div key={doc.docId} className="flex items-center gap-3 rounded-2xl border border-black/10 bg-[#F8F9FA] p-3 dark:border-white/10 dark:bg-[#101214]">
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-black/10 bg-white text-lg dark:border-white/10 dark:bg-white/[0.04]">
+                                                        📄
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="truncate text-[11px] font-black uppercase tracking-[0.08em] text-gray-900 dark:text-white">
+                                                            {doc.fileName}
+                                                        </div>
+                                                        <div className="text-[9px] font-mono uppercase tracking-[0.12em] text-gray-500 dark:text-white/40">
+                                                            {((doc.size || 0) / 1024).toFixed(1)} KB
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {docError && (
+                                                <p className="text-[10px] text-amber-600 dark:text-amber-400">{docError}</p>
+                                            )}
+
+                                            <p className="pt-1 text-[10px] leading-relaxed text-gray-500 dark:text-white/42">
+                                                Files are managed through chatbot creation and chat attachments. Profile upload has been removed so this panel stays read-only and backend-authoritative.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        <button
+                            onClick={handleSave}
+                            className="w-full rounded-2xl bg-gray-900 py-4 text-[11px] font-black uppercase tracking-[0.22em] text-white transition hover:bg-black dark:bg-white dark:text-black dark:hover:bg-white/90"
+                        >
+                            Update Profile
+                        </button>
                     </div>
                 </div>
             </div>

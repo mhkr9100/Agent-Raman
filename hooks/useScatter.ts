@@ -83,7 +83,7 @@ export const useScatter = () => {
     // === Background Directives ===
     const processSilentDirective = useCallback(async (task: GlobalTask) => {
         const agent = agents.find(a => a.id === task.agentId);
-        if (!agent) return "Error: Agent not found.";
+        if (!agent) return "Error: ChatBot not found.";
         const response = await agentChat({
             agentId: agent.id,
             message: task.label,
@@ -121,9 +121,8 @@ export const useScatter = () => {
         attachments?: File[],
         searchEnabled?: boolean,
         createEnabled?: boolean,
-        prismMode?: 'ask' | 'create' | 'council',
+        prismMode?: 'ask' | 'create',
         specialAgentContext?: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string },
-        councilConfig?: { councilModelIds: string[]; decisionModelId: string },
         targetChatId?: string
     ) => {
         const chatId = targetChatId || activeChatId;
@@ -161,7 +160,6 @@ export const useScatter = () => {
                     message: runtimeMessage,
                     mode: prismMode || 'ask',
                     conversationId: chatId,
-                    ...(councilConfig ? { councilConfig } : {}),
                     ...(specialAgentContext ? { specialAgentContext } : {})
                 } as const;
 
@@ -292,8 +290,8 @@ export const useScatter = () => {
         // Switch to Prism chat
         setActiveChatId('prism-core');
         // Auto-send create-mode message with special agent context
-        const message = `Personalize and deploy the "${template.name}" agent for me.`;
-        handleSendMessage(message, 1, undefined, false, false, 'create', template, undefined, 'prism-core');
+        const message = `Personalize and deploy the "${template.name}" chatbot for me.`;
+        handleSendMessage(message, 1, undefined, false, false, 'create', template, 'prism-core');
     }, [setActiveChatId, handleSendMessage]);
 
     return {

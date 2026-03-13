@@ -143,7 +143,7 @@ export const useUserMap = (currentUser: UserProfile | null) => {
                 .filter(Boolean);
 
             if (memoryStrings.length === 0) {
-                throw new Error('No memories to consolidate. Chat with agents first to build your memory.');
+                throw new Error('No memories to consolidate. Chat with Prism or your chatbots first to build your memory.');
             }
 
             const tree = await consolidateUserMap({

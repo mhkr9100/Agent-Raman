@@ -52,7 +52,7 @@ export const useAgentExecution = (
                     name: agentRecord.name,
                     type: 'agent',
                     role: agentRecord.role || 'Specialist',
-                    jobDescription: agentRecord.blueprint?.agentDescription || `A specialized ${agentRecord.role || 'AI'} agent.`,
+                    jobDescription: agentRecord.blueprint?.agentDescription || `A specialized ${agentRecord.role || 'AI'} chatbot.`,
                     icon: agentRecord.icon || '🤖',
                     provider: 'google',
                     model: agentRecord.modelId || 'gemini-2.5-flash',
@@ -128,7 +128,7 @@ export const useAgentExecution = (
                 const res = await createAgent({
                     agentName: toolCall.args.name || toolCall.args.agentName,
                     role: toolCall.args.role,
-                    agentDescription: toolCall.args.description || toolCall.args.agentDescription || `A specialized ${toolCall.args.role || 'AI'} agent.`,
+                    agentDescription: toolCall.args.description || toolCall.args.agentDescription || `A specialized ${toolCall.args.role || 'AI'} chatbot.`,
                     systemPrompt: toolCall.args.jobDescription || toolCall.args.systemPrompt,
                     icon: toolCall.args.icon,
                     model: {
@@ -156,14 +156,14 @@ export const useAgentExecution = (
                 const updatedHistory = [...history];
                 updatedHistory[msgIndex] = {
                     ...updatedHistory[msgIndex],
-                    content: { ...updatedHistory[msgIndex].content, text: `✅ Agent Fabrication Successful: ${res.name} has been deployed.`, toolCall: undefined }
+                    content: { ...updatedHistory[msgIndex].content, text: `✅ ChatBot creation successful: ${res.name} has been deployed.`, toolCall: undefined }
                 };
 
                 const introMessage: Message = {
                     id: `intro-${Date.now()}`,
                     userId: currentUser?.id,
                     agent: agentParam as Agent,
-                    content: { type: 'text', text: `Initialization complete. I am **${agentParam.name}**, your new ${agentParam.role}. How can I assist you today?` },
+                    content: { type: 'text', text: `Initialization complete. I am **${agentParam.name}**, your new ${agentParam.role} chatbot. How can I assist you today?` },
                     type: 'agent'
                 };
 
@@ -174,12 +174,12 @@ export const useAgentExecution = (
                 }));
                 setActiveChatId(agentParam.id);
             } catch (err: any) {
-                console.error("Agent creation failed:", err);
+                console.error("ChatBot creation failed:", err);
                 // Optionally show error message in chat history
                 const updatedHistory = [...history];
                 updatedHistory[msgIndex] = {
                     ...updatedHistory[msgIndex],
-                    content: { ...updatedHistory[msgIndex].content, text: `⚠️ Agent Fabrication Failed: ${err.message}`, toolCall: undefined }
+                    content: { ...updatedHistory[msgIndex].content, text: `⚠️ ChatBot creation failed: ${err.message}`, toolCall: undefined }
                 };
                 useAppStore.getState().setChatHistory(prev => ({
                     ...prev,

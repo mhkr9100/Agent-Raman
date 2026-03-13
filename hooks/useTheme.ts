@@ -12,9 +12,14 @@ export const useTheme = () => {
             setTheme(savedTheme);
             if (savedTheme === 'light') {
                 document.documentElement.classList.remove('dark');
+                document.documentElement.style.colorScheme = 'light';
             } else {
                 document.documentElement.classList.add('dark');
+                document.documentElement.style.colorScheme = 'dark';
             }
+        } else {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
         }
     }, []);
 
@@ -25,8 +30,10 @@ export const useTheme = () => {
 
         if (newTheme === 'dark') {
             document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
         } else {
             document.documentElement.classList.remove('dark');
+            document.documentElement.style.colorScheme = 'light';
         }
     };
 

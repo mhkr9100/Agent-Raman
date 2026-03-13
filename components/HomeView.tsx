@@ -28,8 +28,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                             <span className="text-[12px] uppercase tracking-widest text-slate-400 dark:text-slate-500 font-bold ml-4 align-top border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 rounded px-2 py-0.5">Beta</span>
                         </h1>
                         <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 font-medium max-w-2xl mx-auto leading-relaxed">
-                            A unified platform for multi-agent collaboration. Deploy specialized AI units,
-                            build autonomous squads, and orchestrate complex workflows.
+                            A unified platform for context-aware AI work. Build specialized chatbots,
+                            organize them into teams, and orchestrate complex workflows with real backend memory.
                         </p>
                     </div>
 
@@ -38,7 +38,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                             onClick={onStartChat}
                             className="px-12 py-5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-2xl hover:bg-gray-800 dark:hover:bg-slate-200 active:scale-[0.98]"
                         >
-                            Enter Orchestrator
+                            Enter Workspace
                         </button>
                     </div>
 
@@ -47,10 +47,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                             <h2 className="text-[10px] font-black text-gray-400 dark:text-white/30 uppercase tracking-[0.5em]">Core Philosophy</h2>
                             <div className="max-w-3xl mx-auto text-sm md:text-base text-gray-600 dark:text-white/50 leading-relaxed space-y-6">
                                 <p>
-                                    RamN AI bridges the gap between isolated conversational bots and truly collaborative AI workflows. Rather than relying on a single monolithic intelligence, you orchestrate a <span className="text-gray-900 dark:text-white font-bold">Spectrum</span> of specialized agents.
+                                    RamN AI bridges the gap between isolated conversational bots and truly collaborative AI workflows. Rather than relying on a single monolithic intelligence, you orchestrate a <span className="text-gray-900 dark:text-white font-bold">Spectrum</span> of specialized chatbots.
                                 </p>
                                 <p>
-                                    Each agent possesses explicit directives, unique API tools, and a defined cognitive role. By grouping them into <span className="text-gray-900 dark:text-white font-bold">Squads</span>, they autonomously debate, delegate tasks, and synthesize sophisticated solutions to multi-step problems that basic prompts simply cannot solve.
+                                    Each chatbot has explicit directives, real backend capabilities, and a defined role. By grouping them into <span className="text-gray-900 dark:text-white font-bold">Teams</span>, they can collaborate on multi-step problems that basic prompts simply cannot solve.
                                 </p>
                             </div>
                         </div>
@@ -62,14 +62,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                     whileHover={{ scale: 1.02 }}
                                     className="p-6 bg-white dark:bg-white/[0.02] border border-black/10 dark:border-white/5 rounded-3xl flex gap-6 text-left shadow-xl dark:shadow-none"
                                 >
-                                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 dark:text-indigo-400 flex-shrink-0">
+                                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-300 flex-shrink-0">
                                         <Key size={20} />
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">1. Enter the Orchestrator</h3>
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">1. Enter the Workspace</h3>
                                         <p className="text-xs text-gray-600 dark:text-white/40 leading-relaxed">
-                                            Access your workspace and begin interacting with specialized AI units.
-                                            RamN AI manages all intelligence infrastructure for you.
+                                            Access your workspace and begin interacting with Prism, chatbots, and teams.
+                                            RamN AI manages the live backend infrastructure for you.
                                         </p>
                                     </div>
                                 </motion.div>
@@ -84,8 +84,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">2. Consult Prism Core</h3>
                                         <p className="text-xs text-gray-600 dark:text-white/40 leading-relaxed">
-                                            Ask <span className="text-white/60 font-bold">Prism</span> for help or to fabricate new agents.
-                                            Try: <span className="italic">"Prism, create a Python expert for me."</span>
+                                            Ask <span className="font-bold text-gray-900 dark:text-white">Prism</span> for help or to design new chatbots.
+                                            Try: <span className="italic">"Prism, create a Python expert chatbot for me."</span>
                                         </p>
                                     </div>
                                 </motion.div>
@@ -100,8 +100,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">3. Direct Interaction</h3>
                                         <p className="text-xs text-gray-600 dark:text-white/40 leading-relaxed">
-                                            Select any agent from the sidebar to chat 1-on-1. Each unit has specialized
-                                            system instructions and capabilities.
+                                            Select any chatbot from the sidebar to chat 1-on-1. Each one has its own
+                                            instructions, capabilities, and knowledge space.
                                         </p>
                                     </div>
                                 </motion.div>
@@ -114,10 +114,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                         <Users size={20} />
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">4. Assemble Squads</h3>
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">4. Build Teams</h3>
                                         <p className="text-xs text-gray-600 dark:text-white/40 leading-relaxed">
-                                            Create a <span className="text-white/60 font-bold">Team</span> to let multiple agents collaborate.
-                                            Mention them using <span className="text-white/60 font-bold">@Name</span> to trigger their expertise.
+                                            Create a <span className="font-bold text-gray-900 dark:text-white">Team</span> to let multiple chatbots collaborate.
+                                            Mention them using <span className="font-bold text-gray-700 dark:text-white/60">@Name</span> to trigger their expertise.
                                         </p>
                                     </div>
                                 </motion.div>
@@ -128,10 +128,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                             <div className="space-y-4 text-left">
                                 <div className="flex items-center gap-3 text-gray-500 dark:text-white/20">
                                     <Bot size={16} />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Specialized Units</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Specialized ChatBots</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 dark:text-white/40 leading-relaxed">
-                                    From image generation to deep research, deploy agents with specific tools
+                                    From image generation to deep research, deploy chatbots with specific capabilities
                                     and models tailored for the task.
                                 </p>
                             </div>
@@ -141,7 +141,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                     <span className="text-[10px] font-black uppercase tracking-widest">Need Help?</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 dark:text-white/40 leading-relaxed">
-                                    Prism Core is always active. Ask it about capabilities, agent management,
+                                    Prism Core is always active. Ask it about capabilities, chatbot management,
                                     or to explain the system architecture.
                                 </p>
                             </div>
@@ -151,7 +151,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                     <span className="text-[10px] font-black uppercase tracking-widest">Spectrum View</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 dark:text-white/40 leading-relaxed">
-                                    Explore the Spectrum to find pre-configured agent templates or
+                                    Explore the Spectrum to find pre-configured chatbot templates or
                                     discover the strengths of different AI models.
                                 </p>
                             </div>
@@ -162,4 +162,3 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
         </div>
     );
 };
-

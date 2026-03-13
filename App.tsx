@@ -47,16 +47,16 @@ const App: React.FC = () => {
   const [isMemoryImportOpen, setIsMemoryImportOpen] = useState(false);
   const [isMemoryImporting, setIsMemoryImporting] = useState(false);
 
-  const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean, id: string, name: string, type: 'Agent' | 'Team' | null }>({ isOpen: false, id: '', name: '', type: null });
+  const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean, id: string, name: string, type: 'ChatBot' | 'Team' | null }>({ isOpen: false, id: '', name: '', type: null });
   const ingestedAssistantMessageIdsRef = useRef<Set<string>>(new Set());
 
-  const triggerDelete = (id: string, name: string, type: 'Agent' | 'Team') => {
+  const triggerDelete = (id: string, name: string, type: 'ChatBot' | 'Team') => {
     setDeleteModalState({ isOpen: true, id, name, type });
   };
 
   const confirmDelete = async () => {
     try {
-      if (deleteModalState.type === 'Agent') {
+      if (deleteModalState.type === 'ChatBot') {
         await deleteAgent(deleteModalState.id);
       } else if (deleteModalState.type === 'Team') {
         await deleteTeam(deleteModalState.id);
@@ -67,16 +67,16 @@ const App: React.FC = () => {
     }
   };
 
-  // Creates an agent via real backend API, then adds to local state
+  // Creates a chatbot via real backend API, then adds to local state
   const handleCreateAgentFromModal = async (data: any) => {
     try {
       const toolIds = normalizeToolIds(data.toolIds || data.capabilities || []);
       const pendingDocuments: File[] = Array.isArray(data.pendingDocuments) ? data.pendingDocuments.slice(0, 5) : [];
       const res = await createAgent({
         agentName: data.name,
-        agentDescription: data.jobDescription || data.description || `A specialized ${data.role} agent.`,
+        agentDescription: data.jobDescription || data.description || `A specialized ${data.role} chatbot.`,
         role: data.role,
-        systemPrompt: data.jobDescription || `You are a specialized ${data.role} AI agent. ${data.description || ''}`,
+        systemPrompt: data.jobDescription || `You are a specialized ${data.role} AI chatbot. ${data.description || ''}`,
         icon: data.icon || '🤖',
         model: {
           modelId: data.model || 'gemini-2.5-flash',
@@ -90,15 +90,15 @@ const App: React.FC = () => {
           const { uploadAndRegisterMany } = await import('./services/documentService');
           await uploadAndRegisterMany(pendingDocuments, 'agent', res.agentId);
         } catch (uploadErr: any) {
-          console.error('Agent created but document registration failed:', uploadErr);
-          alert(`Agent created, but one or more documents failed to register: ${uploadErr?.message || 'Unknown error'}`);
+          console.error('ChatBot created but document registration failed:', uploadErr);
+          alert(`ChatBot created, but one or more documents failed to register: ${uploadErr?.message || 'Unknown error'}`);
         }
       }
 
       recruitAgent({ ...data, id: res.agentId, name: res.name, capabilities: toolIds });
     } catch (err: any) {
-      console.error('Failed to create agent:', err);
-      alert(`Agent creation failed: ${err.message}`);
+      console.error('Failed to create chatbot:', err);
+      alert(`ChatBot creation failed: ${err.message}`);
     }
   };
 
@@ -118,7 +118,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Special Agent "Add via Prism" flow
+  // Special ChatBot "Add via Prism" flow
   const handleAddSpecialAgentViaPrism = (template: any) => {
     setActiveView('prism');
     sendSpecialAgentToPrism({
@@ -252,8 +252,8 @@ const App: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494 3.32 3.32 0 0 0 2.822-3.237V9.72m-3.22 8.4A3.32 3.32 0 0 0 21 14.885V5.115a3.32 3.32 0 0 0-2.822-3.236A48.282 48.282 0 0 0 12 1.535c-2.11 0-4.18.173-6.208.494A3.32 3.32 0 0 0 3 5.115v9.77M12 10.5h.008v.008H12V10.5Z" />
                 </svg>
               </div>
-              <h3 className="text-white/40 font-black uppercase tracking-[0.2em] text-xs">No Agent Selected</h3>
-              <p className="text-white/20 text-[10px] mt-2 font-medium">Select an agent or team from the sidebar to begin.</p>
+              <h3 className="text-gray-700 dark:text-white/40 font-black uppercase tracking-[0.2em] text-xs">No ChatBot Selected</h3>
+              <p className="text-gray-500 dark:text-white/20 text-[10px] mt-2 font-medium">Select a chatbot or team from the sidebar to begin.</p>
             </div>
           );
         }
@@ -325,7 +325,7 @@ const App: React.FC = () => {
             setIsMobileMenuOpen(false);
           }}
           onDeleteTeam={(id) => triggerDelete(id, teams.find(t => t.id === id)?.name || 'Team', 'Team')}
-          onDeleteAgent={(id) => triggerDelete(id, agents.find(a => a.id === id)?.name || 'Agent', 'Agent')}
+          onDeleteAgent={(id) => triggerDelete(id, agents.find(a => a.id === id)?.name || 'ChatBot', 'ChatBot')}
           onOpenFeedback={() => setIsFeedbackModalOpen(true)}
           userProfile={userProfile}
         />

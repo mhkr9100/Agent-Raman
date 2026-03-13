@@ -4,21 +4,18 @@ import { AGENTS } from '../constants';
 import { useAppStore } from '../store/useAppStore';
 import { dbService, STORES_ENUM } from '../services/db';
 
-const PRISM_INTRO = `Prism is Active. I am your Meta Agent and Workspace Architect.
+const PRISM_INTRO = `Prism is active. I am your prompt and context architect.
 
 **Quick Guide:**
-- **Ask Prism** (Default): Get answers to any general question.
-- **Route**: Find the best AI model for your objective without creating an agent.
-- **Create Agents**: Fabricate specialized units for dedicated tasks.
-- **Chat Interval**: Pace the interaction for multi-step reasoning.
+- **Ask Prism**: Get help with objectives, workflows, prompts, and system design.
+- **Create ChatBots**: Design a focused chatbot or team from one clear objective.
+- **Bring Context**: Attach files or import memory so Prism can work from your real context.
 
-How can I help you build your workspace today? Tell me about a project, a workflow, or a specific problem you're looking to solve.
+Tell me what you want to accomplish, and I will help shape the right chatbot or workflow for it.`;
 
-Let's start with "create an agent....!"`;
+const getAgentIntro = (name: string, role: string) => `**${name}** is online. I am configured for **${role}**. What do you want to work on?`;
 
-const getAgentIntro = (name: string, role: string) => `**${name}** is Online. I am a specialized unit assigned the role of **${role}**. How can I assist you in my area of expertise today? Use the input bar below to send instructions.`;
-
-const getTeamIntro = (name: string) => `**${name}** Squad is Synchronized. Mention an agent using **@Name** to trigger their specialized expertise. How can the team collaborate on your project today?`;
+const getTeamIntro = (name: string) => `**${name}** is ready. Mention a chatbot using **@Name** to direct work, or ask the team to coordinate the task together.`;
 
 export const useChatSessions = (currentUser: UserProfile | null) => {
     const chatHistory = useAppStore(state => state.chatHistory);
@@ -57,7 +54,7 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
             };
         }
 
-        // Search for agent in constants
+        // Search for chatbot in constants
         const agent = Object.values(AGENTS).find(a => a.id === entityId);
         if (agent && !agent.isSystem) {
             return {
@@ -68,12 +65,12 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
             };
         }
 
-        // For custom agents or teams, have a helpful fallback
+        // For custom chatbots or teams, have a helpful fallback
         if (entityId.startsWith('agent-') || entityId.indexOf('-') > -1) {
             return {
                 id: `msg-gen-init-${Date.now()}`,
-                agent: { id: entityId, name: 'Agent', role: 'Specialist', type: 'agent', icon: '🤖' } as any,
-                content: { type: 'text', text: `Welcome to your specialized session. I am your assigned AI unit. How can I assist you with your objective today?` },
+                agent: { id: entityId, name: 'ChatBot', role: 'Specialist', type: 'agent', icon: '🤖' } as any,
+                content: { type: 'text', text: `This chatbot is ready. Share the task, question, or document context you want it to work from.` },
                 type: 'agent'
             };
         }
@@ -82,8 +79,8 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
 
         return {
             id: `msg-squad-init-${Date.now()}`,
-            agent: { id: entityId, name: 'Squad', type: 'team', icon: '👥' } as any,
-            content: { type: 'text', text: `This squad is synchronized. Use **@Name** to trigger a specialist's expertise or ask a general question to start the coordination.` },
+            agent: { id: entityId, name: 'Team', type: 'team', icon: '👥' } as any,
+            content: { type: 'text', text: `This team is synchronized. Use **@Name** to trigger a chatbot's expertise or ask a general question to start the coordination.` },
             type: 'agent'
         };
     }, []);

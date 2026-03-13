@@ -14,30 +14,30 @@
  */
 
 import { callAI, callAIWithTools } from '../../shared/vertex-ai.js';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import {
     getAgent,
     saveMessage,
     getConversation,
     getToolById,
     getUserMap,
-    listDocumentsByOwner
+    saveDocument,
+    updateAgent
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { checkAndRecordUsage } from '../../shared/rate-limit.js';
 import { deriveToolIdsFromBlueprint, toCanonicalToolId } from '../../shared/tool-ids.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
+import {
+    DEFAULT_VERTEX_MODEL_ID,
+    SUPPORTED_VERTEX_MODELS,
+    resolveSupportedVertexModelId
+} from '../../shared/runtime-policy.js';
+import { getRelevantDocumentContext } from '../../shared/document-context.js';
 
 // ─── Constants ───────────────────────────────────────────────────
 
 const MAX_REACT_ITERATIONS = 5;
-const DOC_READER_MAX_FILES = 3;
-const DOC_READER_MAX_CHARS = 1800;
-const SUPPORTED_VERTEX_MODELS = new Set([
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-2.5-flash-lite'
-]);
 const s3Client = new S3Client({ region: process.env.S3_BUCKET_REGION || process.env.AWS_REGION || 'us-east-2' });
 
 function respond(event, statusCode, body) {
@@ -49,43 +49,6 @@ function respond(event, statusCode, body) {
         },
         body: JSON.stringify(body)
     };
-}
-
-async function streamToString(stream) {
-    if (!stream) return '';
-    const chunks = [];
-    for await (const chunk of stream) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks).toString('utf-8');
-}
-
-function tokenizeSearch(input) {
-    return String(input || '')
-        .toLowerCase()
-        .split(/[^a-z0-9]+/g)
-        .filter(Boolean)
-        .filter(token => token.length > 2)
-        .slice(0, 20);
-}
-
-function buildSnippet(text, queryTokens) {
-    const normalized = String(text || '').replace(/\s+/g, ' ').trim();
-    if (!normalized) return '';
-    if (!queryTokens.length) return normalized.slice(0, DOC_READER_MAX_CHARS);
-
-    const lower = normalized.toLowerCase();
-    let bestIndex = -1;
-    for (const token of queryTokens) {
-        const idx = lower.indexOf(token);
-        if (idx !== -1 && (bestIndex === -1 || idx < bestIndex)) {
-            bestIndex = idx;
-        }
-    }
-    if (bestIndex === -1) return normalized.slice(0, DOC_READER_MAX_CHARS);
-    const start = Math.max(0, bestIndex - 350);
-    const end = Math.min(normalized.length, bestIndex + DOC_READER_MAX_CHARS);
-    return normalized.slice(start, end);
 }
 
 // ─── Built-in Tool Executors ─────────────────────────────────────
@@ -239,68 +202,65 @@ async function executeGetCurrentTime(args) {
 async function executeDocReader(args, context = {}) {
     const query = String(args?.query || args?.question || args?.input || '').trim();
     const { userId, agentId } = context;
-    if (!userId) {
-        return 'Document Reader cannot run without a valid user context.';
+    const documentContext = await getRelevantDocumentContext({ userId, agentId, query });
+    if (documentContext.error) {
+        return documentContext.error;
     }
-
-    const docsFromAgent = agentId
-        ? await listDocumentsByOwner(userId, 'agent', agentId)
-        : [];
-    const docsFromUser = await listDocumentsByOwner(userId, 'user', userId);
-
-    const allDocs = [...docsFromAgent, ...docsFromUser];
-    if (allDocs.length === 0) {
+    if (!documentContext.text) {
         return 'No registered documents found for this session.';
     }
+    return `Document Reader Results${query ? ` for "${query}"` : ''}:\n\n${documentContext.text}`;
+}
 
-    const queryTokens = tokenizeSearch(query);
+async function executeCanvas(args, context = {}) {
+    const { userId, agentId } = context;
+    if (!userId) {
+        return 'Canvas requires a valid user context.';
+    }
+
     const bucket = process.env.S3_BUCKET_NAME || '';
     if (!bucket) {
-        return 'Document Reader is unavailable because S3 bucket configuration is missing.';
+        return 'Canvas is unavailable because S3 bucket configuration is missing.';
     }
 
-    const hydrated = [];
-    for (const doc of allDocs) {
-        if (!doc?.textKey) continue;
-        try {
-            const result = await s3Client.send(new GetObjectCommand({
-                Bucket: bucket,
-                Key: doc.textKey
-            }));
-            const text = await streamToString(result.Body);
-            if (!text.trim()) continue;
-            const lower = text.toLowerCase();
-            const score = queryTokens.length === 0
-                ? 1
-                : queryTokens.reduce((acc, token) => acc + (lower.includes(token) ? 1 : 0), 0);
-
-            hydrated.push({
-                doc,
-                score,
-                snippet: buildSnippet(text, queryTokens)
-            });
-        } catch (error) {
-            console.warn(`DOC-READER: Failed to read text payload for ${doc.docId}:`, error.message);
-        }
+    const content = String(args?.content || args?.markdown || args?.input || '').trim();
+    if (!content) {
+        return 'Canvas requires non-empty content.';
     }
 
-    if (hydrated.length === 0) {
-        return 'Document Reader could not load parsed text payloads for available documents.';
-    }
+    const title = String(args?.title || 'Canvas Note').trim() || 'Canvas Note';
+    const safeTitle = title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 64) || 'canvas-note';
 
-    hydrated.sort((a, b) => b.score - a.score);
-    const selected = hydrated.slice(0, DOC_READER_MAX_FILES);
+    const ownerType = agentId ? 'agent' : 'user';
+    const ownerId = agentId || userId;
+    const docId = crypto.randomUUID();
+    const key = `knowledge-base/${ownerId}/canvas/${Date.now()}-${safeTitle}.md`;
+    const payload = `# ${title}\n\n${content}\n`;
 
-    const body = selected.map((item, index) => {
-        const title = item.doc.fileName || `Document ${index + 1}`;
-        return [
-            `### ${index + 1}. ${title}`,
-            `Relevance score: ${item.score}`,
-            `Snippet: ${item.snippet}`
-        ].join('\n');
-    }).join('\n\n');
+    await s3Client.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: payload,
+        ContentType: 'text/markdown; charset=utf-8'
+    }));
 
-    return `Document Reader Results${query ? ` for "${query}"` : ''}:\n\n${body}`;
+    await saveDocument({
+        docId,
+        userId,
+        ownerType,
+        ownerId,
+        fileName: `${title}.md`,
+        fileKey: key,
+        textKey: key,
+        contentType: 'text/markdown',
+        size: Buffer.byteLength(payload, 'utf-8')
+    });
+
+    return `Canvas saved successfully as "${title}.md" in the ${ownerType === 'agent' ? 'chatbot' : 'user'} knowledge space.`;
 }
 
 // Tool executor registry — maps toolId to function
@@ -324,7 +284,10 @@ const TOOL_EXECUTORS = {
     // Document Reader
     'doc-reader': executeDocReader,
     'doc_reader': executeDocReader,
-    'docReader': executeDocReader
+    'docReader': executeDocReader,
+
+    // Canvas
+    canvas: executeCanvas
 };
 
 const LEGACY_TOOL_CANDIDATES = {
@@ -348,31 +311,19 @@ async function getToolRecordWithFallback(toolId) {
 }
 
 function resolveRuntimeModel(requestedModelId) {
-    const requested = (requestedModelId || '').trim();
-
-    if (!requested) {
+    const resolution = resolveSupportedVertexModelId(requestedModelId);
+    if (!SUPPORTED_VERTEX_MODELS.has(resolution.runtimeModelId)) {
         return {
             ok: false,
-            error: 'Missing modelId in agent blueprint. Set blueprint.model.modelId to a Vertex Gemini model.'
-        };
-    }
-
-    if (!requested.startsWith('gemini-')) {
-        return {
-            ok: false,
-            error: `Model "${requested}" is not supported in this deployment. Only Vertex Gemini models are allowed.`
-        };
-    }
-    if (!SUPPORTED_VERTEX_MODELS.has(requested)) {
-        return {
-            ok: false,
-            error: `Model "${requested}" is not enabled in this deployment. Supported models: ${Array.from(SUPPORTED_VERTEX_MODELS).join(', ')}`
+            error: `Model "${requestedModelId}" is not enabled in this deployment. Supported models: ${Array.from(SUPPORTED_VERTEX_MODELS).join(', ')}`
         };
     }
 
     return {
         ok: true,
-        runtimeModelId: requested
+        runtimeModelId: resolution.runtimeModelId,
+        migrated: resolution.migrated,
+        reason: resolution.reason
     };
 }
 
@@ -428,6 +379,15 @@ function toolToFunctionDeclaration(tool) {
             },
             required: []
         };
+    } else if (canonicalId === 'canvas') {
+        decl.parameters = {
+            type: 'OBJECT',
+            properties: {
+                title: { type: 'STRING', description: 'Short title for the canvas artifact' },
+                content: { type: 'STRING', description: 'Markdown content to persist to the canvas' }
+            },
+            required: ['title', 'content']
+        };
     } else {
         // Generic fallback — single input string
         decl.parameters = {
@@ -469,14 +429,14 @@ export const handler = async (event) => {
             });
         }
 
-        console.log(`AGENT-RUN: agentId=${agentId}, userId=${userId}, conversationId=${conversationId || 'new'}`);
+        console.log(`AGENT-RUN: chatbotId=${agentId}, userId=${userId}, conversationId=${conversationId || 'new'}`);
 
-        // 1. Load agent from DynamoDB
+        // 1. Load chatbot from DynamoDB
         const agent = await getAgent(agentId, userId);
 
         if (!agent) {
-            console.warn(`AGENT-RUN: Agent not found: ${agentId}`);
-            return respond(event, 404, { error: 'Agent not found' });
+            console.warn(`AGENT-RUN: ChatBot not found: ${agentId}`);
+            return respond(event, 404, { error: 'ChatBot not found' });
         }
 
         if (agent.userId !== userId) {
@@ -484,10 +444,10 @@ export const handler = async (event) => {
             return respond(event, 403, { error: 'You do not have access to this agent' });
         }
 
-        console.log(`AGENT-RUN: Loaded agent "${agent.name}" (status: ${agent.status})`);
+        console.log(`AGENT-RUN: Loaded chatbot "${agent.name}" (status: ${agent.status})`);
 
         if (agent.status !== 'active') {
-            return respond(event, 400, { error: `Agent is ${agent.status}. Only active agents can be run.` });
+            return respond(event, 400, { error: `ChatBot is ${agent.status}. Only active chatbots can be run.` });
         }
 
         // 2. Load conversation history
@@ -507,12 +467,30 @@ export const handler = async (event) => {
         const baseSystemPrompt = blueprint.systemPrompt;
 
         // Resolve selected model to a runtime-supported model.
-        const requestedModelId = blueprint.model?.modelId || 'gemini-2.5-flash';
+        const requestedModelId = blueprint.model?.modelId || DEFAULT_VERTEX_MODEL_ID;
         const modelResolution = resolveRuntimeModel(requestedModelId);
         if (!modelResolution.ok) {
             return respond(event, 400, { error: modelResolution.error });
         }
         const modelId = modelResolution.runtimeModelId;
+        const modelFallbackApplied = !!modelResolution.migrated;
+
+        if (modelFallbackApplied) {
+            console.warn(`AGENT-RUN: Repairing legacy model "${requestedModelId}" -> "${modelId}" for ${agentId}`);
+            try {
+                await updateAgent(agentId, userId, {
+                    blueprint: {
+                        ...blueprint,
+                        model: {
+                            ...(blueprint.model || {}),
+                            modelId
+                        }
+                    }
+                });
+            } catch (repairError) {
+                console.warn('AGENT-RUN: Failed to persist repaired model mapping:', repairError.message);
+            }
+        }
 
         const temperature = blueprint.model?.temperature ?? 0.3;
 
@@ -532,13 +510,32 @@ export const handler = async (event) => {
             console.warn('AGENT-RUN: ⚠️ UserMap fetch failed (non-fatal, using blueprint prompt only):', mapErr.message);
         }
 
+        const blueprintToolIds = deriveToolIdsFromBlueprint(blueprint);
+
+        try {
+            const documentContext = await getRelevantDocumentContext({
+                userId,
+                agentId,
+                query: message,
+                maxFiles: 2,
+                maxChars: 1200
+            });
+
+            if (documentContext.text) {
+                systemPrompt = `${systemPrompt}\n\n# RETRIEVED DOCUMENT CONTEXT\nThese snippets were retrieved from documents already attached to this chatbot or user account. Treat them as high-priority evidence and cite the document names when useful.\n${documentContext.text}`;
+            } else if (documentContext.error) {
+                systemPrompt = `${systemPrompt}\n\n# DOCUMENT RETRIEVAL STATUS\nDocument retrieval returned: ${documentContext.error}`;
+            }
+        } catch (docErr) {
+            console.warn('AGENT-RUN: Failed to retrieve document context:', docErr.message);
+        }
+
         console.log(`AGENT-RUN: Using model=${modelId}, temperature=${temperature}`);
         console.log(`AGENT-RUN: System prompt length: ${systemPrompt.length} chars`);
 
         // 4. Resolve tools from ToolRegistry → Gemini functionDeclarations
         // Support legacy + canonical tool IDs.
         const blueprintTools = Array.isArray(blueprint.tools) ? blueprint.tools : [];
-        const blueprintToolIds = deriveToolIdsFromBlueprint(blueprint);
         let functionDeclarations = [];
 
         console.log(`AGENT-RUN: Resolving tools...`);
@@ -687,7 +684,7 @@ export const handler = async (event) => {
             agentName: agent.name,
             requestedModelId,
             runtimeModelId: modelId,
-            modelFallbackApplied: false,
+            modelFallbackApplied,
             toolsUsed: allToolCalls.map(tc => tc.name),
             iterations: iteration
         });
@@ -700,7 +697,7 @@ export const handler = async (event) => {
         }
 
         return respond(event, 500, {
-            error: 'Failed to run agent',
+            error: 'Failed to run chatbot',
             message: error.message || 'Unknown error'
         });
     }

@@ -68,10 +68,9 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
 
                 const res = await listTools();
                 if (!mounted) return;
-                const allowed = new Set(['web-search', 'thinking', 'image-generation']);
                 const normalized = (res.tools || [])
                     .map(tool => ({ ...tool, toolId: normalizeToolIds([tool.toolId])[0] || tool.toolId }))
-                    .filter(tool => allowed.has(tool.toolId));
+                    .filter(tool => !!tool.toolId);
                 setAvailableTools(normalized);
                 if (normalized.length > 0) {
                     setSelectedCapabilities(prev => {
@@ -106,7 +105,7 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
         const remainingSlots = Math.max(0, 5 - pendingDocuments.length);
         const selected = files.slice(0, remainingSlots);
         if (files.length > remainingSlots) {
-            setAttachmentError('Only 5 documents are allowed while creating an agent.');
+            setAttachmentError('Only 5 documents are allowed while creating a chatbot.');
         }
 
         const accepted: File[] = [];
@@ -169,35 +168,35 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-            <div className="bg-[#1A1A1A] w-full max-w-xl rounded-2xl shadow-2xl border border-white/10 flex flex-col overflow-hidden max-h-[90vh]">
-                <div className="flex items-center justify-between p-6 border-b border-white/10">
-                    <h2 className="text-xl font-bold text-white uppercase tracking-tight">
-                        {type === 'employee' ? 'Create Agent' : 'Create Team'}
+        <div className="fixed inset-0 bg-black/65 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
+            <div className="w-full max-w-xl rounded-[28px] shadow-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#15171a] flex flex-col overflow-hidden max-h-[90vh]">
+                <div className="flex items-center justify-between p-6 border-b border-black/10 dark:border-white/10">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white uppercase tracking-tight">
+                        {type === 'employee' ? 'Create ChatBot' : 'Create Team'}
                     </h2>
-                    <button onClick={onClose} className="hover:text-white text-white/40 transition"><XMarkIcon /></button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-900 dark:text-white/40 dark:hover:text-white transition"><XMarkIcon /></button>
                 </div>
 
                 <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
                     {type === 'employee' ? (
                         <>
                             <div>
-                                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">Agent Name</label>
+                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-2">ChatBot Name</label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={e => setName(e.target.value)}
-                                    className="w-full bg-black border border-white/10 rounded-xl p-3 text-white focus:border-white outline-none text-sm"
-                                    placeholder="e.g. Content Strategist"
+                                    className="w-full rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-3 text-sm text-gray-900 dark:text-white outline-none transition-colors focus:border-gray-900 dark:focus:border-white"
+                                    placeholder="e.g. Proposal Analyst"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">AI Model (Brain)</label>
+                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-2">AI Model</label>
                                 <select
                                     value={selectedModelId}
                                     onChange={e => setSelectedModelId(e.target.value)}
-                                    className="w-full bg-black border border-white/10 rounded-xl p-3 text-white focus:border-white outline-none text-sm appearance-none"
+                                    className="w-full appearance-none rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-3 text-sm text-gray-900 dark:text-white outline-none transition-colors focus:border-gray-900 dark:focus:border-white"
                                 >
                                     {availableModels.map(model => (
                                         <option key={model.modelId} value={model.modelId}>
@@ -206,35 +205,35 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
                                     ))}
                                 </select>
                                 {availableModels.length === 0 && (
-                                    <p className="text-[10px] text-white/40 mt-2">No models loaded from registry.</p>
+                                    <p className="text-[10px] text-gray-500 dark:text-white/40 mt-2">No models loaded from registry.</p>
                                 )}
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">System Instructions</label>
+                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-2">System Instructions</label>
                                 <textarea
                                     value={jd}
                                     onChange={e => setJd(e.target.value)}
                                     rows={6}
-                                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-white outline-none text-xs leading-relaxed resize-none cursor-text mb-6"
-                                    placeholder="Define exactly how this agent should behave..."
+                                    className="w-full mb-6 resize-none rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-4 text-xs leading-relaxed text-gray-900 dark:text-white outline-none transition-colors focus:border-gray-900 dark:focus:border-white"
+                                    placeholder="Define exactly how this chatbot should behave..."
                                 />
                             </div>
 
                             <div>
                                 <div className="flex items-center justify-between mb-3">
-                                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest">Knowledge Documents</label>
+                                    <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest">Knowledge Files</label>
                                     <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider font-bold">Saved After Create</span>
                                 </div>
 
                                 <div className="space-y-2">
                                     {pendingDocuments.map((doc, idx) => (
-                                        <div key={`${doc.name}-${doc.size}-${idx}`} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
+                                        <div key={`${doc.name}-${doc.size}-${idx}`} className="flex items-center justify-between rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] p-3">
                                             <div className="flex flex-1 items-center gap-3 overflow-hidden">
                                                 <span className="text-xl">📄</span>
                                                 <div className="truncate pr-4">
-                                                    <div className="text-xs font-bold text-white truncate">{doc.name}</div>
-                                                    <div className="text-[9px] text-white/40 uppercase tracking-widest">{(doc.size / 1024).toFixed(1)} KB</div>
+                                                    <div className="text-xs font-bold text-gray-900 dark:text-white truncate">{doc.name}</div>
+                                                    <div className="text-[9px] text-gray-500 dark:text-white/40 uppercase tracking-widest">{(doc.size / 1024).toFixed(1)} KB</div>
                                                 </div>
                                             </div>
                                             <button onClick={() => setPendingDocuments(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 p-1 flex-shrink-0 relative z-10 transition-colors">
@@ -247,11 +246,11 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
                                         <p className="text-[10px] text-amber-400">{attachmentError}</p>
                                     )}
 
-                                    <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-xl cursor-pointer transition-colors bg-black border-white/10 hover:bg-white/5 hover:border-white/30">
+                                    <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-2xl cursor-pointer transition-colors border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] hover:border-black/20 dark:hover:border-white/30 hover:bg-black/[0.02] dark:hover:bg-white/[0.05]">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                            <svg className="w-6 h-6 mb-2 text-white/40" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" /></svg>
-                                            <p className="mb-1 text-[10px] text-white/60 font-bold"><span className="text-white">Select documents</span> (upload after create)</p>
-                                            <p className="text-[8px] uppercase tracking-widest text-white/40">PDF, TXT, DOCX, CSV, MD (max 5)</p>
+                                            <svg className="w-6 h-6 mb-2 text-gray-500 dark:text-white/40" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" /></svg>
+                                            <p className="mb-1 text-[10px] text-gray-600 dark:text-white/60 font-bold"><span className="text-gray-900 dark:text-white">Select files</span> (upload after create)</p>
+                                            <p className="text-[8px] uppercase tracking-widest text-gray-500 dark:text-white/40">PDF, TXT, DOCX, CSV, MD (max 5)</p>
                                         </div>
                                         <input type="file" className="hidden" onChange={handleFileUpload} multiple accept=".pdf,.txt,.doc,.docx,.csv,.md,.json,.yaml,.yml,.xml" />
                                     </label>
@@ -259,43 +258,43 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">Tools</label>
+                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-3">Capabilities</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {availableTools.map(cap => (
                                         <button
                                             key={cap.toolId}
                                             type="button"
                                             onClick={() => toggleCapability(cap.toolId)}
-                                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${selectedCapabilities.includes(cap.toolId) ? 'bg-white/10 border-white/40' : 'bg-black border-white/5 hover:border-white/20'}`}
+                                            className={`flex items-center gap-3 rounded-2xl border p-3 transition-all ${selectedCapabilities.includes(cap.toolId) ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] hover:border-black/20 dark:hover:border-white/20'}`}
                                         >
                                             <span className="text-lg">{cap.icon || '🧩'}</span>
-                                            <span className="text-[10px] font-bold text-white uppercase">{cap.name || cap.toolId}</span>
+                                            <span className="text-[10px] font-bold text-gray-900 dark:text-white uppercase">{cap.name || cap.toolId}</span>
                                         </button>
                                     ))}
                                 </div>
                                 {availableTools.length === 0 && (
-                                    <p className="text-[10px] text-white/40 mt-2">No tools loaded from registry.</p>
+                                    <p className="text-[10px] text-gray-500 dark:text-white/40 mt-2">No capabilities loaded from registry.</p>
                                 )}
                             </div>
                         </>
                     ) : (
                         <>
                             <div>
-                                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">Team Name</label>
-                                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl p-3 text-white focus:border-white outline-none text-sm" placeholder="e.g. Project Alpha" />
+                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-2">Team Name</label>
+                                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-3 text-sm text-gray-900 dark:text-white outline-none transition-colors focus:border-gray-900 dark:focus:border-white" placeholder="e.g. Proposal Ops" />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">Team Objective</label>
-                                <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full bg-black border border-white/10 rounded-xl p-3 text-white focus:border-white outline-none text-sm resize-none" placeholder="What is the goal of this team?" />
+                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-2">Team Objective</label>
+                                <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full resize-none rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-3 text-sm text-gray-900 dark:text-white outline-none transition-colors focus:border-gray-900 dark:focus:border-white" placeholder="What is the goal of this team?" />
                             </div>
 
-                            <div className="bg-black border border-white/5 rounded-2xl p-4">
-                                <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-4">Select Members</h3>
+                            <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-4">
+                                <h3 className="text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-4">Select ChatBots</h3>
                                 <div className="max-h-40 overflow-y-auto space-y-1 custom-scrollbar">
                                     {employees.map(agent => (
-                                        <div key={agent.id} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition ${selectedExistingIds.has(agent.id) ? 'bg-white/10' : 'hover:bg-white/5'}`} onClick={() => toggleExistingAgent(agent.id)}>
-                                            <input type="checkbox" checked={selectedExistingIds.has(agent.id)} readOnly className="rounded border-white/20 bg-black text-white" />
-                                            <span className="text-sm text-white/80">{agent.name}</span>
+                                        <div key={agent.id} className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition ${selectedExistingIds.has(agent.id) ? 'bg-emerald-500/10' : 'hover:bg-black/[0.03] dark:hover:bg-white/[0.05]'}`} onClick={() => toggleExistingAgent(agent.id)}>
+                                            <input type="checkbox" checked={selectedExistingIds.has(agent.id)} readOnly className="rounded border-black/20 dark:border-white/20 bg-transparent text-emerald-500" />
+                                            <span className="text-sm text-gray-800 dark:text-white/80">{agent.name}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -304,7 +303,7 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
                     )}
                 </div>
 
-                <div className="p-6 border-t border-white/10 flex justify-end">
+                <div className="p-6 border-t border-black/10 dark:border-white/10 flex justify-end">
                     <button
                         type="button"
                         onClick={type === 'employee' ? handleSaveEmployee : handleSaveGroup}
@@ -315,9 +314,9 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
                                 ? (!jd.trim() || !selectedModelId || selectedCapabilities.length === 0)
                                 : selectedExistingIds.size === 0)
                         }
-                        className="bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] py-4 px-12 rounded-xl disabled:opacity-30 transition hover:bg-white/90 active:scale-95"
+                        className="rounded-2xl bg-gray-900 dark:bg-white px-12 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-white dark:text-black transition hover:bg-black dark:hover:bg-white/90 active:scale-95 disabled:opacity-30"
                     >
-                        {type === 'employee' ? (isCreating ? 'Creating...' : 'Create Agent') : 'Create Team'}
+                        {type === 'employee' ? (isCreating ? 'Creating...' : 'Create ChatBot') : 'Create Team'}
                     </button>
                 </div>
             </div>

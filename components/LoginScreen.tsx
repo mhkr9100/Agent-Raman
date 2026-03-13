@@ -143,17 +143,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
 
                     <div className="space-y-6 max-w-4xl">
                         <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter text-gray-900 dark:text-white uppercase leading-[0.9]">
-                            RamN <br /><span className="text-indigo-500 dark:text-indigo-400">AI</span>
+                            RamN <br /><span className="text-emerald-600 dark:text-emerald-300">AI</span>
                         </h1>
                         <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 font-medium max-w-2xl mx-auto leading-relaxed">
-                            AI Agents Made Simple. Stop managing AI. Let AI manage your work.
+                            AI ChatBots Made Practical. Build persistent AI workflows with Prism, UserMap, and real backend memory.
                         </p>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-4 pt-4">
                         <button
                             onClick={() => openAuth('signup')}
-                            className="group flex items-center justify-center gap-3 px-10 py-5 bg-indigo-600 dark:bg-indigo-500 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl shadow-indigo-500/20 hover:bg-indigo-700 dark:hover:bg-indigo-400 active:scale-[0.98]"
+                            className="group flex items-center justify-center gap-3 px-10 py-5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl shadow-black/10 dark:shadow-none hover:bg-black dark:hover:bg-white/90 active:scale-[0.98]"
                         >
                             Create Account
                             <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
@@ -164,30 +164,30 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                 {/* Features Section */}
                 <div className="w-full pt-32 space-y-24">
                     <div className="space-y-6 text-center max-w-3xl mx-auto">
-                        <h2 className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.5em]">The Ecosystem</h2>
+                        <h2 className="text-[10px] font-black text-emerald-600 dark:text-emerald-300 uppercase tracking-[0.5em]">The Ecosystem</h2>
                         <h3 className="text-3xl md:text-4xl font-black uppercase tracking-tight">Beyond Single-Prompt Chatbots</h3>
                         <p className="text-sm md:text-base text-gray-600 dark:text-white/50 leading-relaxed">
-                            RamN AI bridges the gap between isolated AI interactions and true collaborative workflows. Assemble a <strong className="text-gray-900 dark:text-white">Spectrum</strong> of uniquely prompted agents equipped with integrated tools, and deploy them to solve multi-step problems.
+                            RamN AI bridges the gap between isolated AI interactions and true collaborative workflows. Assemble a <strong className="text-gray-900 dark:text-white">Spectrum</strong> of uniquely prompted chatbots equipped with integrated capabilities, and deploy them to solve multi-step problems.
                         </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="p-8 bg-white dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-3xl space-y-4 shadow-xl shadow-black/5 dark:shadow-none">
-                            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 dark:text-indigo-400">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-300">
                                 <Users size={24} />
                             </div>
-                            <h4 className="text-lg font-bold uppercase tracking-tight">Multi-Agent Squads</h4>
+                            <h4 className="text-lg font-bold uppercase tracking-tight">ChatBots + Teams</h4>
                             <p className="text-sm text-gray-600 dark:text-white/50 leading-relaxed">
-                                Create independent agents and combine them into collaborative Teams. Tag them via @mentions to cross-reference their expertise.
+                                Create focused chatbots and combine them into collaborative teams. Tag them via @mentions to route work precisely.
                             </p>
                         </div>
                         <div className="p-8 bg-white dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-3xl space-y-4 shadow-xl shadow-black/5 dark:shadow-none">
                             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 dark:text-amber-400">
                                 <Sparkles size={24} />
                             </div>
-                            <h4 className="text-lg font-bold uppercase tracking-tight">Multi-Model Engine</h4>
+                            <h4 className="text-lg font-bold uppercase tracking-tight">Vertex Model Engine</h4>
                             <p className="text-sm text-gray-600 dark:text-white/50 leading-relaxed">
-                                Don't rely on just one brain. Route tasks through Gemini 2.0, Claude 3.5, GPT-4o, or Llama 3 to leverage their unique strengths.
+                                Route work through supported Vertex Gemini models selected from the live model registry, with no fake provider fallbacks.
                             </p>
                         </div>
                         <div className="p-8 bg-white dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-3xl space-y-4 shadow-xl shadow-black/5 dark:shadow-none">
@@ -196,7 +196,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                             </div>
                             <h4 className="text-lg font-bold uppercase tracking-tight">Integrated Tools</h4>
                             <p className="text-sm text-gray-600 dark:text-white/50 leading-relaxed">
-                                Equip agents with live web search, weather arrays, image generation, financial ledgers, and deep RAG knowledge bases.
+                                Equip chatbots with live capabilities like web search, image generation, document reading, and persistent canvas artifacts.
                             </p>
                         </div>
                     </div>
@@ -264,7 +264,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                                 type="text"
                                                 autoComplete="name"
                                                 required={authMode === 'signup'}
-                                                className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
+                                                className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 outline-none transition-colors"
                                                 placeholder="Enter your name"
                                                 value={name}
                                                 onChange={(e) => setName(e.target.value)}
@@ -284,7 +284,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                                 type="text"
                                                 autoComplete="one-time-code"
                                                 required
-                                                className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-center text-2xl tracking-[0.5em] font-mono text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
+                                                className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-center text-2xl tracking-[0.5em] font-mono text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 outline-none transition-colors"
                                                 placeholder="000000"
                                                 maxLength={6}
                                                 value={otp}
@@ -294,7 +294,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                     )}
                                     {authMode === 'forgot_pass_email' && (
                                         <div>
-                                            <div className="bg-indigo-500/5 border border-indigo-500/10 text-gray-600 dark:text-white/60 text-xs p-3 rounded-xl text-center mb-4">
+                                            <div className="bg-emerald-500/5 border border-emerald-500/10 text-gray-600 dark:text-white/60 text-xs p-3 rounded-xl text-center mb-4">
                                                 Enter your email address to receive a password reset code.
                                             </div>
                                             <label htmlFor="email" className="block text-[9px] font-black text-gray-500 dark:text-white/40 uppercase mb-2 tracking-[0.2em]">Email Address</label>
@@ -304,7 +304,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                                 type="email"
                                                 autoComplete="email"
                                                 required
-                                                className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
+                                                className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 outline-none transition-colors"
                                                 placeholder="Enter your email"
                                                 value={email}
                                                 onChange={(e) => setEmail(e.target.value)}
@@ -322,7 +322,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                                     type="text"
                                                     autoComplete="one-time-code"
                                                     required
-                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-center text-2xl tracking-[0.5em] font-mono text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors mb-4"
+                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-center text-2xl tracking-[0.5em] font-mono text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 outline-none transition-colors mb-4"
                                                     placeholder="000000"
                                                     maxLength={6}
                                                     value={otp}
@@ -337,7 +337,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                                     type="password"
                                                     autoComplete="new-password"
                                                     required
-                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
+                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 outline-none transition-colors"
                                                     placeholder="Enter new password"
                                                     value={password}
                                                     onChange={(e) => setPassword(e.target.value)}
@@ -356,7 +356,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                                     type="email"
                                                     autoComplete="email"
                                                     required
-                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
+                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 outline-none transition-colors"
                                                     placeholder="Enter your email"
                                                     value={email}
                                                     onChange={(e) => setEmail(e.target.value)}
@@ -369,7 +369,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                                         <button
                                                             type="button"
                                                             onClick={(() => { setAuthMode('forgot_pass_email'); setError(null); setResendMessage(null); })}
-                                                            className="text-[9px] font-bold text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors uppercase tracking-wider"
+                                                            className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 transition-colors uppercase tracking-wider"
                                                         >
                                                             Forgot?
                                                         </button>
@@ -381,7 +381,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                                     type="password"
                                                     autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
                                                     required
-                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-colors"
+                                                    className="w-full bg-[#F8F9FA] dark:bg-black border border-black/10 dark:border-white/10 rounded-xl p-3.5 text-sm text-gray-900 dark:text-white focus:border-emerald-500 dark:focus:border-emerald-400 outline-none transition-colors"
                                                     placeholder="Enter your password"
                                                     value={password}
                                                     onChange={(e) => setPassword(e.target.value)}
@@ -395,7 +395,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                     <button
                                         type="submit"
                                         disabled={isLoading}
-                                        className="w-full py-4 bg-indigo-600 dark:bg-indigo-500 text-white text-[11px] font-black uppercase tracking-[0.3em] rounded-xl transition-all shadow-xl hover:bg-indigo-700 dark:hover:bg-indigo-400 disabled:opacity-50 flex items-center justify-center gap-3"
+                                        className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-black uppercase tracking-[0.3em] rounded-xl transition-all shadow-xl hover:bg-black dark:hover:bg-white/90 disabled:opacity-50 flex items-center justify-center gap-3"
                                     >
                                         {isLoading && <Loader2 size={16} className="animate-spin" />}
                                         {isLoading ? 'Processing...' : (
@@ -438,7 +438,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
                                         <button
                                             type="button"
                                             onClick={() => { setAuthMode('login'); setError(null); setResendMessage(null); }}
-                                            className="text-[10px] font-bold text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 uppercase tracking-[0.1em] transition-colors"
+                                            className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 uppercase tracking-[0.1em] transition-colors"
                                         >
                                             Return to Login
                                         </button>

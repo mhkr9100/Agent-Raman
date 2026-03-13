@@ -51,14 +51,17 @@ export const MemoryImportModal: React.FC<MemoryImportModalProps> = ({
                         Bring Context From Your Other AI Tools
                     </h2>
                     <p className="mt-1 text-[12px] text-gray-600 dark:text-white/60">
-                        Import your existing memory so Prism and your agents can respond with better continuity from day one.
+                        Import your existing memory so Prism and your chatbots can respond with better continuity from day one.
                     </p>
                 </div>
 
                 {mode === 'choice' ? (
                     <div className="p-8 flex flex-col md:flex-row gap-3">
                         <button
-                            onClick={() => setMode('import')}
+                            onClick={() => {
+                                setCopied(false);
+                                setMode('import');
+                            }}
                             className="flex-1 h-11 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black text-[11px] font-black uppercase tracking-[0.12em]"
                         >
                             Yes, Import Context
@@ -81,7 +84,6 @@ export const MemoryImportModal: React.FC<MemoryImportModalProps> = ({
                                     try {
                                         await navigator.clipboard.writeText(SAMPLE_IMPORT_PROMPT);
                                         setCopied(true);
-                                        setTimeout(() => setCopied(false), 1500);
                                     } catch { }
                                 }}
                                 className="px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-[10px] font-black uppercase tracking-[0.12em] text-gray-600 dark:text-white/60"
@@ -102,7 +104,10 @@ export const MemoryImportModal: React.FC<MemoryImportModalProps> = ({
                         </p>
                         <textarea
                             value={pasted}
-                            onChange={(e) => setPasted(e.target.value)}
+                            onChange={(e) => {
+                                if (copied) setCopied(false);
+                                setPasted(e.target.value);
+                            }}
                             rows={8}
                             placeholder="Paste the exported memory/context output here..."
                             className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-black/20 text-[12px] text-gray-800 dark:text-white/80 p-3 outline-none focus:border-black/20 dark:focus:border-white/20"

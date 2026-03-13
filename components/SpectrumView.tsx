@@ -71,7 +71,7 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                         onClick={() => scrollToSection(0)}
                         className="px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white"
                     >
-                        Agents
+                        ChatBots
                     </button>
                     <button
                         onClick={() => scrollToSection(1)}
@@ -92,12 +92,12 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                 ref={scrollContainerRef}
                 className="flex-1 flex overflow-x-auto snap-x snap-mandatory custom-scrollbar scroll-smooth"
             >
-                {/* SECTION 1: AGENTS (User + Special) */}
+                {/* SECTION 1: CHATBOTS (User + Special) */}
                 <div className="min-w-full snap-start p-8 overflow-y-auto custom-scrollbar">
                     <div className="max-w-5xl mx-auto">
                         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
-                                <h3 className="text-xs font-black text-gray-500 dark:text-white/40 uppercase tracking-[0.3em]">Agents Interface</h3>
+                                <h3 className="text-xs font-black text-gray-500 dark:text-white/40 uppercase tracking-[0.3em]">ChatBots Interface</h3>
                                 <div className="h-px w-12 bg-black/10 dark:bg-white/5 hidden md:block" />
                             </div>
                         </div>
@@ -108,7 +108,7 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                                 className="h-[104px] flex flex-col items-center justify-center gap-2 bg-white/50 dark:bg-white/[0.02] border border-dashed border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 rounded-2xl p-4 group transition-all"
                             >
                                 <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-gray-400 dark:text-white/40 group-hover:bg-gray-900 dark:group-hover:bg-white group-hover:text-white dark:group-hover:text-black transition-all text-xl font-bold">+</div>
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Custom Agent</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Custom ChatBot</span>
                             </button>
 
                             {userAgents.map(agent => (
@@ -117,7 +117,7 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                                     icon={agent.icon}
                                     name={agent.name}
                                     sub={agent.role}
-                                    tagline={agent.jobDescription ? `${agent.jobDescription.slice(0, 80)}...` : 'Custom specialist agent.'}
+                                    tagline={agent.jobDescription ? `${agent.jobDescription.slice(0, 80)}...` : 'Custom specialist chatbot.'}
                                     onClick={() => onOpenChat(agent.id)}
                                     isExpanded={expandedId === agent.id}
                                     onToggleExpand={() => setExpandedId(expandedId === agent.id ? null : agent.id)}
@@ -127,13 +127,13 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
 
                             {isLoadingAgents && (
                                 <div className="col-span-full p-6 rounded-2xl border border-dashed border-black/10 dark:border-white/10 text-center text-[10px] text-gray-500 dark:text-white/40 uppercase tracking-[0.15em]">
-                                    Loading Special Agents...
+                                    Loading Special ChatBots...
                                 </div>
                             )}
 
                             {!isLoadingAgents && specialAgents.length === 0 && (
                                 <div className="col-span-full p-6 rounded-2xl border border-dashed border-black/10 dark:border-white/10 text-center text-[10px] text-gray-500 dark:text-white/40 uppercase tracking-[0.15em]">
-                                    No Special Agents Found
+                                    No Special ChatBots Found
                                 </div>
                             )}
 
@@ -142,7 +142,7 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                                     key={template.id}
                                     icon={template.icon}
                                     name={template.name}
-                                    sub={template.role || 'Special Agent'}
+                                    sub={template.role || 'Special ChatBot'}
                                     tagline={template.description}
                                     onClick={() => onAddViaPrism(template)}
                                     isExpanded={expandedId === template.id}

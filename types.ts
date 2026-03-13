@@ -5,6 +5,7 @@ export type AgentCapability =
   | 'web-search'
   | 'image-generation'
   | 'doc-reader'
+  | 'canvas'
   | 'webSearch'
   | 'web_search'
   | 'googleSearch'

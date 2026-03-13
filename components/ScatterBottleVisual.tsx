@@ -39,16 +39,16 @@ export const ScatterBottleVisual: React.FC<ScatterBottleVisualProps> = ({
     return (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden bg-black/5">
             {/* The 3D Ambient Core */}
-            <div className={`absolute w-[1200px] h-[1200px] bg-indigo-500/[0.015] rounded-full blur-[180px] transition-opacity duration-1000 ${isRolling ? 'opacity-50' : 'opacity-10'}`} />
+            <div className={`absolute w-[1200px] h-[1200px] bg-emerald-500/[0.015] rounded-full blur-[180px] transition-opacity duration-1000 ${isRolling ? 'opacity-50' : 'opacity-10'}`} />
 
             <div className="relative w-[800px] h-[800px] flex items-center justify-center">
 
                 {/* THE PRISM AXIS */}
                 <div className="relative z-40 flex flex-col items-center">
-                    <div className="absolute -top-64 -bottom-64 w-px bg-gradient-to-b from-transparent via-indigo-500/20 to-transparent" />
+                    <div className="absolute -top-64 -bottom-64 w-px bg-gradient-to-b from-transparent via-emerald-500/20 to-transparent" />
 
-                    <div className={`w-24 h-24 bg-white/[0.02] backdrop-blur-3xl border border-white/5 rounded-[2rem] flex items-center justify-center shadow-[0_0_80px_rgba(99,102,241,0.05)] transition-all duration-1000 ${isRolling ? 'rotate-90 scale-105 border-indigo-500/20' : 'rotate-45'}`}>
-                        <div className="w-4 h-4 rounded-full bg-indigo-400 opacity-20 blur-xl animate-pulse" />
+                    <div className={`w-24 h-24 bg-white/[0.02] backdrop-blur-3xl border border-white/5 rounded-[2rem] flex items-center justify-center shadow-[0_0_80px_rgba(16,185,129,0.08)] transition-all duration-1000 ${isRolling ? 'rotate-90 scale-105 border-emerald-500/20' : 'rotate-45'}`}>
+                        <div className="w-4 h-4 rounded-full bg-emerald-400 opacity-20 blur-xl animate-pulse" />
                     </div>
                 </div>
 
@@ -72,7 +72,7 @@ export const ScatterBottleVisual: React.FC<ScatterBottleVisualProps> = ({
                                 className={`absolute top-0 left-1/2 -translate-x-1/2 origin-bottom transition-all duration-1000 ${isSelected ? 'opacity-40 h-[300px]' : 'opacity-0 h-[0px]'}`}
                                 style={{
                                     width: '1px',
-                                    background: 'linear-gradient(to top, #818cf8, transparent)',
+                                    background: 'linear-gradient(to top, #10b981, transparent)',
                                     transform: `translateY(${-verticalOffset}px)`
                                 }}
                             />
@@ -82,10 +82,10 @@ export const ScatterBottleVisual: React.FC<ScatterBottleVisualProps> = ({
                                 className={`absolute left-1/2 -translate-x-1/2 transition-all duration-1000 ${isSelected ? 'opacity-100 scale-110 translate-y-[-320px]' : 'opacity-0 scale-50 translate-y-[0px]'}`}
                                 style={{ transform: `rotate(${-currentRotation}deg)` }}
                             >
-                                <div className="w-14 h-14 rounded-2xl border border-indigo-500/40 flex flex-col items-center justify-center bg-black/90 shadow-[0_0_30px_rgba(99,102,241,0.3)] backdrop-blur-2xl">
+                                <div className="w-14 h-14 rounded-2xl border border-emerald-500/40 flex flex-col items-center justify-center bg-black/90 shadow-[0_0_30px_rgba(16,185,129,0.25)] backdrop-blur-2xl">
                                     <span className="text-xl">{agent.icon}</span>
                                     <div className="absolute -top-8 w-max">
-                                        <span className="text-[7px] font-black uppercase text-indigo-400 tracking-[0.2em] bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 animate-pulse">Mentioned</span>
+                                        <span className="text-[7px] font-black uppercase text-emerald-300 tracking-[0.2em] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 animate-pulse">Mentioned</span>
                                     </div>
                                 </div>
                             </div>
