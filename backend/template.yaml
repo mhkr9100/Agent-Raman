@@ -388,8 +388,8 @@ Resources:
                 - dynamodb:UpdateItem
               Resource:
                 - !GetAtt EntitiesTable.Arn
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*/index/*"
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
@@ -436,8 +436,8 @@ Resources:
                 - dynamodb:UpdateItem
               Resource:
                 - !GetAtt EntitiesTable.Arn
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*/index/*"
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
@@ -481,8 +481,8 @@ Resources:
                 - dynamodb:UpdateItem
               Resource:
                 - !GetAtt EntitiesTable.Arn
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*/index/*"
       Events:
         AgentCreate:
           Type: Api
@@ -522,8 +522,8 @@ Resources:
                 - dynamodb:Scan
                 - dynamodb:UpdateItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*/index/*"
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
@@ -585,8 +585,8 @@ Resources:
                 - dynamodb:Scan
                 - dynamodb:UpdateItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*/index/*"
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
@@ -642,8 +642,8 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:Scan
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*/index/*"
       Events:
         AgentList:
           Type: Api
@@ -803,8 +803,8 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:Scan
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*/index/*"
       Events:
         AgentDelete:
           Type: Api
@@ -836,7 +836,7 @@ Resources:
                 - dynamodb:Scan
                 - dynamodb:GetItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
       Events:
         ModelRegistryV2:
           Type: Api
@@ -868,7 +868,7 @@ Resources:
                 - dynamodb:Scan
                 - dynamodb:GetItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
       Events:
         ToolRegistryV2:
           Type: Api
@@ -900,7 +900,7 @@ Resources:
                 - dynamodb:Scan
                 - dynamodb:GetItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
       Events:
         SpecialAgents:
           Type: Api
@@ -933,7 +933,7 @@ Resources:
                 - dynamodb:PutItem
                 - dynamodb:UpdateItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
       Events:
         UserMapGet:
           Type: Api
@@ -1006,8 +1006,8 @@ Resources:
                 - dynamodb:DeleteItem
                 - dynamodb:UpdateItem
               Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*/index/*"
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
