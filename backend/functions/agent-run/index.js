@@ -3,7 +3,6 @@
  */
 
 import crypto from 'crypto';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import {
     callAI,
     callAIStream,
@@ -16,7 +15,6 @@ import {
     getConversation,
     getToolById,
     getUserMap,
-    saveDocument,
     updateAgent,
     searchRelevantMemories
 } from '../../shared/dynamo.js';
@@ -31,11 +29,9 @@ import {
 } from '../../shared/runtime-policy.js';
 import { getRelevantDocumentContext } from '../../shared/document-context.js';
 import { buildConversationContext } from '../../shared/conversation-context.js';
-import { indexRegisteredDocument } from '../../shared/document-index.js';
 import { summarizeAttachmentNames, toVertexUserParts } from '../../shared/chat-attachments.js';
 
 const MAX_REACT_ITERATIONS = 5;
-const s3Client = new S3Client({ region: process.env.S3_BUCKET_REGION || process.env.AWS_REGION || 'us-east-2' });
 
 function respond(event, statusCode, body) {
     return {
@@ -52,7 +48,6 @@ function buildStreamMetadata(requestHeaders, statusCode = 200) {
     return {
         statusCode,
         headers: {
-            ...buildCorsHeaders(requestHeaders, 'OPTIONS,POST'),
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive'
@@ -98,7 +93,7 @@ const GREETING_ONLY_MESSAGES = new Set([
 function normalizeRequestedCapability(capability) {
     const normalized = toCanonicalToolId(String(capability || '').trim());
     if (!normalized || normalized === 'auto') return null;
-    return normalized;
+    return ['web-search', 'thinking'].includes(normalized) ? normalized : null;
 }
 
 function isGreetingOnlyMessage(message) {
@@ -258,52 +253,6 @@ async function executeDocReader(args, context = {}) {
     return `Document Reader Results${query ? ` for "${query}"` : ''}:\n\n${documentContext.text}`;
 }
 
-async function executeCanvas(args, context = {}) {
-    const { userId, agentId } = context;
-    if (!userId) return 'Canvas requires a valid user context.';
-
-    const bucket = process.env.S3_BUCKET_NAME || '';
-    if (!bucket) return 'Canvas is unavailable because S3 bucket configuration is missing.';
-
-    const content = String(args?.content || args?.markdown || args?.input || '').trim();
-    if (!content) return 'Canvas requires non-empty content.';
-
-    const title = String(args?.title || 'Canvas Note').trim() || 'Canvas Note';
-    const safeTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'canvas-note';
-    const ownerType = agentId ? 'agent' : 'user';
-    const ownerId = agentId || userId;
-    const docId = crypto.randomUUID();
-    const key = `knowledge-base/${ownerId}/canvas/${Date.now()}-${safeTitle}.md`;
-    const payload = `# ${title}\n\n${content}\n`;
-    const createdAt = new Date().toISOString();
-
-    await s3Client.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: payload,
-        ContentType: 'text/markdown; charset=utf-8'
-    }));
-
-    const document = {
-        docId,
-        userId,
-        ownerType,
-        ownerId,
-        fileName: `${title}.md`,
-        fileKey: key,
-        textKey: key,
-        contentType: 'text/markdown',
-        size: Buffer.byteLength(payload, 'utf-8'),
-        createdAt,
-        updatedAt: createdAt
-    };
-
-    await saveDocument(document);
-    await indexRegisteredDocument(document);
-
-    return `Canvas saved successfully as "${title}.md" in the ${ownerType === 'agent' ? 'chatbot' : 'user'} knowledge space.`;
-}
-
 const TOOL_EXECUTORS = {
     'web-search': executeGoogleSearch,
     googleSearch: executeGoogleSearch,
@@ -317,13 +266,11 @@ const TOOL_EXECUTORS = {
     datetime: executeGetCurrentTime,
     'doc-reader': executeDocReader,
     doc_reader: executeDocReader,
-    docReader: executeDocReader,
-    canvas: executeCanvas
+    docReader: executeDocReader
 };
 
 const LEGACY_TOOL_CANDIDATES = {
     'web-search': ['webSearch', 'googleSearch', 'web_search'],
-    'image-generation': ['imageGeneration', 'imageEditing'],
     'doc-reader': ['docReader', 'doc_reader', 'fileManipulation'],
     thinking: ['thinking']
 };
@@ -366,7 +313,7 @@ async function executeTool(toolName, args, context = {}) {
 
 function toolToFunctionDeclaration(tool) {
     const canonicalId = toCanonicalToolId(tool.toolId);
-    if (canonicalId === 'web-search' || canonicalId === 'thinking' || canonicalId === 'image-generation') {
+    if (canonicalId === 'web-search' || canonicalId === 'thinking') {
         return null;
     }
 
@@ -406,15 +353,6 @@ function toolToFunctionDeclaration(tool) {
                 query: { type: 'STRING', description: 'Question or query to retrieve relevant document snippets' }
             },
             required: []
-        };
-    } else if (canonicalId === 'canvas') {
-        declaration.parameters = {
-            type: 'OBJECT',
-            properties: {
-                title: { type: 'STRING', description: 'Short title for the canvas artifact' },
-                content: { type: 'STRING', description: 'Markdown content to persist to the canvas' }
-            },
-            required: ['title', 'content']
         };
     } else {
         declaration.parameters = {
@@ -486,10 +424,6 @@ function buildToolRuntimeConfig(toolRecords, requestedCapability) {
                 functionDeclarations: [],
                 availableCapabilities
             };
-        }
-
-        if (requested === 'image-generation') {
-            throw httpError(400, 'Capability unavailable', 'Image generation is not yet enabled in chatbot chat runtime.');
         }
 
         return {
@@ -631,10 +565,6 @@ async function buildRuntimeContext({ userId, agentId, message, conversationId, a
     if (runtimeTools.availableCapabilities.has('web-search')) {
         systemPrompt = `${systemPrompt}\n\n# LIVE WEB ACCESS\nYou have access to Google Search grounding through Vertex AI. Use it whenever the user needs current web information instead of guessing.`;
     }
-    if (normalizeRequestedCapability(requestedCapability) === 'canvas') {
-        systemPrompt = `${systemPrompt}\n\n# USER-SELECTED CAPABILITY\nThe user explicitly selected Canvas for this message. If helpful, save the result into canvas instead of only replying in chat.`;
-    }
-
     const attachmentSummary = summarizeAttachmentNames(attachments);
     const persistedUserMessage = attachmentSummary
         ? `${message}\n\n[Image attachments included: ${attachmentSummary}]`

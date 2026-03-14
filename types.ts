@@ -3,22 +3,12 @@ export type AgentType = 'agent' | 'HR' | 'user' | 'custom';
 
 export type AgentCapability =
   | 'web-search'
-  | 'image-generation'
   | 'doc-reader'
-  | 'canvas'
   | 'webSearch'
   | 'web_search'
   | 'googleSearch'
   | 'googleMaps'
-  | 'imageGeneration'
-  | 'imageEditing'
-  | 'videoGeneration'
-  | 'speechGeneration'
-  | 'transcription'
   | 'thinking'
-  | 'vision'
-  | 'videoUnderstanding'
-  | 'liveAudio'
   | 'fileManipulation'
   | 'fabricateAgent'
   | 'fabricateTeam';

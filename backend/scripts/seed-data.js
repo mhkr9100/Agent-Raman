@@ -77,15 +77,6 @@ const TOOLS = [
         status: 'active'
     },
     {
-        toolId: 'image-generation',
-        name: 'Image Generation',
-        type: 'plugin',
-        category: 'creative',
-        description: 'Generate images from text prompts',
-        capabilities: ['text_to_image'],
-        status: 'active'
-    },
-    {
         toolId: 'doc-reader',
         name: 'Document Reader',
         type: 'plugin',
@@ -94,14 +85,6 @@ const TOOLS = [
         capabilities: ['document_retrieval', 'snippet_extraction'],
         status: 'active'
     },
-    {
-        toolId: 'canvas',
-        name: 'Canvas',
-        type: 'plugin',
-        category: 'workspace',
-        description: 'Persist structured notes and artifacts into the chatbot knowledge space',
-        capabilities: ['artifact_write', 'workspace_canvas'],
-        status: 'active'
     }
 ];
 
@@ -174,7 +157,7 @@ Your goal is to provide comprehensive, accurate research on {{TOPIC}}.
 
 ### OUTPUT FORMAT:
 Structured report with: Summary, Key Findings, Details, Sources, Recommendations`,
-        tools: ['web-search', 'doc-reader'],
+        tools: ['web-search', 'thinking'],
         model: { provider: 'google', modelId: 'gemini-2.5-pro', temperature: 0.3 },
         contextSlots: ['DOMAIN', 'TOPIC'],
         category: 'research'
@@ -200,7 +183,7 @@ Structured report with: Summary, Key Findings, Details, Sources, Recommendations
 
 ### OUTPUT FORMAT:
 {{FORMAT}}`,
-        tools: ['web-search'],
+        tools: ['web-search', 'thinking'],
         model: { provider: 'google', modelId: 'gemini-2.5-flash', temperature: 0.7 },
         contextSlots: ['CONTENT_TYPE', 'AUDIENCE', 'FORMAT'],
         category: 'content'

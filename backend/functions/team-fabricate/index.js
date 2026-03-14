@@ -23,7 +23,6 @@ import {
 
 const LEGACY_TOOL_CANDIDATES = {
     'web-search': ['webSearch', 'googleSearch', 'web_search'],
-    'image-generation': ['imageGeneration', 'imageEditing'],
     'doc-reader': ['docReader', 'doc_reader', 'fileManipulation'],
     thinking: ['thinking']
 };

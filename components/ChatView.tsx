@@ -20,7 +20,7 @@ interface ChatViewProps {
     createEnabled?: boolean,
     prismMode?: 'ask' | 'create',
     specialAgentContext?: any,
-    requestedCapability?: 'auto' | 'web-search' | 'thinking' | 'canvas'
+    requestedCapability?: 'auto' | 'web-search' | 'thinking'
   ) => void;
   onAddAgent: (agentData: Omit<AgentType, 'id' | 'type'>) => void;
   onCreateTeam: (teamData: { name: string, agentIds: string[] }) => void;

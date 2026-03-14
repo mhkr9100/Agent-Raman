@@ -4,7 +4,7 @@ import { MAX_DOCUMENT_BYTES } from '../services/documentParser';
 import { validateChatAttachment } from '../services/runtimeAttachments';
 
 export type PrismMode = 'create' | 'ask';
-export type RequestedCapability = 'auto' | 'web-search' | 'thinking' | 'canvas';
+export type RequestedCapability = 'auto' | 'web-search' | 'thinking';
 
 interface InputBarProps {
   onSubmit: (
@@ -160,8 +160,7 @@ export const InputBar: React.FC<InputBarProps> = ({
   const capabilityOptions: { key: RequestedCapability; label: string }[] = [
     { key: 'auto', label: 'Auto' },
     { key: 'web-search', label: 'Web Search' },
-    { key: 'thinking', label: 'Deep Thinking' },
-    { key: 'canvas', label: 'Canvas' }
+    { key: 'thinking', label: 'Deep Thinking' }
   ];
 
   return (
@@ -253,7 +252,7 @@ export const InputBar: React.FC<InputBarProps> = ({
             onClick={() => fileInputRef.current?.click()}
             className="mb-1 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-black/10 text-gray-500 transition-colors hover:border-black/20 hover:text-gray-900 dark:border-white/10 dark:text-white/45 dark:hover:border-white/20 dark:hover:text-white"
             disabled={isLoading}
-            title={isPrism ? 'Attach files to your account knowledge space' : 'Attach files to this chatbot knowledge space'}
+            title={isPrism ? 'Attach files to your account context' : 'Attach files to this chatbot context'}
           >
             +
           </button>
@@ -307,9 +306,6 @@ export const InputBar: React.FC<InputBarProps> = ({
               className="max-h-[100px] w-full resize-none bg-transparent px-1 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-white/28"
               disabled={isLoading}
             />
-            <p className="px-1 text-[9px] text-gray-500 dark:text-white/32">
-              Files are stored in the real knowledge space and retrieved server-side when relevant.
-            </p>
           </div>
 
           <button

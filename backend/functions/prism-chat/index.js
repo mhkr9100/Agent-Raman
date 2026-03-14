@@ -41,7 +41,6 @@ function buildStreamMetadata(requestHeaders, statusCode = 200) {
     return {
         statusCode,
         headers: {
-            ...buildCorsHeaders(requestHeaders, 'OPTIONS,POST'),
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive'
@@ -377,20 +376,24 @@ async function handleCreate({ userId, message, conversationId, attachments = [],
         temperature_default: model.temperature_default
     })), null, 2);
 
+    const allowedSpecialAgentTools = (specialAgentContext?.defaultTools || [])
+        .map((toolId) => toCanonicalToolId(toolId))
+        .filter((toolId) => PUBLIC_TOOL_IDS.has(toolId));
+
     const specialAgentBlock = specialAgentContext ? `
 SPECIAL AGENT TEMPLATE (PRE-BUILT BY RAMNAI):
 Name: ${specialAgentContext.name}
 Role: ${specialAgentContext.role}
 Predefined System Prompt:
 ${specialAgentContext.predefinedPrompt}
-Default Tools: ${(specialAgentContext.defaultTools || []).join(', ')}
+Default Tools: ${(allowedSpecialAgentTools.length > 0 ? allowedSpecialAgentTools : ['thinking']).join(', ')}
 Suggested Model: ${specialAgentContext.suggestedModel || 'gemini-2.5-flash'}
 
 IMPORTANT: This is a pre-built Special ChatBot template. The user clicked "Add via Prism" to personalize it. You MUST:
 1. Set blueprintReady: true immediately — do NOT ask clarifying questions.
 2. Set blueprintType: "agent" (do NOT return team blueprints for this flow).
 3. Use the predefined prompt as the BASE, but ENRICH the BACKSTORY section with the USER CONTEXT below.
-4. Keep the same tools and model from the template unless there is a strong reason to change.
+4. Keep the same tools and model from the template unless there is a strong reason to change, but ONLY use supported capabilities from the available tools list.
 5. Keep explanation to 2-3 SHORT sentences.
 ` : '';
 
@@ -505,6 +508,7 @@ When asking questions, respond with this JSON shape:
 
 RULES FOR DESIGNING CHATBOTS:
 - Select MINIMAL tools (only what is needed)
+- The only user-selectable capabilities in this deployment are web-search and thinking
 - The systemPrompt MUST follow the structured format above — no exceptions
 - Choose the cheapest model that can handle the task
 - Always include all sections: ROLE, GOAL, BACKSTORY, TOOLS, RULES, OUTPUT FORMAT, SAFETY

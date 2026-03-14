@@ -37,7 +37,26 @@ export const handler = async (event) => {
                 toolId: toCanonicalToolId(tool.toolId)
             }))
             .filter((tool) => PUBLIC_TOOL_IDS.has(tool.toolId));
-        const deduped = Array.from(new Map(filtered.map((tool) => [tool.toolId, tool])).values());
+        const presentation = filtered.map((tool) => {
+            if (tool.toolId === 'web-search') {
+                return {
+                    ...tool,
+                    name: 'Web Search',
+                    description: 'Live web search grounded through Vertex AI',
+                    summary: 'Use live web grounding for current information, sources, and public web research.'
+                };
+            }
+            if (tool.toolId === 'thinking') {
+                return {
+                    ...tool,
+                    name: 'Deep Thinking',
+                    description: 'Structured reasoning for complex planning and analysis',
+                    summary: 'Use deliberate step-by-step reasoning for harder questions and multi-step decisions.'
+                };
+            }
+            return tool;
+        });
+        const deduped = Array.from(new Map(presentation.map((tool) => [tool.toolId, tool])).values());
         console.log(`TOOL-REGISTRY: ✅ Found ${deduped.length} tools (from ${tools.length} total)`);
 
         return respond(event, 200, { tools: deduped });

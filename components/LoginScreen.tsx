@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { PrismIcon } from './icons/PrismIcon';
 import { RamanIcon } from './icons/RamanIcon';
 import { motion, AnimatePresence } from 'motion/react';
 import { Key, Bot, Users, MessageSquare, Sparkles, HelpCircle, ArrowRight, Loader2 } from 'lucide-react';
@@ -11,7 +10,7 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister }) => {
-    const [showAuthModal, setShowAuthModal] = useState(true);
+    const [showAuthModal, setShowAuthModal] = useState(false);
     const [authMode, setAuthMode] = useState<'login' | 'signup' | 'otp' | 'forgot_pass_email' | 'forgot_pass_reset'>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -111,105 +110,205 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
     };
 
     return (
-        <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#1A1A1A] text-gray-900 dark:text-white font-sans selection:bg-black/10 dark:selection:bg-white/10 transition-colors duration-300 overflow-y-auto custom-scrollbar relative">
+        <div className="min-h-screen overflow-y-auto custom-scrollbar bg-[#f3f5f4] text-gray-950 transition-colors duration-300 selection:bg-emerald-500/20 dark:bg-[#0f1113] dark:text-white relative">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                <div className="absolute left-[-12%] top-[-8%] h-[28rem] w-[28rem] rounded-full bg-emerald-400/12 blur-3xl dark:bg-emerald-400/10" />
+                <div className="absolute right-[-8%] top-[12%] h-[24rem] w-[24rem] rounded-full bg-black/6 blur-3xl dark:bg-white/6" />
+                <div className="absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.12),transparent_55%)] dark:bg-[radial-gradient(circle_at_top,rgba(110,231,183,0.08),transparent_50%)]" />
+            </div>
 
-            {/* Navigation Bar */}
-            <nav className="fixed top-0 left-0 right-0 p-6 flex justify-between items-center z-40 bg-[#F8F9FA]/80 dark:bg-[#1A1A1A]/80 backdrop-blur-md border-b border-black/5 dark:border-white/5">
-                <div className="flex items-center gap-3">
-                    <RamanIcon size={28} />
-                    <span className="font-black tracking-widest uppercase text-sm">RamN AI</span>
-                </div>
-                <div className="flex items-center gap-4">
-                    <button onClick={() => openAuth('login')} className="text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 dark:text-white/60 dark:hover:text-white transition-colors">
-                        Log In
-                    </button>
-                    <button onClick={() => openAuth('signup')} className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-lg transition-all shadow-lg hover:bg-gray-800 dark:hover:bg-slate-200">
-                        Get Started
-                    </button>
+            <nav className="sticky top-0 z-40 border-b border-black/5 bg-[#f3f5f4]/88 px-6 py-5 backdrop-blur-xl dark:border-white/5 dark:bg-[#0f1113]/86">
+                <div className="mx-auto flex max-w-7xl items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <RamanIcon size={30} />
+                        <div className="flex flex-col">
+                            <span className="text-sm font-black uppercase tracking-[0.32em]">RamN AI</span>
+                            <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-gray-500 dark:text-white/40">Prism + Memory + ChatBots</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => openAuth('login')} className="rounded-full border border-black/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-gray-600 transition hover:border-black/20 hover:text-gray-900 dark:border-white/10 dark:text-white/60 dark:hover:border-white/20 dark:hover:text-white">
+                            Log In
+                        </button>
+                        <button onClick={() => openAuth('signup')} className="rounded-full bg-gray-950 px-5 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-black dark:bg-white dark:text-black dark:hover:bg-white/90">
+                            Create Account
+                        </button>
+                    </div>
                 </div>
             </nav>
 
-            {/* Hero Section */}
-            <div className="max-w-5xl mx-auto px-6 pt-40 pb-20 md:py-48">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8 }}
-                    className="flex flex-col items-center text-center space-y-12"
-                >
-                    <div className="text-gray-900 dark:text-white/30 hidden md:block">
-                        <RamanIcon size={100} />
-                    </div>
+            <div className="mx-auto max-w-7xl px-6 pb-16 pt-14 md:pb-24 md:pt-20">
+                <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+                    <motion.div
+                        initial={{ opacity: 0, y: 18 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.7 }}
+                        className="space-y-8"
+                    >
+                        <div className="inline-flex items-center gap-3 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-300">
+                            <Sparkles size={14} />
+                            Raman-Effect Workspace
+                        </div>
 
-                    <div className="space-y-6 max-w-4xl">
-                        <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter text-gray-900 dark:text-white uppercase leading-[0.9]">
-                            RamN <br /><span className="text-emerald-600 dark:text-emerald-300">AI</span>
-                        </h1>
-                        <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 font-medium max-w-2xl mx-auto leading-relaxed">
-                            AI ChatBots Made Practical. Build persistent AI workflows with Prism, UserMap, and real backend memory.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row gap-4 pt-4">
-                        <button
-                            onClick={() => openAuth('signup')}
-                            className="group flex items-center justify-center gap-3 px-10 py-5 bg-gray-900 dark:bg-white text-white dark:text-black text-xs font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl shadow-black/10 dark:shadow-none hover:bg-black dark:hover:bg-white/90 active:scale-[0.98]"
-                        >
-                            Create Account
-                            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                        </button>
-                    </div>
-                </motion.div>
-
-                {/* Features Section */}
-                <div className="w-full pt-32 space-y-24">
-                    <div className="space-y-6 text-center max-w-3xl mx-auto">
-                        <h2 className="text-[10px] font-black text-emerald-600 dark:text-emerald-300 uppercase tracking-[0.5em]">The Ecosystem</h2>
-                        <h3 className="text-3xl md:text-4xl font-black uppercase tracking-tight">Beyond Single-Prompt Chatbots</h3>
-                        <p className="text-sm md:text-base text-gray-600 dark:text-white/50 leading-relaxed">
-                            RamN AI bridges the gap between isolated AI interactions and true collaborative workflows. Assemble a <strong className="text-gray-900 dark:text-white">Spectrum</strong> of uniquely prompted chatbots equipped with integrated capabilities, and deploy them to solve multi-step problems.
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="p-8 bg-white dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-3xl space-y-4 shadow-xl shadow-black/5 dark:shadow-none">
-                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-300">
-                                <Users size={24} />
-                            </div>
-                            <h4 className="text-lg font-bold uppercase tracking-tight">ChatBots + Teams</h4>
-                            <p className="text-sm text-gray-600 dark:text-white/50 leading-relaxed">
-                                Create focused chatbots and combine them into collaborative teams. Tag them via @mentions to route work precisely.
+                        <div className="space-y-6">
+                            <h1 className="max-w-4xl text-5xl font-black uppercase leading-[0.88] tracking-[-0.05em] text-gray-950 md:text-7xl dark:text-white">
+                                Turn one objective into a deployable
+                                <span className="block text-emerald-600 dark:text-emerald-300">Prism-built ChatBot system</span>
+                            </h1>
+                            <p className="max-w-2xl text-base leading-8 text-gray-600 dark:text-white/62 md:text-lg">
+                                RamN AI is built for users who know what they need done but should not have to hand-write prompts, wire tools, or manage memory themselves. Prism turns intent into instructions, selects the right live capability, and deploys a persistent chatbot with real backend state.
                             </p>
                         </div>
-                        <div className="p-8 bg-white dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-3xl space-y-4 shadow-xl shadow-black/5 dark:shadow-none">
-                            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 dark:text-amber-400">
-                                <Sparkles size={24} />
-                            </div>
-                            <h4 className="text-lg font-bold uppercase tracking-tight">Vertex Model Engine</h4>
-                            <p className="text-sm text-gray-600 dark:text-white/50 leading-relaxed">
-                                Route work through supported Vertex Gemini models selected from the live model registry, with no fake provider fallbacks.
-                            </p>
+
+                        <div className="flex flex-col gap-4 sm:flex-row">
+                            <button
+                                onClick={() => openAuth('signup')}
+                                className="group inline-flex items-center justify-center gap-3 rounded-2xl bg-gray-950 px-8 py-4 text-[11px] font-black uppercase tracking-[0.24em] text-white transition hover:bg-black dark:bg-white dark:text-black dark:hover:bg-white/90"
+                            >
+                                Start Building
+                                <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                            </button>
+                            <button
+                                onClick={() => openAuth('login')}
+                                className="inline-flex items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white/70 px-8 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-gray-800 transition hover:border-black/20 hover:bg-white dark:border-white/10 dark:bg-white/[0.03] dark:text-white/80 dark:hover:border-white/20 dark:hover:bg-white/[0.06]"
+                            >
+                                Resume Workspace
+                            </button>
                         </div>
-                        <div className="p-8 bg-white dark:bg-white/[0.02] border border-black/5 dark:border-white/5 rounded-3xl space-y-4 shadow-xl shadow-black/5 dark:shadow-none">
-                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 dark:text-emerald-400">
-                                <Key size={24} />
+
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <div className="rounded-3xl border border-black/8 bg-white/80 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/8 dark:bg-white/[0.03] dark:shadow-none">
+                                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                                    <Bot size={20} />
+                                </div>
+                                <h3 className="text-[13px] font-black uppercase tracking-[0.12em]">Prism Creates</h3>
+                                <p className="mt-2 text-[12px] leading-6 text-gray-600 dark:text-white/55">
+                                    Users describe the job. Prism writes the system instructions, chooses the toolset, and prepares the chatbot blueprint.
+                                </p>
                             </div>
-                            <h4 className="text-lg font-bold uppercase tracking-tight">Integrated Tools</h4>
-                            <p className="text-sm text-gray-600 dark:text-white/50 leading-relaxed">
-                                Equip chatbots with live capabilities like web search, image generation, document reading, and persistent canvas artifacts.
-                            </p>
+                            <div className="rounded-3xl border border-black/8 bg-white/80 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/8 dark:bg-white/[0.03] dark:shadow-none">
+                                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-300">
+                                    <MessageSquare size={20} />
+                                </div>
+                                <h3 className="text-[13px] font-black uppercase tracking-[0.12em]">Live Runtime</h3>
+                                <p className="mt-2 text-[12px] leading-6 text-gray-600 dark:text-white/55">
+                                    Only two capabilities are exposed right now: live web search and deep thinking. No fake tools, no surface clutter.
+                                </p>
+                            </div>
+                            <div className="rounded-3xl border border-black/8 bg-white/80 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-white/8 dark:bg-white/[0.03] dark:shadow-none">
+                                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-black/5 text-gray-900 dark:bg-white/8 dark:text-white">
+                                    <Users size={20} />
+                                </div>
+                                <h3 className="text-[13px] font-black uppercase tracking-[0.12em]">Persistent Context</h3>
+                                <p className="mt-2 text-[12px] leading-6 text-gray-600 dark:text-white/55">
+                                    UserMap, conversations, and chatbot state live on the backend so the workspace stays consistent across sessions and devices.
+                                </p>
+                            </div>
                         </div>
-                    </div>
+                    </motion.div>
+
+                    <motion.div
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.85, delay: 0.08 }}
+                        className="space-y-5"
+                    >
+                        <div className="overflow-hidden rounded-[2rem] border border-black/8 bg-[#101214] shadow-[0_32px_100px_rgba(15,23,42,0.18)] dark:border-white/10">
+                            <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-rose-400/80" />
+                                    <span className="h-2.5 w-2.5 rounded-full bg-amber-300/80" />
+                                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
+                                </div>
+                                <span className="text-[9px] font-black uppercase tracking-[0.28em] text-white/42">Prism Runtime</span>
+                            </div>
+                            <div className="grid gap-5 p-5">
+                                <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                                    <div className="mb-3 text-[8px] font-black uppercase tracking-[0.24em] text-emerald-300/70">Objective</div>
+                                    <div className="rounded-2xl bg-black/30 px-4 py-3 font-mono text-[12px] leading-6 text-white/82">
+                                        Build a chatbot that finds Missouri RFPs from my profile, reasons through fit, and replies with direct sources.
+                                    </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                                    <div className="mb-3 flex items-center justify-between">
+                                        <span className="text-[8px] font-black uppercase tracking-[0.24em] text-white/40">Generated Blueprint</span>
+                                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-emerald-300">Ready</span>
+                                    </div>
+                                    <pre className="overflow-x-auto rounded-2xl bg-black/35 p-4 text-[11px] leading-6 text-white/82 custom-scrollbar">{`role: Procurement Research Analyst
+tools: [web-search, thinking]
+model: gemini-2.5-pro
+
+rules:
+- search the live web when currency matters
+- reason before filtering opportunities
+- cite the source link in every result
+- use profile context as decision criteria`}</pre>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                                        <div className="mb-3 text-[8px] font-black uppercase tracking-[0.24em] text-white/40">Capability Rail</div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between rounded-xl border border-emerald-400/18 bg-emerald-400/8 px-3 py-2">
+                                                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">Web Search</span>
+                                                <span className="text-[9px] text-white/45">Live</span>
+                                            </div>
+                                            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                                                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/80">Deep Thinking</span>
+                                                <span className="text-[9px] text-white/45">Live</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+                                        <div className="mb-3 text-[8px] font-black uppercase tracking-[0.24em] text-white/40">Delivery Guarantees</div>
+                                        <div className="space-y-2 text-[11px] leading-5 text-white/65">
+                                            <div className="flex items-start gap-2"><HelpCircle size={14} className="mt-0.5 text-emerald-300" /><span>Backend-authoritative conversations and memory</span></div>
+                                            <div className="flex items-start gap-2"><HelpCircle size={14} className="mt-0.5 text-emerald-300" /><span>Real Vertex-backed responses and retrieval</span></div>
+                                            <div className="flex items-start gap-2"><HelpCircle size={14} className="mt-0.5 text-emerald-300" /><span>No mock loading states or hardcoded outputs</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <div className="rounded-3xl border border-black/8 bg-white/70 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                                    <Sparkles size={18} />
+                                </div>
+                                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">Prism</div>
+                                <p className="mt-3 text-[12px] leading-6 text-gray-600 dark:text-white/58">
+                                    Converts plain-English intent into structured system instructions and deployment-ready chatbot blueprints.
+                                </p>
+                            </div>
+                            <div className="rounded-3xl border border-black/8 bg-white/70 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-300">
+                                    <Key size={18} />
+                                </div>
+                                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">UserMap</div>
+                                <p className="mt-3 text-[12px] leading-6 text-gray-600 dark:text-white/58">
+                                    Maintains reusable context and memory so the same account can resume work without starting over each time.
+                                </p>
+                            </div>
+                            <div className="rounded-3xl border border-black/8 bg-white/70 p-5 dark:border-white/8 dark:bg-white/[0.03]">
+                                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-black/5 text-gray-900 dark:bg-white/8 dark:text-white">
+                                    <Users size={18} />
+                                </div>
+                                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">Collaboration</div>
+                                <p className="mt-3 text-[12px] leading-6 text-gray-600 dark:text-white/58">
+                                    Build focused chatbots first, then evolve toward team collaboration when a workflow needs multiple specialists.
+                                </p>
+                            </div>
+                        </div>
+                    </motion.div>
                 </div>
 
-                <div className="mt-32 pt-12 border-t border-black/10 dark:border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="flex items-center gap-3 opacity-50">
-                        <RamanIcon size={24} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">RamN AI Platform &copy; 2026</span>
-                    </div>
-                    <div className="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 transition-colors">
-                        <span>Status: Operational</span>
-                    </div>
+                <div className="mt-16 grid gap-4 border-t border-black/8 pt-8 text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 dark:border-white/8 dark:text-white/34 md:grid-cols-4">
+                    <div>Prism-authored instructions</div>
+                    <div>Server-side memory + retrieval</div>
+                    <div>Live web search + deep thinking</div>
+                    <div>Production-backed chatbot runtime</div>
                 </div>
             </div>
 

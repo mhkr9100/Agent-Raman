@@ -52,14 +52,8 @@ export const useScatter = () => {
         if (currentUser) {
             const init = async () => {
                 try {
-                    const { dbService, STORES_ENUM } = await import('../services/db');
-                    // 1. Core Hydration
                     await loadEntities(currentUser.id);
                     await loadSessions(currentUser.id);
-
-                    // 2. Enterprise Data Sync (Prevent cross-browser data loss)
-                    console.log('[useScatter] Syncing memories from cloud...');
-                    await dbService.pullFromCloud(STORES_ENUM.MEMORIES, currentUser.id);
                 } catch (e) {
                     console.error('[useScatter] Initialization Error:', e);
                 } finally {
@@ -182,7 +176,7 @@ export const useScatter = () => {
         createEnabled?: boolean,
         prismMode?: 'ask' | 'create',
         specialAgentContext?: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string },
-        requestedCapability?: 'auto' | 'web-search' | 'thinking' | 'canvas',
+        requestedCapability?: 'auto' | 'web-search' | 'thinking',
         targetChatId?: string
     ) => {
         const chatId = targetChatId || activeChatId;
@@ -231,9 +225,14 @@ export const useScatter = () => {
                     return response;
                 } catch (streamErr) {
                     console.warn('[useScatter] Prism stream unavailable; falling back to JSON response.', streamErr);
-                    const response = await prismChat(prismRequest);
-                    finalizeStreamMessage(chatId, messageId, response.text || '', response.toolCall ? { toolCall: response.toolCall } : undefined);
-                    return response;
+                    try {
+                        const response = await prismChat(prismRequest);
+                        finalizeStreamMessage(chatId, messageId, response.text || '', response.toolCall ? { toolCall: response.toolCall } : undefined);
+                        return response;
+                    } catch (jsonErr: any) {
+                        finalizeStreamMessage(chatId, messageId, `⚠️ Error connecting to AI: ${jsonErr.message}`);
+                        return null;
+                    }
                 }
             };
 
@@ -260,9 +259,14 @@ export const useScatter = () => {
                     return response;
                 } catch (streamErr) {
                     console.warn('[useScatter] Agent stream unavailable; falling back to JSON response.', streamErr);
-                    const response = await agentChat(request);
-                    finalizeStreamMessage(chatId, messageId, response.response || '');
-                    return response;
+                    try {
+                        const response = await agentChat(request);
+                        finalizeStreamMessage(chatId, messageId, response.response || '');
+                        return response;
+                    } catch (jsonErr: any) {
+                        finalizeStreamMessage(chatId, messageId, `⚠️ Error connecting to AI: ${jsonErr.message}`);
+                        return null;
+                    }
                 }
             };
 

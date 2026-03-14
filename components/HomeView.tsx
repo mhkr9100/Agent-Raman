@@ -101,7 +101,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                         <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">3. Direct Interaction</h3>
                                         <p className="text-xs text-gray-600 dark:text-white/40 leading-relaxed">
                                             Select any chatbot from the sidebar to chat 1-on-1. Each one has its own
-                                            instructions, capabilities, and knowledge space.
+                                            instructions, live capabilities, and server-side context.
                                         </p>
                                     </div>
                                 </motion.div>
@@ -131,8 +131,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                     <span className="text-[10px] font-black uppercase tracking-widest">Specialized ChatBots</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 dark:text-white/40 leading-relaxed">
-                                    From image generation to deep research, deploy chatbots with specific capabilities
-                                    and models tailored for the task.
+                                    Deploy chatbots with focused live capabilities for web search and deep reasoning,
+                                    paired with the model best suited for the task.
                                 </p>
                             </div>
                             <div className="space-y-4 text-left">

@@ -222,7 +222,7 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
 
                             <div>
                                 <div className="flex items-center justify-between mb-3">
-                                    <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest">Knowledge Files</label>
+                                    <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest">Context Files</label>
                                     <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase tracking-wider font-bold">Saved After Create</span>
                                 </div>
 
@@ -249,7 +249,7 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
                                     <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-2xl cursor-pointer transition-colors border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] hover:border-black/20 dark:hover:border-white/30 hover:bg-black/[0.02] dark:hover:bg-white/[0.05]">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                             <svg className="w-6 h-6 mb-2 text-gray-500 dark:text-white/40" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" /></svg>
-                                            <p className="mb-1 text-[10px] text-gray-600 dark:text-white/60 font-bold"><span className="text-gray-900 dark:text-white">Select files</span> (upload after create)</p>
+                                            <p className="mb-1 text-[10px] text-gray-600 dark:text-white/60 font-bold"><span className="text-gray-900 dark:text-white">Select files</span> (attached after create)</p>
                                             <p className="text-[8px] uppercase tracking-widest text-gray-500 dark:text-white/40">PDF, TXT, DOCX, CSV, MD (max 5)</p>
                                         </div>
                                         <input type="file" className="hidden" onChange={handleFileUpload} multiple accept=".pdf,.txt,.doc,.docx,.csv,.md,.json,.yaml,.yml,.xml" />

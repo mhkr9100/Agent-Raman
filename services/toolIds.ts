@@ -4,8 +4,6 @@ export const LEGACY_TO_CANONICAL_TOOL_ID: Record<string, string> = {
     web_search: 'web-search',
     googleMaps: 'web-search',
     thinking: 'thinking',
-    imageGeneration: 'image-generation',
-    imageEditing: 'image-generation',
     fileManipulation: 'doc-reader',
     docReader: 'doc-reader',
     doc_reader: 'doc-reader'

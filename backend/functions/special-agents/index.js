@@ -8,6 +8,8 @@
 import { listSpecialAgents } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
+import { toCanonicalToolId } from '../../shared/tool-ids.js';
+import { PUBLIC_TOOL_IDS } from '../../shared/runtime-policy.js';
 
 function respond(event, statusCode, body) {
     return {
@@ -28,7 +30,14 @@ export const handler = async (event) => {
         await validateToken(authHeader);
 
         console.log('SPECIAL-AGENTS: Listing all templates');
-        const templates = await listSpecialAgents();
+        const templates = (await listSpecialAgents()).map((template) => ({
+            ...template,
+            tools: Array.from(new Set(
+                (Array.isArray(template.tools) ? template.tools : [])
+                    .map((toolId) => toCanonicalToolId(toolId))
+                    .filter((toolId) => PUBLIC_TOOL_IDS.has(toolId))
+            ))
+        }));
         console.log(`SPECIAL-AGENTS: ✅ Found ${templates.length} templates`);
 
         return respond(event, 200, { templates });

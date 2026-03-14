@@ -16,16 +16,12 @@ export const SUPPORTED_VERTEX_MODELS = new Set([
 export const SUPPORTED_TOOL_IDS = new Set([
     'web-search',
     'thinking',
-    'image-generation',
-    'doc-reader',
-    'canvas'
+    'doc-reader'
 ]);
 
 export const PUBLIC_TOOL_IDS = new Set([
     'web-search',
-    'thinking',
-    'image-generation',
-    'canvas'
+    'thinking'
 ]);
 
 const LEGACY_MODEL_FALLBACKS = {
