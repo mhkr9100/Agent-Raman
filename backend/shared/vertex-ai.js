@@ -188,6 +188,47 @@ function normalizeUserParts(userParts = []) {
         .filter(Boolean);
 }
 
+function normalizeTools(tools = []) {
+    if (!Array.isArray(tools) || tools.length === 0) return [];
+
+    const normalized = [];
+    const functionDeclarations = [];
+
+    for (const tool of tools) {
+        if (!tool || typeof tool !== 'object') continue;
+
+        if (Array.isArray(tool.functionDeclarations)) {
+            functionDeclarations.push(...tool.functionDeclarations.filter(Boolean));
+            continue;
+        }
+
+        if (tool.googleSearch) {
+            normalized.push({ googleSearch: {} });
+            continue;
+        }
+
+        if (tool.retrieval) {
+            normalized.push({ retrieval: tool.retrieval });
+            continue;
+        }
+
+        if (tool.googleSearchRetrieval) {
+            normalized.push({ googleSearchRetrieval: tool.googleSearchRetrieval });
+            continue;
+        }
+
+        if (tool.name) {
+            functionDeclarations.push(tool);
+        }
+    }
+
+    if (functionDeclarations.length > 0) {
+        normalized.unshift({ functionDeclarations });
+    }
+
+    return normalized;
+}
+
 function buildPayload({ systemPrompt, userMessage, history = [], userParts = [], tools, temperature, modelName }) {
     const contents = [];
 
@@ -217,8 +258,9 @@ function buildPayload({ systemPrompt, userMessage, history = [], userParts = [],
         payload.systemInstruction = { parts: [{ text: systemPrompt }] };
     }
 
-    if (tools && tools.length > 0) {
-        payload.tools = [{ functionDeclarations: tools }];
+    const normalizedTools = normalizeTools(tools);
+    if (normalizedTools.length > 0) {
+        payload.tools = normalizedTools;
     }
 
     return payload;

@@ -182,6 +182,7 @@ export const useScatter = () => {
         createEnabled?: boolean,
         prismMode?: 'ask' | 'create',
         specialAgentContext?: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string },
+        requestedCapability?: 'auto' | 'web-search' | 'thinking' | 'canvas',
         targetChatId?: string
     ) => {
         const chatId = targetChatId || activeChatId;
@@ -242,7 +243,8 @@ export const useScatter = () => {
                     message: runtimeMessage,
                     conversationId: chatId,
                     attachments: runtimeAttachments,
-                    focusDocumentIds
+                    focusDocumentIds,
+                    requestedCapability: requestedCapability && requestedCapability !== 'auto' ? requestedCapability : undefined
                 };
 
                 try {
@@ -339,7 +341,7 @@ export const useScatter = () => {
         setActiveChatId('prism-core');
         // Auto-send create-mode message with special agent context
         const message = `Personalize and deploy the "${template.name}" chatbot for me.`;
-        handleSendMessage(message, 1, undefined, false, false, 'create', template, 'prism-core');
+        handleSendMessage(message, 1, undefined, false, false, 'create', template, undefined, 'prism-core');
     }, [setActiveChatId, handleSendMessage]);
 
     return {

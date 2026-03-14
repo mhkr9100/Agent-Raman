@@ -4,6 +4,7 @@ import { MAX_DOCUMENT_BYTES } from '../services/documentParser';
 import { validateChatAttachment } from '../services/runtimeAttachments';
 
 export type PrismMode = 'create' | 'ask';
+export type RequestedCapability = 'auto' | 'web-search' | 'thinking' | 'canvas';
 
 interface InputBarProps {
   onSubmit: (
@@ -13,7 +14,8 @@ interface InputBarProps {
     searchEnabled?: boolean,
     createEnabled?: boolean,
     prismMode?: PrismMode,
-    specialAgentContext?: any
+    specialAgentContext?: any,
+    requestedCapability?: RequestedCapability
   ) => void;
   isLoading: boolean;
   mentionCandidates?: Agent[];
@@ -34,6 +36,7 @@ export const InputBar: React.FC<InputBarProps> = ({
   const [prismMode, setPrismMode] = useState<PrismMode>('ask');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [requestedCapability, setRequestedCapability] = useState<RequestedCapability>('auto');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,7 +72,9 @@ export const InputBar: React.FC<InputBarProps> = ({
       attachments,
       false,
       prismMode === 'create',
-      isPrism ? prismMode : undefined
+      isPrism ? prismMode : undefined,
+      undefined,
+      requestedCapability
     );
 
     setPrompt('');
@@ -150,6 +155,13 @@ export const InputBar: React.FC<InputBarProps> = ({
   const prismModes: { key: PrismMode; label: string; icon: string }[] = [
     { key: 'ask', label: 'Ask Prism', icon: '△' },
     { key: 'create', label: 'Create ChatBots', icon: '⚡' }
+  ];
+
+  const capabilityOptions: { key: RequestedCapability; label: string }[] = [
+    { key: 'auto', label: 'Auto' },
+    { key: 'web-search', label: 'Web Search' },
+    { key: 'thinking', label: 'Deep Thinking' },
+    { key: 'canvas', label: 'Canvas' }
   ];
 
   return (
@@ -257,6 +269,27 @@ export const InputBar: React.FC<InputBarProps> = ({
           />
 
           <div className="flex-1">
+            {!isPrism && (
+              <div className="mb-2 flex items-center gap-2 px-1">
+                <span className="text-[8px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-white/35">
+                  Capability
+                </span>
+                <select
+                  value={requestedCapability}
+                  onChange={(e) => setRequestedCapability(e.target.value as RequestedCapability)}
+                  className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-gray-700 outline-none transition-colors hover:border-black/20 dark:border-white/10 dark:bg-white/[0.05] dark:text-white/70 dark:hover:border-white/20"
+                  disabled={isLoading}
+                  title="Choose how this message should be handled"
+                >
+                  {capabilityOptions.map(option => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <textarea
               ref={textareaRef}
               value={prompt}

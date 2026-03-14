@@ -480,6 +480,7 @@ Resources:
                 - dynamodb:Scan
                 - dynamodb:UpdateItem
               Resource:
+                - !GetAtt EntitiesTable.Arn
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
       Events:

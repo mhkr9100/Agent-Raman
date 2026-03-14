@@ -284,6 +284,7 @@ export interface AgentChatRequest {
     conversationId?: string;
     attachments?: RuntimeAttachment[];
     focusDocumentIds?: string[];
+    requestedCapability?: string;
 }
 
 export interface AgentChatResponse {
@@ -301,7 +302,8 @@ export async function agentChat(params: AgentChatRequest): Promise<AgentChatResp
             message: params.message,
             conversationId: params.conversationId || null,
             attachments: params.attachments || [],
-            focusDocumentIds: params.focusDocumentIds || []
+            focusDocumentIds: params.focusDocumentIds || [],
+            requestedCapability: params.requestedCapability || null
         });
     } catch (error: any) {
         console.error('API: agentChat failed:', error.message);
@@ -327,7 +329,8 @@ export async function agentChatStream(
             message: params.message,
             conversationId: params.conversationId || null,
             attachments: params.attachments || [],
-            focusDocumentIds: params.focusDocumentIds || []
+            focusDocumentIds: params.focusDocumentIds || [],
+            requestedCapability: params.requestedCapability || null
         })
     });
 

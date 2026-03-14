@@ -82,6 +82,37 @@ function formatMemoryContext(memories) {
         .join('\n');
 }
 
+const GREETING_ONLY_MESSAGES = new Set([
+    'hi',
+    'hello',
+    'hey',
+    'hey there',
+    'hi there',
+    'good morning',
+    'good afternoon',
+    'good evening',
+    'yo',
+    'sup'
+]);
+
+function normalizeRequestedCapability(capability) {
+    const normalized = toCanonicalToolId(String(capability || '').trim());
+    if (!normalized || normalized === 'auto') return null;
+    return normalized;
+}
+
+function isGreetingOnlyMessage(message) {
+    const normalized = String(message || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[.!?,]+/g, '');
+    return GREETING_ONLY_MESSAGES.has(normalized);
+}
+
+function buildGreetingResponse(agentName) {
+    return `Hello! I'm ${agentName}. What would you like me to help you with today?`;
+}
+
 async function executeGoogleSearch(args) {
     const query = args.query || args.search_query || '';
     console.log(`TOOL-EXEC: googleSearch — query="${query}"`);
@@ -335,6 +366,10 @@ async function executeTool(toolName, args, context = {}) {
 
 function toolToFunctionDeclaration(tool) {
     const canonicalId = toCanonicalToolId(tool.toolId);
+    if (canonicalId === 'web-search' || canonicalId === 'thinking' || canonicalId === 'image-generation') {
+        return null;
+    }
+
     const declaration = {
         name: canonicalId,
         description: tool.description || `Tool: ${tool.name}`
@@ -394,7 +429,96 @@ function toolToFunctionDeclaration(tool) {
     return declaration;
 }
 
-async function buildRuntimeContext({ userId, agentId, message, conversationId, attachments = [], focusDocumentIds = [] }) {
+function buildToolRuntimeConfig(toolRecords, requestedCapability) {
+    const availableCapabilities = new Set(
+        (toolRecords || [])
+            .map((tool) => toCanonicalToolId(tool?.toolId))
+            .filter(Boolean)
+    );
+
+    const functionDeclarations = [];
+    let hasWebSearch = false;
+    let hasThinking = false;
+
+    for (const tool of toolRecords || []) {
+        const canonicalId = toCanonicalToolId(tool?.toolId);
+        if (!canonicalId) continue;
+
+        if (canonicalId === 'web-search') {
+            hasWebSearch = true;
+            continue;
+        }
+
+        if (canonicalId === 'thinking') {
+            hasThinking = true;
+            continue;
+        }
+
+        const declaration = toolToFunctionDeclaration(tool);
+        if (declaration) {
+            functionDeclarations.push(declaration);
+        }
+    }
+
+    const uniqueFunctionDeclarations = Array.from(
+        new Map(functionDeclarations.map((tool) => [tool.name, tool])).values()
+    );
+
+    const requested = normalizeRequestedCapability(requestedCapability);
+    if (requested) {
+        if (requested === 'thinking') {
+            return {
+                hasThinking: true,
+                vertexTools: [],
+                functionDeclarations: [],
+                availableCapabilities
+            };
+        }
+
+        if (!availableCapabilities.has(requested)) {
+            throw httpError(400, 'Capability unavailable', `This chatbot does not have the "${requested}" capability enabled.`);
+        }
+
+        if (requested === 'web-search') {
+            return {
+                hasThinking,
+                vertexTools: [{ googleSearch: {} }],
+                functionDeclarations: [],
+                availableCapabilities
+            };
+        }
+
+        if (requested === 'image-generation') {
+            throw httpError(400, 'Capability unavailable', 'Image generation is not yet enabled in chatbot chat runtime.');
+        }
+
+        return {
+            hasThinking,
+            vertexTools: uniqueFunctionDeclarations.length > 0
+                ? [{ functionDeclarations: uniqueFunctionDeclarations.filter((tool) => tool.name === requested) }]
+                : [],
+            functionDeclarations: uniqueFunctionDeclarations.filter((tool) => tool.name === requested),
+            availableCapabilities
+        };
+    }
+
+    const vertexTools = [];
+    if (uniqueFunctionDeclarations.length > 0) {
+        vertexTools.push({ functionDeclarations: uniqueFunctionDeclarations });
+    }
+    if (hasWebSearch) {
+        vertexTools.push({ googleSearch: {} });
+    }
+
+    return {
+        hasThinking,
+        vertexTools,
+        functionDeclarations: uniqueFunctionDeclarations,
+        availableCapabilities
+    };
+}
+
+async function buildRuntimeContext({ userId, agentId, message, conversationId, attachments = [], focusDocumentIds = [], requestedCapability = null }) {
     const convId = conversationId || crypto.randomUUID();
     let history = [];
     let conversationSummary = '';
@@ -486,21 +610,30 @@ async function buildRuntimeContext({ userId, agentId, message, conversationId, a
 
     const blueprintToolIds = deriveToolIdsFromBlueprint(blueprint);
     const blueprintTools = Array.isArray(blueprint.tools) ? blueprint.tools : [];
-    let functionDeclarations = [];
+    let toolRecords = [];
 
     if (blueprintTools.length > 0 && typeof blueprintTools[0] === 'object') {
-        functionDeclarations = blueprintTools.map(toolToFunctionDeclaration);
+        toolRecords = blueprintTools.filter(Boolean);
     } else {
         const idsToResolve = blueprintToolIds.length > 0
             ? blueprintToolIds
             : (Array.isArray(blueprintTools) ? blueprintTools.map(toCanonicalToolId) : []);
         if (idsToResolve.length > 0 && typeof idsToResolve[0] === 'string') {
-            const toolRecords = await Promise.all(idsToResolve.map((toolId) => getToolRecordWithFallback(toolId)));
-            functionDeclarations = toolRecords.filter(Boolean).map(toolToFunctionDeclaration);
+            const resolved = await Promise.all(idsToResolve.map((toolId) => getToolRecordWithFallback(toolId)));
+            toolRecords = resolved.filter(Boolean);
         }
     }
 
-    functionDeclarations = Array.from(new Map(functionDeclarations.map((item) => [item.name, item])).values());
+    const runtimeTools = buildToolRuntimeConfig(toolRecords, requestedCapability);
+    if (runtimeTools.hasThinking) {
+        systemPrompt = `${systemPrompt}\n\n# REASONING MODE\nUse deliberate step-by-step reasoning internally before answering.`;
+    }
+    if (runtimeTools.availableCapabilities.has('web-search')) {
+        systemPrompt = `${systemPrompt}\n\n# LIVE WEB ACCESS\nYou have access to Google Search grounding through Vertex AI. Use it whenever the user needs current web information instead of guessing.`;
+    }
+    if (normalizeRequestedCapability(requestedCapability) === 'canvas') {
+        systemPrompt = `${systemPrompt}\n\n# USER-SELECTED CAPABILITY\nThe user explicitly selected Canvas for this message. If helpful, save the result into canvas instead of only replying in chat.`;
+    }
 
     const attachmentSummary = summarizeAttachmentNames(attachments);
     const persistedUserMessage = attachmentSummary
@@ -517,15 +650,40 @@ async function buildRuntimeContext({ userId, agentId, message, conversationId, a
         temperature: blueprint.model?.temperature ?? 0.3,
         history,
         systemPrompt,
-        hasTools: functionDeclarations.length > 0,
-        functionDeclarations,
+        hasTools: runtimeTools.vertexTools.length > 0,
+        functionDeclarations: runtimeTools.functionDeclarations,
+        vertexTools: runtimeTools.vertexTools,
         userParts: toVertexUserParts(attachments),
         persistedUserMessage
     };
 }
 
-async function runAgentChat({ userId, agentId, message, conversationId, attachments = [], focusDocumentIds = [], stream }) {
-    const runtime = await buildRuntimeContext({ userId, agentId, message, conversationId, attachments, focusDocumentIds });
+async function runAgentChat({ userId, agentId, message, conversationId, attachments = [], focusDocumentIds = [], requestedCapability = null, stream }) {
+    const greetingOnly = isGreetingOnlyMessage(message) && attachments.length === 0 && focusDocumentIds.length === 0;
+    if (greetingOnly) {
+        const agent = await getAgent(agentId, userId);
+        if (!agent) throw httpError(404, 'ChatBot not found');
+        if (agent.userId !== userId) throw httpError(403, 'You do not have access to this agent');
+        if (agent.status !== 'active') throw httpError(400, `ChatBot is ${agent.status}. Only active chatbots can be run.`);
+
+        const convId = conversationId || crypto.randomUUID();
+        const greetingText = buildGreetingResponse(agent.name);
+        await saveMessage({ conversationId: convId, role: 'user', content: message, agentId, userId });
+        await saveMessage({ conversationId: convId, role: 'assistant', content: greetingText, agentId, userId });
+        return {
+            response: greetingText,
+            conversationId: convId,
+            agentId,
+            agentName: agent.name,
+            requestedModelId: agent.blueprint?.model?.modelId || DEFAULT_VERTEX_MODEL_ID,
+            runtimeModelId: agent.blueprint?.model?.modelId || DEFAULT_VERTEX_MODEL_ID,
+            modelFallbackApplied: false,
+            toolsUsed: [],
+            iterations: 0
+        };
+    }
+
+    const runtime = await buildRuntimeContext({ userId, agentId, message, conversationId, attachments, focusDocumentIds, requestedCapability });
 
     await saveMessage({
         conversationId: runtime.convId,
@@ -573,7 +731,7 @@ async function runAgentChat({ userId, agentId, message, conversationId, attachme
                     userMessage: iteration === 1 ? message : null,
                     history: runtime.history,
                     userParts: iteration === 1 ? runtime.userParts : [],
-                    tools: runtime.functionDeclarations,
+                    tools: runtime.vertexTools,
                     modelName: runtime.modelId,
                     temperature: runtime.temperature,
                     onTextDelta: async (delta) => stream({ type: 'text-delta', delta }),
@@ -584,7 +742,7 @@ async function runAgentChat({ userId, agentId, message, conversationId, attachme
                     userMessage: iteration === 1 ? message : null,
                     history: runtime.history,
                     userParts: iteration === 1 ? runtime.userParts : [],
-                    tools: runtime.functionDeclarations,
+                    tools: runtime.vertexTools,
                     modelName: runtime.modelId,
                     temperature: runtime.temperature
                 });
@@ -664,6 +822,7 @@ async function parseAuthorizedRequest(event) {
     const { agentId, message, conversationId } = body;
     const attachments = Array.isArray(body.attachments) ? body.attachments : [];
     const focusDocumentIds = Array.isArray(body.focusDocumentIds) ? body.focusDocumentIds : [];
+    const requestedCapability = normalizeRequestedCapability(body.requestedCapability);
 
     if (!agentId) throw httpError(400, 'Missing agentId');
     if (!message) throw httpError(400, 'Missing message');
@@ -679,7 +838,8 @@ async function parseAuthorizedRequest(event) {
         message,
         conversationId,
         attachments,
-        focusDocumentIds
+        focusDocumentIds,
+        requestedCapability
     };
 }
 
