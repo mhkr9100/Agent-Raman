@@ -137,7 +137,8 @@ async function readEventStream<TPayload>(
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const chunks = buffer.split('\n\n');
+        const normalized = buffer.replace(/\r\n/g, '\n');
+        const chunks = normalized.split('\n\n');
         buffer = chunks.pop() || '';
 
         for (const chunk of chunks) {

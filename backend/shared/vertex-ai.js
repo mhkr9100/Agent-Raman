@@ -343,7 +343,8 @@ async function sendVertexRequest(payload, modelName) {
 }
 
 function readSseEvents(buffer) {
-    const blocks = buffer.split('\n\n');
+    const normalized = buffer.replace(/\r\n/g, '\n');
+    const blocks = normalized.split('\n\n');
     const remainder = blocks.pop() || '';
     const events = [];
 
