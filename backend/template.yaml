@@ -108,6 +108,41 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  DocumentChunksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: RamN_DocumentChunks
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: chunkId
+          AttributeType: S
+        - AttributeName: ownerKey
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+        - AttributeName: docId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: chunkId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: ownerKey-createdAt-index
+          KeySchema:
+            - AttributeName: ownerKey
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: docId-createdAt-index
+          KeySchema:
+            - AttributeName: docId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
   TeamsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -369,21 +404,58 @@ Resources:
           Properties:
             Path: /api/v2/prism/chat
             Method: POST
-        PrismChatStream:
-          Type: Api
-          Properties:
-            Path: /api/v2/prism/chat/stream
-            Method: POST
         PrismChatOptions:
           Type: Api
           Properties:
             Path: /api/v2/prism/chat
             Method: OPTIONS
-        PrismChatStreamOptions:
-          Type: Api
-          Properties:
-            Path: /api/v2/prism/chat/stream
-            Method: OPTIONS
+
+  PrismChatStreamFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/prism-chat/index.streamHandler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          GCP_PROJECT_ID: ramn-ai
+          GCP_LOCATION: us-central1
+          GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
+          TABLE_PREFIX: 'RamN_'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:UpdateItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref GcpServiceAccountSecret
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${S3BucketName}/knowledge-base/*"
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: RESPONSE_STREAM
+        Cors:
+          AllowOrigins: !Split [",", !Ref AllowedOrigins]
+          AllowMethods:
+            - POST
+            - OPTIONS
+          AllowHeaders:
+            - Content-Type
+            - Authorization
 
   # ──── Agent Create (Blueprint Saver) ────
   AgentCreateFunction:
@@ -484,6 +556,71 @@ Resources:
           Properties:
             Path: /api/v2/agents/{agentId}/chat
             Method: OPTIONS
+
+  AgentRunStreamFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions/agent-run/index.streamHandler
+      CodeUri: .
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          GCP_PROJECT_ID: ramn-ai
+          GCP_LOCATION: us-central1
+          GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
+          TABLE_PREFIX: 'RamN_'
+          GOOGLE_SEARCH_API_KEY: !Ref GoogleSearchApiKey
+          GOOGLE_CSE_ID: !Ref GoogleCseId
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:UpdateItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+              Resource:
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_UserMap'
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource:
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Documents'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_Documents/index/*'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_DocumentChunks'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_DocumentChunks/index/*'
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${S3BucketName}/knowledge-base/*"
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref GcpServiceAccountSecret
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: RESPONSE_STREAM
+        Cors:
+          AllowOrigins: !Split [",", !Ref AllowedOrigins]
+          AllowMethods:
+            - POST
+            - OPTIONS
+          AllowHeaders:
+            - Content-Type
+            - Authorization
 
   # ──── Agent List (Read-Only) ────
   AgentListFunction:
@@ -850,11 +987,14 @@ Resources:
       Handler: functions/documents/index.handler
       CodeUri: .
       Runtime: nodejs22.x
-      Timeout: 20
-      MemorySize: 256
+      Timeout: 60
+      MemorySize: 512
       Environment:
         Variables:
           TABLE_PREFIX: 'RamN_'
+          GCP_PROJECT_ID: ramn-ai
+          GCP_LOCATION: us-central1
+          GCP_SERVICE_ACCOUNT_SECRET_ARN: !Ref GcpServiceAccountSecret
       Policies:
         - Statement:
             - Effect: Allow
@@ -863,9 +1003,19 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:Query
                 - dynamodb:DeleteItem
+                - dynamodb:UpdateItem
               Resource:
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*"
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN_*/index/*"
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref GcpServiceAccountSecret
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${S3BucketName}/knowledge-base/*"
       Events:
         DocumentsRegister:
           Type: Api
@@ -975,3 +1125,9 @@ Outputs:
   PrismChatUrl:
     Description: Prism Chat V2 API Endpoint
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v2/prism/chat"
+  PrismChatStreamUrl:
+    Description: Prism Chat streaming Function URL
+    Value: !GetAtt PrismChatStreamFunctionUrl.FunctionUrl
+  AgentRunStreamUrl:
+    Description: Agent runtime streaming Function URL
+    Value: !GetAtt AgentRunStreamFunctionUrl.FunctionUrl

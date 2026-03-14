@@ -149,6 +149,36 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
         }
     }, [addMessageToHistory, currentUser, persistChatMessage]);
 
+    const upsertMessage = useCallback((chatId: string, message: Message) => {
+        setChatHistory(prev => {
+            const existing = prev[chatId] || [];
+            const index = existing.findIndex(item => item.id === message.id);
+            const next = index === -1
+                ? [...existing, message]
+                : existing.map((item, itemIndex) => itemIndex === index ? message : item);
+            return { ...prev, [chatId]: next };
+        });
+        if (currentUser?.id) {
+            persistChatMessage(currentUser.id, chatId, message);
+        }
+    }, [currentUser, persistChatMessage, setChatHistory]);
+
+    const updateMessage = useCallback((chatId: string, messageId: string, updater: (message: Message) => Message) => {
+        let updated: Message | null = null;
+        setChatHistory(prev => {
+            const existing = prev[chatId] || [];
+            const next = existing.map((item) => {
+                if (item.id !== messageId) return item;
+                updated = updater(item);
+                return updated;
+            });
+            return { ...prev, [chatId]: next };
+        });
+        if (updated && currentUser?.id) {
+            persistChatMessage(currentUser.id, chatId, updated);
+        }
+    }, [currentUser, persistChatMessage, setChatHistory]);
+
     const clearChat = useCallback((chatId: string) => {
         clearChatHistory(chatId);
     }, [clearChatHistory]);
@@ -176,6 +206,6 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
     return {
         chatHistory, setChatHistory,
         activeChatId, setActiveChatId: switchChat,
-        loadSessions, addMessage, clearChat, loadChatHistory
+        loadSessions, addMessage, upsertMessage, updateMessage, clearChat, loadChatHistory
     };
 };

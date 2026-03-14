@@ -5,7 +5,11 @@
  * All agent logic lives on the backend — this file only transports data.
  */
 
+import type { RuntimeAttachment } from './runtimeAttachments';
+
 const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
+const PRISM_STREAM_URL = import.meta.env.VITE_PRISM_STREAM_URL || `${API_BASE}/api/v2/prism/chat/stream`;
+const AGENT_STREAM_URL = import.meta.env.VITE_AGENT_STREAM_URL || '';
 const IS_DEV = import.meta.env.DEV;
 
 // ─── Auth Helper ─────────────────────────────────────────────
@@ -103,6 +107,69 @@ async function apiDeleteRequest<T>(path: string): Promise<T> {
     return await response.json() as T;
 }
 
+export interface StreamEvent<TPayload = any> {
+    type?: string;
+    phase?: string;
+    delta?: string;
+    payload?: TPayload;
+    error?: string;
+    message?: string;
+    tool?: any;
+    preview?: string;
+}
+
+async function readEventStream<TPayload>(
+    response: Response,
+    onEvent?: (event: StreamEvent<TPayload>) => void
+): Promise<TPayload> {
+    if (!response.body) {
+        return await response.json() as TPayload;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalPayload: TPayload | null = null;
+    let streamError: Error | null = null;
+
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split('\n\n');
+        buffer = chunks.pop() || '';
+
+        for (const chunk of chunks) {
+            const lines = chunk
+                .split('\n')
+                .map((line) => line.trim())
+                .filter((line) => line.startsWith('data:'))
+                .map((line) => line.slice(5).trim())
+                .filter(Boolean);
+
+            if (lines.length === 0) continue;
+
+            try {
+                const event = JSON.parse(lines.join('\n')) as StreamEvent<TPayload>;
+                onEvent?.(event);
+                if (event?.type === 'final' && event.payload) {
+                    finalPayload = event.payload;
+                }
+                if (event?.type === 'error') {
+                    streamError = new Error(event.message || event.error || 'Streaming request failed');
+                }
+            } catch {
+                // Ignore malformed chunk and continue parsing stream.
+            }
+        }
+    }
+
+    if (streamError) throw streamError;
+    if (finalPayload) return finalPayload;
+    throw new Error('Stream ended without final payload');
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  Prism Chat (Meta Agent Brain)
 // ═══════════════════════════════════════════════════════════════
@@ -111,6 +178,8 @@ export interface PrismChatRequest {
     message: string;
     mode: 'ask' | 'route' | 'create';
     conversationId?: string;
+    attachments?: RuntimeAttachment[];
+    focusDocumentIds?: string[];
     specialAgentContext?: {
         name: string;
         role: string;
@@ -136,6 +205,8 @@ export async function prismChat(params: PrismChatRequest): Promise<PrismChatResp
             message: params.message,
             mode: params.mode,
             conversationId: params.conversationId || null,
+            attachments: params.attachments || [],
+            focusDocumentIds: params.focusDocumentIds || [],
             ...(params.specialAgentContext ? { specialAgentContext: params.specialAgentContext } : {})
         });
     } catch (error: any) {
@@ -146,10 +217,10 @@ export async function prismChat(params: PrismChatRequest): Promise<PrismChatResp
 
 export async function prismChatStream(
     params: PrismChatRequest,
-    onEvent?: (event: { type?: string; phase?: string; payload?: PrismChatResponse }) => void
+    onEvent?: (event: StreamEvent<PrismChatResponse>) => void
 ): Promise<PrismChatResponse> {
     const token = getAuthToken();
-    const response = await fetch(`${API_BASE}/api/v2/prism/chat/stream`, {
+    const response = await fetch(PRISM_STREAM_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -160,56 +231,23 @@ export async function prismChatStream(
             message: params.message,
             mode: params.mode,
             conversationId: params.conversationId || null,
+            attachments: params.attachments || [],
+            focusDocumentIds: params.focusDocumentIds || [],
             ...(params.specialAgentContext ? { specialAgentContext: params.specialAgentContext } : {})
         })
     });
 
     if (!response.ok) {
+        if ((response.headers.get('content-type') || '').includes('text/event-stream')) {
+            await readEventStream<PrismChatResponse>(response, onEvent);
+        }
         const errorData = await response.json().catch(() => ({ error: response.statusText, message: '' }));
         const error = errorData.error || `Request failed: ${response.status}`;
         const detail = errorData.message ? ` — ${errorData.message}` : '';
         throw new Error(`${error}${detail}`);
     }
 
-    // Fallback: if stream body is not available, parse regular JSON.
-    if (!response.body) {
-        return await response.json() as PrismChatResponse;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let finalPayload: PrismChatResponse | null = null;
-
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const chunks = buffer.split('\n\n');
-        buffer = chunks.pop() || '';
-
-        for (const chunk of chunks) {
-            const line = chunk.trim();
-            if (!line.startsWith('data:')) continue;
-
-            const jsonStr = line.slice(5).trim();
-            if (!jsonStr) continue;
-
-            try {
-                const event = JSON.parse(jsonStr);
-                onEvent?.(event);
-                if (event?.type === 'final' && event.payload) {
-                    finalPayload = event.payload;
-                }
-            } catch {
-                // Ignore malformed chunk and continue parsing stream.
-            }
-        }
-    }
-
-    if (finalPayload) return finalPayload;
-    throw new Error('Stream ended without final payload');
+    return readEventStream<PrismChatResponse>(response, onEvent);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -243,6 +281,8 @@ export interface AgentChatRequest {
     agentId: string;
     message: string;
     conversationId?: string;
+    attachments?: RuntimeAttachment[];
+    focusDocumentIds?: string[];
 }
 
 export interface AgentChatResponse {
@@ -258,12 +298,46 @@ export async function agentChat(params: AgentChatRequest): Promise<AgentChatResp
             agentId: params.agentId,
             userId: getUserId(),
             message: params.message,
-            conversationId: params.conversationId || null
+            conversationId: params.conversationId || null,
+            attachments: params.attachments || [],
+            focusDocumentIds: params.focusDocumentIds || []
         });
     } catch (error: any) {
         console.error('API: agentChat failed:', error.message);
         throw error;
     }
+}
+
+export async function agentChatStream(
+    params: AgentChatRequest,
+    onEvent?: (event: StreamEvent<AgentChatResponse>) => void
+): Promise<AgentChatResponse> {
+    const token = getAuthToken();
+    const streamUrl = AGENT_STREAM_URL || `${API_BASE}/api/v2/agents/${encodeURIComponent(params.agentId)}/chat/stream`;
+    const response = await fetch(streamUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            agentId: params.agentId,
+            userId: getUserId(),
+            message: params.message,
+            conversationId: params.conversationId || null,
+            attachments: params.attachments || [],
+            focusDocumentIds: params.focusDocumentIds || []
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText, message: '' }));
+        const error = errorData.error || `Request failed: ${response.status}`;
+        const detail = errorData.message ? ` — ${errorData.message}` : '';
+        throw new Error(`${error}${detail}`);
+    }
+
+    return readEventStream<AgentChatResponse>(response, onEvent);
 }
 
 // ═══════════════════════════════════════════════════════════════

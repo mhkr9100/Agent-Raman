@@ -10,10 +10,12 @@ import {
     saveDocument,
     listDocumentsByOwner,
     getDocument,
-    deleteDocument
+    deleteDocument,
+    deleteDocumentChunksByDocId
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
+import { indexRegisteredDocument } from '../../shared/document-index.js';
 
 function respond(event, statusCode, body) {
     return {
@@ -70,7 +72,8 @@ export const handler = async (event) => {
             if (!fileKey) return respond(event, 400, { error: 'fileKey is required' });
 
             const docId = crypto.randomUUID();
-            const document = await saveDocument({
+            const now = new Date().toISOString();
+            const document = {
                 docId,
                 userId,
                 ownerType,
@@ -81,8 +84,23 @@ export const handler = async (event) => {
                 textKey,
                 textUrl,
                 contentType,
-                size
-            });
+                size,
+                createdAt: now,
+                updatedAt: now
+            };
+
+            try {
+                await saveDocument(document);
+                await indexRegisteredDocument(document);
+            } catch (error) {
+                try {
+                    await deleteDocumentChunksByDocId(docId);
+                    await deleteDocument(docId, userId);
+                } catch (cleanupError) {
+                    console.warn('DOCUMENTS: cleanup after failed index/save also failed:', cleanupError.message);
+                }
+                throw error;
+            }
 
             return respond(event, 200, { document });
         }
@@ -94,6 +112,7 @@ export const handler = async (event) => {
             const existing = await getDocument(docId, userId);
             if (!existing) return respond(event, 404, { error: 'Document not found' });
 
+            await deleteDocumentChunksByDocId(docId);
             await deleteDocument(docId, userId);
             return respond(event, 200, { success: true, docId });
         }

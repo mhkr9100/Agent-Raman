@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Agent, Team, Message, UserProfile, MessageContent, Task, ToolCall, GlobalTask } from '../types';
 import { AGENTS } from '../constants';
-import { prismChat, prismChatStream, agentChat } from '../services/apiV2';
+import { prismChat, prismChatStream, agentChat, agentChatStream } from '../services/apiV2';
+import { isImageAttachment, serializeRuntimeImageAttachment } from '../services/runtimeAttachments';
 
 // Composed Hooks
 import { useAuth } from './useAuth';
@@ -38,7 +39,7 @@ export const useScatter = () => {
 
     const {
         activeChatId, setActiveChatId,
-        loadSessions, addMessage, clearChat, loadChatHistory
+        loadSessions, addMessage, upsertMessage, updateMessage, clearChat, loadChatHistory
     } = useChatSessions(currentUser);
 
     // === Rate Limit State ===
@@ -114,6 +115,64 @@ export const useScatter = () => {
         );
     };
 
+    const createStreamMessage = useCallback((chatId: string, agent: Agent) => {
+        const streamMessage: Message = {
+            id: `stream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            userId: currentUser?.id,
+            agent,
+            content: { type: 'text', text: '' },
+            type: 'agent'
+        };
+        upsertMessage(chatId, streamMessage);
+        return streamMessage.id;
+    }, [currentUser?.id, upsertMessage]);
+
+    const applyStreamDelta = useCallback((chatId: string, messageId: string, delta: string) => {
+        if (!delta) return;
+        updateMessage(chatId, messageId, (message) => ({
+            ...message,
+            content: {
+                ...(message.content as any),
+                type: 'text',
+                text: `${((message.content as any).text || '')}${delta}`
+            }
+        }));
+    }, [updateMessage]);
+
+    const finalizeStreamMessage = useCallback((chatId: string, messageId: string, text: string, extra?: Partial<MessageContent>) => {
+        updateMessage(chatId, messageId, (message) => ({
+            ...message,
+            content: {
+                type: 'text',
+                text,
+                ...((extra || {}) as any)
+            }
+        }));
+    }, [updateMessage]);
+
+    const prepareRuntimeAttachments = useCallback(async (files: File[] | undefined, ownerType: 'agent' | 'user', ownerId: string) => {
+        const runtimeAttachments: any[] = [];
+        const focusDocumentIds: string[] = [];
+        if (!files || files.length === 0) {
+            return { runtimeAttachments, focusDocumentIds };
+        }
+
+        const { uploadAndRegisterDocument } = await import('../services/documentService');
+        for (const file of files.slice(0, 5)) {
+            if (isImageAttachment(file)) {
+                runtimeAttachments.push(await serializeRuntimeImageAttachment(file));
+                continue;
+            }
+
+            const document = await uploadAndRegisterDocument({ ownerType, ownerId, file });
+            if (document?.docId) {
+                focusDocumentIds.push(document.docId);
+            }
+        }
+
+        return { runtimeAttachments, focusDocumentIds };
+    }, []);
+
     // === Send Message (Core Orchestration) ===
     const handleSendMessage = useCallback(async (
         text: string,
@@ -144,34 +203,64 @@ export const useScatter = () => {
 
         try {
             const runtimeMessage = text;
-            if (attachments && attachments.length > 0) {
-                const { uploadAndRegisterDocument } = await import('../services/documentService');
-                const files = attachments.slice(0, 5);
-                const ownerType: 'agent' | 'user' = agent ? 'agent' : 'user';
-                const ownerId = agent ? agent.id : currentUser.id;
+            const ownerType: 'agent' | 'user' = agent ? 'agent' : 'user';
+            const ownerId = agent ? agent.id : currentUser.id;
+            const { runtimeAttachments, focusDocumentIds } = await prepareRuntimeAttachments(attachments, ownerType, ownerId);
 
-                for (const file of files) {
-                    await uploadAndRegisterDocument({ ownerType, ownerId, file });
-                }
-            }
+            const prismRequest = {
+                message: runtimeMessage,
+                mode: prismMode || 'ask',
+                conversationId: chatId,
+                attachments: runtimeAttachments,
+                focusDocumentIds,
+                ...(specialAgentContext ? { specialAgentContext } : {})
+            } as const;
 
-            const callPrism = async () => {
-                const request = {
-                    message: runtimeMessage,
-                    mode: prismMode || 'ask',
-                    conversationId: chatId,
-                    ...(specialAgentContext ? { specialAgentContext } : {})
-                } as const;
-
+            const runPrism = async (messageId: string) => {
                 try {
-                    return await prismChatStream(request, (event) => {
+                    const response = await prismChatStream(prismRequest, (event) => {
                         if (event?.type === 'status' && event.phase) {
                             setPrismStatus(event.phase);
                         }
+                        if (event?.type === 'text-delta' && event.delta) {
+                            applyStreamDelta(chatId, messageId, event.delta);
+                        }
                     });
+                    finalizeStreamMessage(chatId, messageId, response.text || '', response.toolCall ? { toolCall: response.toolCall } : undefined);
+                    return response;
                 } catch (streamErr) {
-                    console.warn('[useScatter] Stream endpoint unavailable; falling back to JSON response.', streamErr);
-                    return await prismChat(request);
+                    console.warn('[useScatter] Prism stream unavailable; falling back to JSON response.', streamErr);
+                    const response = await prismChat(prismRequest);
+                    finalizeStreamMessage(chatId, messageId, response.text || '', response.toolCall ? { toolCall: response.toolCall } : undefined);
+                    return response;
+                }
+            };
+
+            const runAgent = async (targetAgent: Agent, messageId: string) => {
+                const request = {
+                    agentId: targetAgent.id,
+                    message: runtimeMessage,
+                    conversationId: chatId,
+                    attachments: runtimeAttachments,
+                    focusDocumentIds
+                };
+
+                try {
+                    const response = await agentChatStream(request, (event) => {
+                        if (event?.type === 'status' && event.phase) {
+                            setPrismStatus(event.phase);
+                        }
+                        if (event?.type === 'text-delta' && event.delta) {
+                            applyStreamDelta(chatId, messageId, event.delta);
+                        }
+                    });
+                    finalizeStreamMessage(chatId, messageId, response.response || '');
+                    return response;
+                } catch (streamErr) {
+                    console.warn('[useScatter] Agent stream unavailable; falling back to JSON response.', streamErr);
+                    const response = await agentChat(request);
+                    finalizeStreamMessage(chatId, messageId, response.response || '');
+                    return response;
                 }
             };
 
@@ -188,36 +277,22 @@ export const useScatter = () => {
                     setTypingAgents(mentionedAgents.map(a => ({ agent: a, tasks: [], mode: 'CHAT' as const })));
 
                     await Promise.all(mentionedAgents.map(async (targetAgent) => {
-                        const response = await agentChat({
-                            agentId: targetAgent.id,
-                            message: runtimeMessage,
-                            conversationId: chatId
-                        });
-                        const responseContent = { type: 'text', text: response.response } as any;
-                        if (responseContent) addMessage(chatId, { id: `msg-${Date.now()}-${targetAgent.id}`, userId: currentUser.id, agent: targetAgent, content: responseContent, type: 'agent' });
+                        const streamMessageId = createStreamMessage(chatId, targetAgent);
+                        try {
+                            await runAgent(targetAgent, streamMessageId);
+                        } catch (error: any) {
+                            finalizeStreamMessage(chatId, streamMessageId, `⚠️ Error connecting to AI: ${error.message}`);
+                        }
                     }));
                 } else {
                     setPrismStatus("No mention detected. Consulting Core...");
-                    const response = await callPrism();
+                    const streamMessageId = createStreamMessage(chatId, AGENTS.PRISM);
+                    const response = await runPrism(streamMessageId);
 
                     if (response) {
-                        const msgId = `msg-${Date.now()}`;
-
-                        addMessage(chatId, {
-                            id: msgId,
-                            userId: currentUser.id,
-                            agent: AGENTS.PRISM,
-                            content: {
-                                type: 'text',
-                                text: response.text || '',
-                                toolCall: response.toolCall
-                            },
-                            type: 'agent'
-                        });
-
                         // Auto-execute READ_ONLY tool calls silently (e.g., search)
                         if (response.toolCall && response.toolCall.safetyType === 'READ_ONLY') {
-                            await handleExecuteCommand(chatId, msgId, response.toolCall,
+                            await handleExecuteCommand(chatId, streamMessageId, response.toolCall,
                                 addTeam,
                                 addDynamoAgent, setActiveChatId
                             );
@@ -227,44 +302,17 @@ export const useScatter = () => {
             } else if (agent || chatId === 'prism-core') {
                 const target = agent || AGENTS.PRISM;
                 setTypingAgent(target);
-
-                let responseContent: any;
-
+                const streamMessageId = createStreamMessage(chatId, target);
                 if (target.id === 'prism-core') {
-                    const prismRes = await callPrism();
-                    responseContent = {
-                        type: 'text',
-                        text: prismRes.text,
-                        toolCall: prismRes.toolCall
-                    };
-                } else {
-                    const agentRes = await agentChat({
-                        agentId: target.id,
-                        message: runtimeMessage,
-                        conversationId: chatId
-                    });
-                    // For now map string response to content interface
-                    responseContent = { type: 'text', text: agentRes.response };
-                }
-
-                if (responseContent) {
-                    const msgId = `msg-${Date.now()}`;
-                    const toolCallInfo = responseContent.toolCall ? { toolCall: responseContent.toolCall } : {};
-
-                    addMessage(chatId, {
-                        id: msgId,
-                        userId: currentUser.id,
-                        agent: target,
-                        content: { type: 'text', text: responseContent.text || '', ...toolCallInfo },
-                        type: 'agent'
-                    });
-
-                    if (responseContent.toolCall && responseContent.toolCall.safetyType === 'READ_ONLY') {
-                        await handleExecuteCommand(chatId, msgId, responseContent.toolCall,
+                    const prismRes = await runPrism(streamMessageId);
+                    if (prismRes?.toolCall && prismRes.toolCall.safetyType === 'READ_ONLY') {
+                        await handleExecuteCommand(chatId, streamMessageId, prismRes.toolCall,
                             addTeam,
                             addDynamoAgent, setActiveChatId
                         );
                     }
+                } else {
+                    await runAgent(target, streamMessageId);
                 }
             }
         } catch (e: any) {
@@ -283,7 +331,7 @@ export const useScatter = () => {
             setTypingAgent(null);
             setOrchestrationWeights({});
         }
-    }, [currentUser, activeChatId, agents, teams, addMessage, addTeam]);
+    }, [currentUser, activeChatId, agents, teams, addMessage, addTeam, addDynamoAgent, applyStreamDelta, createStreamMessage, finalizeStreamMessage, handleExecuteCommand, prepareRuntimeAttachments, setActiveChatId]);
 
     // === Special Agent → Prism Flow ===
     const sendSpecialAgentToPrism = useCallback((template: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string }) => {

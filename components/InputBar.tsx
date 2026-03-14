@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Agent } from '../types';
-import { MAX_DOCUMENT_BYTES, validateDocumentFile } from '../services/documentParser';
+import { MAX_DOCUMENT_BYTES } from '../services/documentParser';
+import { validateChatAttachment } from '../services/runtimeAttachments';
 
 export type PrismMode = 'create' | 'ask';
 
@@ -60,7 +61,7 @@ export const InputBar: React.FC<InputBarProps> = ({
     if (e) e.preventDefault();
     if ((!prompt.trim() && attachments.length === 0) || isLoading) return;
 
-    const finalPrompt = prompt.trim() || 'I uploaded supporting documents. Use the retrieved document context when responding.';
+    const finalPrompt = prompt.trim() || 'Please analyze the attached files and use them when responding.';
 
     onSubmit(
       finalPrompt,
@@ -128,7 +129,7 @@ export const InputBar: React.FC<InputBarProps> = ({
         if (file.size > MAX_FILE_SIZE_BYTES) {
           throw new Error(`"${file.name}" exceeds ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))}MB limit.`);
         }
-        validateDocumentFile(file);
+        validateChatAttachment(file);
         accepted.push(file);
       } catch (err: any) {
         setAttachmentError(err?.message || 'Failed to validate selected file.');
@@ -251,7 +252,7 @@ export const InputBar: React.FC<InputBarProps> = ({
             className="hidden"
             onChange={handleAttachmentPick}
             disabled={isLoading}
-            accept=".pdf,.txt,.doc,.docx,.csv,.md,.json,.yaml,.yml,.xml"
+            accept=".pdf,.txt,.doc,.docx,.csv,.md,.json,.yaml,.yml,.xml,.png,.jpg,.jpeg,.webp,.gif,image/*"
             multiple
           />
 

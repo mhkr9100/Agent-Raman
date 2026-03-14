@@ -1,20 +1,15 @@
 /**
- * RamN AI — Agent Run Lambda (Agent Runtime)
- * 
- * Executes a created agent by loading its blueprint from DynamoDB
- * and calling Vertex AI with the saved system prompt and model config.
- * 
- * Tier 2 Upgrade: ReAct Loop (Reason + Act)
- * The agent can now use tools autonomously. If the LLM requests a tool call,
- * the Lambda executes it, feeds the result back, and loops until a final
- * text answer is produced — just like CrewAI, LangGraph, and Agno agents.
- * 
- * POST /api/agents/{agentId}/chat
- * Body: { agentId, userId, message, conversationId }
+ * RamN AI — Agent Run Lambda (ChatBot Runtime)
  */
 
-import { callAI, callAIWithTools } from '../../shared/vertex-ai.js';
+import crypto from 'crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+    callAI,
+    callAIStream,
+    callAIWithTools,
+    callAIWithToolsStream
+} from '../../shared/vertex-ai.js';
 import {
     getAgent,
     saveMessage,
@@ -22,7 +17,8 @@ import {
     getToolById,
     getUserMap,
     saveDocument,
-    updateAgent
+    updateAgent,
+    searchRelevantMemories
 } from '../../shared/dynamo.js';
 import { validateToken } from '../../shared/auth.js';
 import { checkAndRecordUsage } from '../../shared/rate-limit.js';
@@ -34,8 +30,9 @@ import {
     resolveSupportedVertexModelId
 } from '../../shared/runtime-policy.js';
 import { getRelevantDocumentContext } from '../../shared/document-context.js';
-
-// ─── Constants ───────────────────────────────────────────────────
+import { buildConversationContext } from '../../shared/conversation-context.js';
+import { indexRegisteredDocument } from '../../shared/document-index.js';
+import { summarizeAttachmentNames, toVertexUserParts } from '../../shared/chat-attachments.js';
 
 const MAX_REACT_ITERATIONS = 5;
 const s3Client = new S3Client({ region: process.env.S3_BUCKET_REGION || process.env.AWS_REGION || 'us-east-2' });
@@ -51,14 +48,44 @@ function respond(event, statusCode, body) {
     };
 }
 
-// ─── Built-in Tool Executors ─────────────────────────────────────
-// Each tool maps to a real function. Add new tool executors here.
+function buildStreamMetadata(requestHeaders, statusCode = 200) {
+    return {
+        statusCode,
+        headers: {
+            ...buildCorsHeaders(requestHeaders, 'OPTIONS,POST'),
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        }
+    };
+}
+
+async function writeSseEvent(stream, event) {
+    stream.write(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+function httpError(statusCode, error, message = error) {
+    const err = new Error(message);
+    err.statusCode = statusCode;
+    err.error = error;
+    return err;
+}
+
+function formatMemoryContext(memories) {
+    if (!Array.isArray(memories) || memories.length === 0) return '';
+    return memories
+        .map((memory, index) => {
+            const content = String(memory.content || '').replace(/\s+/g, ' ').trim();
+            const createdAt = memory.createdAt ? ` [${memory.createdAt}]` : '';
+            return `${index + 1}.${createdAt} ${content}`;
+        })
+        .join('\n');
+}
 
 async function executeGoogleSearch(args) {
     const query = args.query || args.search_query || '';
     console.log(`TOOL-EXEC: googleSearch — query="${query}"`);
 
-    // Use Google Custom Search API or fallback to a summary
     const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
     const cseId = process.env.GOOGLE_CSE_ID;
 
@@ -68,15 +95,15 @@ async function executeGoogleSearch(args) {
             const res = await fetch(url);
             const data = await res.json();
             if (data.items && data.items.length > 0) {
-                return data.items.map((item, i) => `${i + 1}. **${item.title}**\n   ${item.snippet}\n   URL: ${item.link}`).join('\n\n');
+                return data.items.map((item, index) => `${index + 1}. **${item.title}**\n   ${item.snippet}\n   URL: ${item.link}`).join('\n\n');
             }
             return `Search returned no results for: "${query}"`;
         } catch (err) {
-            return `Search failed: ${err.message}. Please answer based on your training data.`;
+            return `Search failed: ${err.message}. Please answer based on verified information already available.`;
         }
     }
 
-    return `[Google Search API not configured] The agent attempted to search for "${query}" but no API key is set. Answering based on training data instead.`;
+    return `[Google Search API not configured] The chatbot attempted to search for "${query}" but no API key is set.`;
 }
 
 async function executeCalculator(args) {
@@ -97,24 +124,22 @@ function evaluateArithmeticExpression(input) {
     }
 
     const tokens = [];
-    let i = 0;
-    while (i < sanitized.length) {
-        const ch = sanitized[i];
+    let index = 0;
+    while (index < sanitized.length) {
+        const ch = sanitized[index];
         if (/[0-9.]/.test(ch)) {
             let num = ch;
-            i++;
-            while (i < sanitized.length && /[0-9.]/.test(sanitized[i])) {
-                num += sanitized[i];
-                i++;
+            index++;
+            while (index < sanitized.length && /[0-9.]/.test(sanitized[index])) {
+                num += sanitized[index];
+                index++;
             }
-            if ((num.match(/\./g) || []).length > 1) {
-                throw new Error(`Invalid number: ${num}`);
-            }
+            if ((num.match(/\./g) || []).length > 1) throw new Error(`Invalid number: ${num}`);
             tokens.push({ type: 'num', value: Number(num) });
             continue;
         }
         tokens.push({ type: 'op', value: ch });
-        i++;
+        index++;
     }
 
     const values = [];
@@ -125,9 +150,7 @@ function evaluateArithmeticExpression(input) {
         const op = ops.pop();
         const b = values.pop();
         const a = values.pop();
-        if (typeof a !== 'number' || typeof b !== 'number') {
-            throw new Error('Malformed expression');
-        }
+        if (typeof a !== 'number' || typeof b !== 'number') throw new Error('Malformed expression');
         if (op === '/' && b === 0) throw new Error('Division by zero');
         switch (op) {
             case '+': values.push(a + b); break;
@@ -164,11 +187,7 @@ function evaluateArithmeticExpression(input) {
             values.push(0);
         }
 
-        while (
-            ops.length &&
-            ops[ops.length - 1] !== '(' &&
-            precedence[ops[ops.length - 1]] >= precedence[op]
-        ) {
+        while (ops.length && ops[ops.length - 1] !== '(' && precedence[ops[ops.length - 1]] >= precedence[op]) {
             applyOp();
         }
         ops.push(op);
@@ -203,43 +222,29 @@ async function executeDocReader(args, context = {}) {
     const query = String(args?.query || args?.question || args?.input || '').trim();
     const { userId, agentId } = context;
     const documentContext = await getRelevantDocumentContext({ userId, agentId, query });
-    if (documentContext.error) {
-        return documentContext.error;
-    }
-    if (!documentContext.text) {
-        return 'No registered documents found for this session.';
-    }
+    if (documentContext.error) return documentContext.error;
+    if (!documentContext.text) return 'No registered documents found for this session.';
     return `Document Reader Results${query ? ` for "${query}"` : ''}:\n\n${documentContext.text}`;
 }
 
 async function executeCanvas(args, context = {}) {
     const { userId, agentId } = context;
-    if (!userId) {
-        return 'Canvas requires a valid user context.';
-    }
+    if (!userId) return 'Canvas requires a valid user context.';
 
     const bucket = process.env.S3_BUCKET_NAME || '';
-    if (!bucket) {
-        return 'Canvas is unavailable because S3 bucket configuration is missing.';
-    }
+    if (!bucket) return 'Canvas is unavailable because S3 bucket configuration is missing.';
 
     const content = String(args?.content || args?.markdown || args?.input || '').trim();
-    if (!content) {
-        return 'Canvas requires non-empty content.';
-    }
+    if (!content) return 'Canvas requires non-empty content.';
 
     const title = String(args?.title || 'Canvas Note').trim() || 'Canvas Note';
-    const safeTitle = title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 64) || 'canvas-note';
-
+    const safeTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'canvas-note';
     const ownerType = agentId ? 'agent' : 'user';
     const ownerId = agentId || userId;
     const docId = crypto.randomUUID();
     const key = `knowledge-base/${ownerId}/canvas/${Date.now()}-${safeTitle}.md`;
     const payload = `# ${title}\n\n${content}\n`;
+    const createdAt = new Date().toISOString();
 
     await s3Client.send(new PutObjectCommand({
         Bucket: bucket,
@@ -248,7 +253,7 @@ async function executeCanvas(args, context = {}) {
         ContentType: 'text/markdown; charset=utf-8'
     }));
 
-    await saveDocument({
+    const document = {
         docId,
         userId,
         ownerType,
@@ -257,36 +262,31 @@ async function executeCanvas(args, context = {}) {
         fileKey: key,
         textKey: key,
         contentType: 'text/markdown',
-        size: Buffer.byteLength(payload, 'utf-8')
-    });
+        size: Buffer.byteLength(payload, 'utf-8'),
+        createdAt,
+        updatedAt: createdAt
+    };
+
+    await saveDocument(document);
+    await indexRegisteredDocument(document);
 
     return `Canvas saved successfully as "${title}.md" in the ${ownerType === 'agent' ? 'chatbot' : 'user'} knowledge space.`;
 }
 
-// Tool executor registry — maps toolId to function
 const TOOL_EXECUTORS = {
-    // Search Tool Aliases
     'web-search': executeGoogleSearch,
     googleSearch: executeGoogleSearch,
     google_search: executeGoogleSearch,
     webSearch: executeGoogleSearch,
     web_search: executeGoogleSearch,
-
-    // Calculator Aliases
-    'calculator': executeCalculator,
-    'math': executeCalculator,
-
-    // Time Tool Aliases
-    'getCurrentTime': executeGetCurrentTime,
-    'get_current_time': executeGetCurrentTime,
-    'datetime': executeGetCurrentTime,
-
-    // Document Reader
+    calculator: executeCalculator,
+    math: executeCalculator,
+    getCurrentTime: executeGetCurrentTime,
+    get_current_time: executeGetCurrentTime,
+    datetime: executeGetCurrentTime,
     'doc-reader': executeDocReader,
-    'doc_reader': executeDocReader,
-    'docReader': executeDocReader,
-
-    // Canvas
+    doc_reader: executeDocReader,
+    docReader: executeDocReader,
     canvas: executeCanvas
 };
 
@@ -318,7 +318,6 @@ function resolveRuntimeModel(requestedModelId) {
             error: `Model "${requestedModelId}" is not enabled in this deployment. Supported models: ${Array.from(SUPPORTED_VERTEX_MODELS).join(', ')}`
         };
     }
-
     return {
         ok: true,
         runtimeModelId: resolution.runtimeModelId,
@@ -330,25 +329,19 @@ function resolveRuntimeModel(requestedModelId) {
 async function executeTool(toolName, args, context = {}) {
     const canonical = toCanonicalToolId(toolName);
     const executor = TOOL_EXECUTORS[canonical] || TOOL_EXECUTORS[toolName];
-    if (executor) {
-        return await executor(args, context);
-    }
-    return `[Tool "${toolName}" has no executor configured yet] The agent requested this tool but it is not yet implemented. Please answer using your training data.`;
+    if (executor) return executor(args, context);
+    return `[Tool "${toolName}" has no executor configured yet] The chatbot requested this tool but it is not yet implemented.`;
 }
 
-// ─── Convert ToolRegistry records to Gemini functionDeclarations ─
-
 function toolToFunctionDeclaration(tool) {
-    // Map RamN_ToolRegistry shape → Gemini functionDeclaration shape
     const canonicalId = toCanonicalToolId(tool.toolId);
-    const decl = {
+    const declaration = {
         name: canonicalId,
         description: tool.description || `Tool: ${tool.name}`
     };
 
-    // Build parameters schema based on tool type
     if (['googleSearch', 'webSearch', 'web_search', 'web-search'].includes(canonicalId)) {
-        decl.parameters = {
+        declaration.parameters = {
             type: 'OBJECT',
             properties: {
                 query: { type: 'STRING', description: 'The search query to look up' }
@@ -356,23 +349,23 @@ function toolToFunctionDeclaration(tool) {
             required: ['query']
         };
     } else if (['calculator', 'math'].includes(canonicalId)) {
-        decl.parameters = {
+        declaration.parameters = {
             type: 'OBJECT',
             properties: {
-                expression: { type: 'STRING', description: 'The mathematical expression to evaluate (e.g., "2 + 2", "15 * 3.14")' }
+                expression: { type: 'STRING', description: 'The mathematical expression to evaluate' }
             },
             required: ['expression']
         };
     } else if (['getCurrentTime', 'datetime', 'get_current_time'].includes(canonicalId)) {
-        decl.parameters = {
+        declaration.parameters = {
             type: 'OBJECT',
             properties: {
-                timezone: { type: 'STRING', description: 'IANA timezone string (e.g., "America/New_York", "UTC")' }
+                timezone: { type: 'STRING', description: 'IANA timezone string' }
             },
             required: []
         };
     } else if (['doc-reader', 'doc_reader', 'docReader'].includes(canonicalId)) {
-        decl.parameters = {
+        declaration.parameters = {
             type: 'OBJECT',
             properties: {
                 query: { type: 'STRING', description: 'Question or query to retrieve relevant document snippets' }
@@ -380,7 +373,7 @@ function toolToFunctionDeclaration(tool) {
             required: []
         };
     } else if (canonicalId === 'canvas') {
-        decl.parameters = {
+        declaration.parameters = {
             type: 'OBJECT',
             properties: {
                 title: { type: 'STRING', description: 'Short title for the canvas artifact' },
@@ -389,8 +382,7 @@ function toolToFunctionDeclaration(tool) {
             required: ['title', 'content']
         };
     } else {
-        // Generic fallback — single input string
-        decl.parameters = {
+        declaration.parameters = {
             type: 'OBJECT',
             properties: {
                 input: { type: 'STRING', description: `Input for the ${tool.name} tool` }
@@ -399,10 +391,297 @@ function toolToFunctionDeclaration(tool) {
         };
     }
 
-    return decl;
+    return declaration;
 }
 
-// ─── Handler ─────────────────────────────────────────────────────
+async function buildRuntimeContext({ userId, agentId, message, conversationId, attachments = [], focusDocumentIds = [] }) {
+    const convId = conversationId || crypto.randomUUID();
+    let history = [];
+    let conversationSummary = '';
+
+    const agent = await getAgent(agentId, userId);
+    if (!agent) throw httpError(404, 'ChatBot not found');
+    if (agent.userId !== userId) throw httpError(403, 'You do not have access to this agent');
+    if (agent.status !== 'active') throw httpError(400, `ChatBot is ${agent.status}. Only active chatbots can be run.`);
+
+    const blueprint = agent.blueprint;
+    const requestedModelId = blueprint.model?.modelId || DEFAULT_VERTEX_MODEL_ID;
+    const modelResolution = resolveRuntimeModel(requestedModelId);
+    if (!modelResolution.ok) throw httpError(400, modelResolution.error);
+    const modelId = modelResolution.runtimeModelId;
+
+    if (modelResolution.migrated) {
+        try {
+            await updateAgent(agentId, userId, {
+                blueprint: {
+                    ...blueprint,
+                    model: {
+                        ...(blueprint.model || {}),
+                        modelId
+                    }
+                }
+            });
+        } catch (repairError) {
+            console.warn('AGENT-RUN: Failed to persist repaired model mapping:', repairError.message);
+        }
+    }
+
+    if (conversationId) {
+        const messages = await getConversation(conversationId);
+        const conversationContext = await buildConversationContext({
+            messages,
+            currentUserMessage: message,
+            modelName: modelId
+        });
+        history = conversationContext.history;
+        conversationSummary = conversationContext.summaryText;
+    }
+
+    let systemPrompt = blueprint.systemPrompt;
+    if (conversationSummary) {
+        systemPrompt = `${systemPrompt}\n\n# PRIOR CONVERSATION SUMMARY\n${conversationSummary}`;
+    }
+
+    try {
+        const userMap = await getUserMap(userId);
+        if (userMap && (userMap.preferences || userMap.orgContext || userMap.agentHistory)) {
+            const contextSnippet = JSON.stringify({
+                preferences: userMap.preferences || {},
+                orgContext: userMap.orgContext || {},
+                agentHistory: userMap.agentHistory || []
+            }, null, 2);
+            systemPrompt = `${systemPrompt}\n\n# UPDATED USER CONTEXT (UserMap)\nThe following is the current, up-to-date context about the user you are assisting. Use this to personalize your response:\n${contextSnippet}`;
+        }
+    } catch (mapErr) {
+        console.warn('AGENT-RUN: UserMap fetch failed (non-fatal):', mapErr.message);
+    }
+
+    try {
+        const memories = await searchRelevantMemories(userId, message, { agentId, limit: 6 });
+        const memoryContext = formatMemoryContext(memories);
+        if (memoryContext) {
+            systemPrompt = `${systemPrompt}\n\n# RELEVANT CROSS-CONVERSATION MEMORY\nThese facts were extracted from prior conversations with Prism and other chatbots. Use them only when they directly help the answer.\n${memoryContext}`;
+        }
+    } catch (memoryErr) {
+        console.warn('AGENT-RUN: Memory retrieval failed (non-fatal):', memoryErr.message);
+    }
+
+    try {
+        const documentContext = await getRelevantDocumentContext({
+            userId,
+            agentId,
+            query: message,
+            focusDocumentIds,
+            maxFiles: 3,
+            maxChars: 1200
+        });
+        if (documentContext.text) {
+            systemPrompt = `${systemPrompt}\n\n# RETRIEVED DOCUMENT CONTEXT\nThese snippets were retrieved from documents already attached to this chatbot or user account. Treat them as high-priority evidence and cite the document names when useful.\n${documentContext.text}`;
+        } else if (documentContext.error) {
+            systemPrompt = `${systemPrompt}\n\n# DOCUMENT RETRIEVAL STATUS\nDocument retrieval returned: ${documentContext.error}`;
+        }
+    } catch (docErr) {
+        console.warn('AGENT-RUN: Failed to retrieve document context:', docErr.message);
+    }
+
+    const blueprintToolIds = deriveToolIdsFromBlueprint(blueprint);
+    const blueprintTools = Array.isArray(blueprint.tools) ? blueprint.tools : [];
+    let functionDeclarations = [];
+
+    if (blueprintTools.length > 0 && typeof blueprintTools[0] === 'object') {
+        functionDeclarations = blueprintTools.map(toolToFunctionDeclaration);
+    } else {
+        const idsToResolve = blueprintToolIds.length > 0
+            ? blueprintToolIds
+            : (Array.isArray(blueprintTools) ? blueprintTools.map(toCanonicalToolId) : []);
+        if (idsToResolve.length > 0 && typeof idsToResolve[0] === 'string') {
+            const toolRecords = await Promise.all(idsToResolve.map((toolId) => getToolRecordWithFallback(toolId)));
+            functionDeclarations = toolRecords.filter(Boolean).map(toolToFunctionDeclaration);
+        }
+    }
+
+    functionDeclarations = Array.from(new Map(functionDeclarations.map((item) => [item.name, item])).values());
+
+    const attachmentSummary = summarizeAttachmentNames(attachments);
+    const persistedUserMessage = attachmentSummary
+        ? `${message}\n\n[Image attachments included: ${attachmentSummary}]`
+        : message;
+
+    return {
+        convId,
+        agent,
+        blueprint,
+        modelId,
+        requestedModelId,
+        modelFallbackApplied: !!modelResolution.migrated,
+        temperature: blueprint.model?.temperature ?? 0.3,
+        history,
+        systemPrompt,
+        hasTools: functionDeclarations.length > 0,
+        functionDeclarations,
+        userParts: toVertexUserParts(attachments),
+        persistedUserMessage
+    };
+}
+
+async function runAgentChat({ userId, agentId, message, conversationId, attachments = [], focusDocumentIds = [], stream }) {
+    const runtime = await buildRuntimeContext({ userId, agentId, message, conversationId, attachments, focusDocumentIds });
+
+    await saveMessage({
+        conversationId: runtime.convId,
+        role: 'user',
+        content: runtime.persistedUserMessage,
+        agentId,
+        userId
+    });
+
+    let finalText = '';
+    let allToolCalls = [];
+    let iteration = 0;
+
+    if (!runtime.hasTools) {
+        const aiResult = stream
+            ? await callAIStream({
+                systemPrompt: runtime.systemPrompt,
+                userMessage: message,
+                history: runtime.history,
+                userParts: runtime.userParts,
+                modelName: runtime.modelId,
+                temperature: runtime.temperature,
+                onTextDelta: async (delta) => stream({ type: 'text-delta', delta })
+            })
+            : await callAI({
+                systemPrompt: runtime.systemPrompt,
+                userMessage: message,
+                history: runtime.history,
+                userParts: runtime.userParts,
+                modelName: runtime.modelId,
+                temperature: runtime.temperature
+            });
+        finalText = aiResult.text;
+        iteration = 1;
+    } else {
+        while (iteration < MAX_REACT_ITERATIONS) {
+            iteration++;
+            if (stream) {
+                await stream({ type: 'status', phase: `reasoning-${iteration}` });
+            }
+
+            const aiResult = stream
+                ? await callAIWithToolsStream({
+                    systemPrompt: runtime.systemPrompt,
+                    userMessage: iteration === 1 ? message : null,
+                    history: runtime.history,
+                    userParts: iteration === 1 ? runtime.userParts : [],
+                    tools: runtime.functionDeclarations,
+                    modelName: runtime.modelId,
+                    temperature: runtime.temperature,
+                    onTextDelta: async (delta) => stream({ type: 'text-delta', delta }),
+                    onToolCall: async (toolCall) => stream({ type: 'tool-call', tool: { name: toolCall.name, args: toolCall.args } })
+                })
+                : await callAIWithTools({
+                    systemPrompt: runtime.systemPrompt,
+                    userMessage: iteration === 1 ? message : null,
+                    history: runtime.history,
+                    userParts: iteration === 1 ? runtime.userParts : [],
+                    tools: runtime.functionDeclarations,
+                    modelName: runtime.modelId,
+                    temperature: runtime.temperature
+                });
+
+            const toolCalls = aiResult.toolCalls || [];
+            if (toolCalls.length === 0) {
+                finalText = aiResult.text;
+                break;
+            }
+
+            allToolCalls.push(...toolCalls);
+            for (const toolCall of toolCalls) {
+                const observation = await executeTool(toolCall.name, toolCall.args, { userId, agentId });
+                if (stream) {
+                    await stream({
+                        type: 'tool-result',
+                        tool: toolCall.name,
+                        preview: String(observation || '').slice(0, 240)
+                    });
+                }
+
+                runtime.history.push({
+                    role: 'model',
+                    content: aiResult.text || `[Calling tool: ${toolCall.name}]`
+                });
+                runtime.history.push({
+                    role: 'user',
+                    content: `[Tool Result for ${toolCall.name}]: ${observation}`
+                });
+
+                await saveMessage({
+                    conversationId: runtime.convId,
+                    role: 'user',
+                    content: `[Tool: ${toolCall.name}] ${observation}`,
+                    agentId,
+                    userId
+                });
+            }
+
+            if (aiResult.text) {
+                finalText += `${aiResult.text}\n`;
+            }
+        }
+
+        if (iteration >= MAX_REACT_ITERATIONS && !finalText) {
+            finalText = `I attempted to use my tools but reached the maximum reasoning depth (${MAX_REACT_ITERATIONS} steps). Here is what I gathered so far:\n\n${allToolCalls.map((toolCall) => `- Called **${toolCall.name}** with ${JSON.stringify(toolCall.args)}`).join('\n')}`;
+        }
+    }
+
+    await saveMessage({
+        conversationId: runtime.convId,
+        role: 'assistant',
+        content: finalText,
+        agentId,
+        userId
+    });
+
+    return {
+        response: finalText,
+        conversationId: runtime.convId,
+        agentId,
+        agentName: runtime.agent.name,
+        requestedModelId: runtime.requestedModelId,
+        runtimeModelId: runtime.modelId,
+        modelFallbackApplied: runtime.modelFallbackApplied,
+        toolsUsed: allToolCalls.map((toolCall) => toolCall.name),
+        iterations: iteration
+    };
+}
+
+async function parseAuthorizedRequest(event) {
+    const authHeader = event.headers?.Authorization || event.headers?.authorization;
+    const auth = await validateToken(authHeader);
+    const userId = auth.userId;
+
+    const body = JSON.parse(event.body || '{}');
+    const { agentId, message, conversationId } = body;
+    const attachments = Array.isArray(body.attachments) ? body.attachments : [];
+    const focusDocumentIds = Array.isArray(body.focusDocumentIds) ? body.focusDocumentIds : [];
+
+    if (!agentId) throw httpError(400, 'Missing agentId');
+    if (!message) throw httpError(400, 'Missing message');
+
+    const usage = await checkAndRecordUsage(userId, 'agent');
+    if (!usage.allowed) {
+        throw httpError(429, 'Rate limit exceeded', `Hourly limit reached (${usage.limit}/hour).`);
+    }
+
+    return {
+        userId,
+        agentId,
+        message,
+        conversationId,
+        attachments,
+        focusDocumentIds
+    };
+}
 
 export const handler = async (event) => {
     if (event.httpMethod === 'OPTIONS') {
@@ -410,295 +689,45 @@ export const handler = async (event) => {
     }
 
     try {
-        const authHeader = event.headers?.Authorization || event.headers?.authorization;
-        const auth = await validateToken(authHeader);
-        const userId = auth.userId;
-
-        const body = JSON.parse(event.body || '{}');
-        const { agentId, message, conversationId } = body;
-
-        if (!agentId) return respond(event, 400, { error: 'Missing agentId' });
-        if (!message) return respond(event, 400, { error: 'Missing message' });
-
-        const usage = await checkAndRecordUsage(userId, 'agent');
-        if (!usage.allowed) {
-            return respond(event, 429, {
-                error: 'Rate limit exceeded',
-                message: `Hourly limit reached (${usage.limit}/hour).`,
-                usage
-            });
-        }
-
-        console.log(`AGENT-RUN: chatbotId=${agentId}, userId=${userId}, conversationId=${conversationId || 'new'}`);
-
-        // 1. Load chatbot from DynamoDB
-        const agent = await getAgent(agentId, userId);
-
-        if (!agent) {
-            console.warn(`AGENT-RUN: ChatBot not found: ${agentId}`);
-            return respond(event, 404, { error: 'ChatBot not found' });
-        }
-
-        if (agent.userId !== userId) {
-            console.warn(`AGENT-RUN: Forbidden — agent belongs to ${agent.userId}, not ${userId}`);
-            return respond(event, 403, { error: 'You do not have access to this agent' });
-        }
-
-        console.log(`AGENT-RUN: Loaded chatbot "${agent.name}" (status: ${agent.status})`);
-
-        if (agent.status !== 'active') {
-            return respond(event, 400, { error: `ChatBot is ${agent.status}. Only active chatbots can be run.` });
-        }
-
-        // 2. Load conversation history
-        const convId = conversationId || crypto.randomUUID();
-        let history = [];
-        if (conversationId) {
-            const messages = await getConversation(conversationId);
-            history = messages.map(m => ({
-                role: m.role === 'assistant' ? 'model' : m.role,
-                content: m.content
-            }));
-            console.log(`AGENT-RUN: Loaded ${history.length} history messages`);
-        }
-
-        // 3. Extract blueprint config & dynamic User Context (UserMap)
-        const blueprint = agent.blueprint;
-        const baseSystemPrompt = blueprint.systemPrompt;
-
-        // Resolve selected model to a runtime-supported model.
-        const requestedModelId = blueprint.model?.modelId || DEFAULT_VERTEX_MODEL_ID;
-        const modelResolution = resolveRuntimeModel(requestedModelId);
-        if (!modelResolution.ok) {
-            return respond(event, 400, { error: modelResolution.error });
-        }
-        const modelId = modelResolution.runtimeModelId;
-        const modelFallbackApplied = !!modelResolution.migrated;
-
-        if (modelFallbackApplied) {
-            console.warn(`AGENT-RUN: Repairing legacy model "${requestedModelId}" -> "${modelId}" for ${agentId}`);
-            try {
-                await updateAgent(agentId, userId, {
-                    blueprint: {
-                        ...blueprint,
-                        model: {
-                            ...(blueprint.model || {}),
-                            modelId
-                        }
-                    }
-                });
-            } catch (repairError) {
-                console.warn('AGENT-RUN: Failed to persist repaired model mapping:', repairError.message);
-            }
-        }
-
-        const temperature = blueprint.model?.temperature ?? 0.3;
-
-        // Fetch LATEST user context (UserMap) — FAIL-SAFE: if this fails, agent still works
-        let systemPrompt = baseSystemPrompt;
-        try {
-            const userMap = await getUserMap(userId);
-            if (userMap && (userMap.preferences || userMap.orgContext || userMap.agentHistory)) {
-                const contextSnippet = JSON.stringify({
-                    preferences: userMap.preferences || {},
-                    orgContext: userMap.orgContext || {},
-                    agentHistory: userMap.agentHistory || []
-                }, null, 2);
-                systemPrompt = `${baseSystemPrompt}\n\n# UPDATED USER CONTEXT (UserMap)\nThe following is the current, up-to-date context about the user you are assisting. Use this to personalize your response:\n${contextSnippet}`;
-            }
-        } catch (mapErr) {
-            console.warn('AGENT-RUN: ⚠️ UserMap fetch failed (non-fatal, using blueprint prompt only):', mapErr.message);
-        }
-
-        const blueprintToolIds = deriveToolIdsFromBlueprint(blueprint);
-
-        try {
-            const documentContext = await getRelevantDocumentContext({
-                userId,
-                agentId,
-                query: message,
-                maxFiles: 2,
-                maxChars: 1200
-            });
-
-            if (documentContext.text) {
-                systemPrompt = `${systemPrompt}\n\n# RETRIEVED DOCUMENT CONTEXT\nThese snippets were retrieved from documents already attached to this chatbot or user account. Treat them as high-priority evidence and cite the document names when useful.\n${documentContext.text}`;
-            } else if (documentContext.error) {
-                systemPrompt = `${systemPrompt}\n\n# DOCUMENT RETRIEVAL STATUS\nDocument retrieval returned: ${documentContext.error}`;
-            }
-        } catch (docErr) {
-            console.warn('AGENT-RUN: Failed to retrieve document context:', docErr.message);
-        }
-
-        console.log(`AGENT-RUN: Using model=${modelId}, temperature=${temperature}`);
-        console.log(`AGENT-RUN: System prompt length: ${systemPrompt.length} chars`);
-
-        // 4. Resolve tools from ToolRegistry → Gemini functionDeclarations
-        // Support legacy + canonical tool IDs.
-        const blueprintTools = Array.isArray(blueprint.tools) ? blueprint.tools : [];
-        let functionDeclarations = [];
-
-        console.log(`AGENT-RUN: Resolving tools...`);
-
-        if (blueprintTools.length > 0 && typeof blueprintTools[0] === 'object') {
-            // Case 1: Tools are already resolved objects in the blueprint
-            console.log(`AGENT-RUN: Using ${blueprintTools.length} pre-resolved tool objects from blueprint`);
-            functionDeclarations = blueprintTools.map(toolToFunctionDeclaration);
-        } else {
-            // Case 2: We have IDs, need to fetch from DB
-            const idsToResolve = blueprintToolIds.length > 0 ? blueprintToolIds : (Array.isArray(blueprintTools) ? blueprintTools.map(toCanonicalToolId) : []);
-            if (idsToResolve.length > 0 && typeof idsToResolve[0] === 'string') {
-                console.log(`AGENT-RUN: Fetching ${idsToResolve.length} tools from registry by ID: [${idsToResolve.join(', ')}]`);
-                const toolPromises = idsToResolve.map(tid => getToolRecordWithFallback(tid));
-                const toolRecords = await Promise.all(toolPromises);
-                functionDeclarations = toolRecords
-                    .filter(t => t !== null)
-                    .map(toolToFunctionDeclaration);
-            }
-        }
-
-        // Deduplicate function declarations by name after canonicalization.
-        functionDeclarations = Array.from(
-            new Map(functionDeclarations.map(d => [d.name, d])).values()
-        );
-
-        console.log(`AGENT-RUN: Resolved ${functionDeclarations.length} function declarations`);
-
-        const hasTools = functionDeclarations.length > 0;
-
-        // 5. Save user message to conversation
-        await saveMessage({
-            conversationId: convId,
-            role: 'user',
-            content: message,
-            agentId,
-            userId
-        });
-
-        // ═══════════════════════════════════════════════════════════
-        //  Agent Execution
-        // ═══════════════════════════════════════════════════════════
-
-        let finalText = '';
-        let allToolCalls = [];
-        let iteration = 0;
-
-        if (!hasTools) {
-            // ─── Simple Path: No tools, single AI call (no ReAct loop needed) ───
-            console.log('AGENT-RUN: No tools — single AI call (no ReAct loop)');
-            const aiResult = await callAI({
-                systemPrompt,
-                userMessage: message,
-                history,
-                modelName: modelId,
-                temperature
-            });
-            finalText = aiResult.text;
-            iteration = 1;
-            console.log(`AGENT-RUN: ✅ Response — ${finalText.length} chars`);
-        } else {
-            // ─── ReAct Loop: Thought → Action → Observation → repeat ───
-            //     (CrewAI / LangGraph / Agno pattern)
-            while (iteration < MAX_REACT_ITERATIONS) {
-                iteration++;
-                console.log(`AGENT-RUN: ═══ ReAct iteration ${iteration}/${MAX_REACT_ITERATIONS} ═══`);
-
-                const aiResult = await callAIWithTools({
-                    systemPrompt,
-                    userMessage: iteration === 1 ? message : null,
-                    history,
-                    tools: functionDeclarations,
-                    modelName: modelId,
-                    temperature
-                });
-
-                const toolCalls = aiResult.toolCalls || [];
-                console.log(`AGENT-RUN: AI response — ${aiResult.text.length} chars, ${toolCalls.length} tool calls`);
-
-                // If no tool calls → this is the final answer
-                if (toolCalls.length === 0) {
-                    finalText = aiResult.text;
-                    console.log(`AGENT-RUN: ✅ Final answer received at iteration ${iteration}`);
-                    break;
-                }
-
-                // Tool calls detected → execute each one
-                for (const tc of toolCalls) {
-                    console.log(`AGENT-RUN: 🔧 Tool call: ${tc.name}(${JSON.stringify(tc.args)})`);
-                    allToolCalls.push(tc);
-
-                    const observation = await executeTool(tc.name, tc.args, { userId, agentId });
-                    console.log(`AGENT-RUN: 📋 Observation: ${observation.substring(0, 200)}...`);
-
-                    // Append the model's response (with tool call) to history
-                    history.push({
-                        role: 'model',
-                        content: aiResult.text || `[Calling tool: ${tc.name}]`
-                    });
-
-                    // Append tool result as "user" message (Observation)
-                    history.push({
-                        role: 'user',
-                        content: `[Tool Result for ${tc.name}]: ${observation}`
-                    });
-
-                    // Save tool observation to conversation for audit trail
-                    await saveMessage({
-                        conversationId: convId,
-                        role: 'user',
-                        content: `[Tool: ${tc.name}] ${observation}`,
-                        agentId,
-                        userId
-                    });
-                }
-
-                // If we also got text alongside tool calls, accumulate it
-                if (aiResult.text) {
-                    finalText += aiResult.text + '\n';
-                }
-            }
-
-            // Safety: if we ran out of iterations, use whatever text we have
-            if (iteration >= MAX_REACT_ITERATIONS && !finalText) {
-                finalText = `I attempted to use my tools but reached the maximum reasoning depth (${MAX_REACT_ITERATIONS} steps). Here is what I gathered so far:\n\n` +
-                    allToolCalls.map(tc => `- Called **${tc.name}** with ${JSON.stringify(tc.args)}`).join('\n');
-            }
-        }
-
-        // 6. Save final assistant response
-        await saveMessage({
-            conversationId: convId,
-            role: 'assistant',
-            content: finalText,
-            agentId,
-            userId
-        });
-
-        console.log(`AGENT-RUN: ✅ Response saved to conversation ${convId} (${iteration} iterations, ${allToolCalls.length} tool calls)`);
-
-        // 7. Return
-        return respond(event, 200, {
-            response: finalText,
-            conversationId: convId,
-            agentId,
-            agentName: agent.name,
-            requestedModelId,
-            runtimeModelId: modelId,
-            modelFallbackApplied,
-            toolsUsed: allToolCalls.map(tc => tc.name),
-            iterations: iteration
-        });
-
+        const request = await parseAuthorizedRequest(event);
+        const payload = await runAgentChat(request);
+        return respond(event, 200, payload);
     } catch (error) {
         console.error('AGENT-RUN: ❌ Error:', error);
-
-        if (error.message && error.message.startsWith('Unauthorized')) {
-            return respond(event, 401, { error: 'Unauthorized', message: error.message });
-        }
-
-        return respond(event, 500, {
-            error: 'Failed to run chatbot',
+        const statusCode = error.statusCode || (error.message && error.message.startsWith('Unauthorized') ? 401 : 500);
+        const errorCode = error.error || (statusCode === 401 ? 'Unauthorized' : 'Failed to run chatbot');
+        return respond(event, statusCode, {
+            error: errorCode,
             message: error.message || 'Unknown error'
         });
     }
 };
+
+export const streamHandler = awslambda.streamifyResponse(async (event, responseStream) => {
+    let stream = null;
+    try {
+        const request = await parseAuthorizedRequest(event);
+        stream = awslambda.HttpResponseStream.from(responseStream, buildStreamMetadata(event.headers, 200));
+        await writeSseEvent(stream, { type: 'status', phase: 'accepted' });
+
+        const payload = await runAgentChat({
+            ...request,
+            stream: async (streamEvent) => writeSseEvent(stream, streamEvent)
+        });
+
+        await writeSseEvent(stream, { type: 'final', payload });
+        await writeSseEvent(stream, { type: 'done' });
+        stream.end();
+    } catch (error) {
+        console.error('AGENT-RUN: ❌ Stream error:', error);
+        const statusCode = error.statusCode || (error.message && error.message.startsWith('Unauthorized') ? 401 : 500);
+        stream = stream || awslambda.HttpResponseStream.from(responseStream, buildStreamMetadata(event.headers, statusCode));
+        await writeSseEvent(stream, {
+            type: 'error',
+            error: error.error || (statusCode === 401 ? 'Unauthorized' : 'Failed to run chatbot'),
+            message: error.message || 'Unknown error'
+        });
+        await writeSseEvent(stream, { type: 'done' });
+        stream.end();
+    }
+});

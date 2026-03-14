@@ -46,8 +46,10 @@ const TABLES = {
     USER_MAP: `${PREFIX}UserMap`,
     USAGE: `${PREFIX}Usage`,
     MODEL_REGISTRY: `${PREFIX}ModelRegistry`,
-    DOCUMENTS: `${PREFIX}Documents`
+    DOCUMENTS: `${PREFIX}Documents`,
+    DOCUMENT_CHUNKS: `${PREFIX}DocumentChunks`
 };
+const ENTITY_TABLE_NAME = process.env.TABLE_NAME || 'RamN-Entities';
 
 // ─── Error Wrapper ───────────────────────────────────────────────
 
@@ -303,6 +305,79 @@ export async function getConversation(conversationId) {
     }
 }
 
+function tokenizeQuery(input) {
+    return String(input || '')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/g)
+        .filter(Boolean)
+        .filter((token) => token.length > 2)
+        .slice(0, 20);
+}
+
+function scoreMemory(memory, queryTokens, agentId) {
+    const content = String(memory?.content || '').toLowerCase();
+    if (!content) return Number.NEGATIVE_INFINITY;
+
+    let score = 0;
+    if (agentId && memory?.agentId === agentId) score += 4;
+    if (queryTokens.length === 0) score += 1;
+
+    for (const token of queryTokens) {
+        if (content.includes(token)) score += 3;
+    }
+
+    const createdAt = Date.parse(memory?.createdAt || '');
+    if (Number.isFinite(createdAt)) {
+        const ageHours = Math.max(0, (Date.now() - createdAt) / (1000 * 60 * 60));
+        score += Math.max(0, 2 - (ageHours / 72));
+    }
+
+    return score;
+}
+
+/**
+ * Search user memories already extracted from prior conversations.
+ * These are stored in the shared Entities table under USER#{userId} / memories#*.
+ */
+export async function searchRelevantMemories(userId, query, { agentId, limit = 5, scanLimit = 250 } = {}) {
+    console.log(`[dynamo] searchRelevantMemories: ${userId.substring(0, 8)}***`);
+    try {
+        const pk = `USER#${userId}`;
+        const result = await docClient.send(new QueryCommand({
+            TableName: ENTITY_TABLE_NAME,
+            KeyConditionExpression: 'PK = :pk AND begins_with(SK, :skPrefix)',
+            ExpressionAttributeValues: {
+                ':pk': pk,
+                ':skPrefix': 'memories#'
+            },
+            ScanIndexForward: false,
+            Limit: scanLimit
+        }));
+
+        const memories = (result.Items || [])
+            .map((item) => item.data)
+            .filter(Boolean);
+
+        if (memories.length === 0) return [];
+
+        const queryTokens = tokenizeQuery(query);
+        return memories
+            .map((memory) => ({
+                ...memory,
+                _score: scoreMemory(memory, queryTokens, agentId)
+            }))
+            .filter((memory) => Number.isFinite(memory._score))
+            .sort((a, b) => {
+                if (b._score !== a._score) return b._score - a._score;
+                return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+            })
+            .slice(0, limit)
+            .map(({ _score, ...memory }) => memory);
+    } catch (error) {
+        wrapError(ENTITY_TABLE_NAME, 'searchRelevantMemories', error);
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════
 //  TOOL REGISTRY — RamN_ToolRegistry (PK: toolId)
 // ══════════════════════════════════════════════════════════════════
@@ -514,7 +589,9 @@ export async function saveDocument({
     textKey,
     textUrl,
     contentType,
-    size
+    size,
+    createdAt,
+    updatedAt
 }) {
     console.log(`[dynamo] saveDocument: ${docId} for user ${userId.substring(0, 8)}*** (${ownerType}:${ownerId})`);
     try {
@@ -533,8 +610,8 @@ export async function saveDocument({
             textUrl: textUrl || null,
             contentType: contentType || 'application/octet-stream',
             size: Number(size) || 0,
-            createdAt: now,
-            updatedAt: now
+            createdAt: createdAt || now,
+            updatedAt: updatedAt || now
         };
 
         await docClient.send(new PutCommand({
@@ -590,6 +667,80 @@ export async function deleteDocument(docId, userId) {
         return { success: true, docId };
     } catch (error) {
         wrapError(TABLES.DOCUMENTS, 'deleteDocument', error);
+    }
+}
+
+export async function saveDocumentChunks(chunks = []) {
+    if (!Array.isArray(chunks) || chunks.length === 0) return [];
+    console.log(`[dynamo] saveDocumentChunks: ${chunks.length} chunk(s)`);
+    try {
+        for (const chunk of chunks) {
+            await docClient.send(new PutCommand({
+                TableName: TABLES.DOCUMENT_CHUNKS,
+                Item: {
+                    ...chunk,
+                    ownerKey: `${chunk.userId}#${chunk.ownerType}#${chunk.ownerId}`,
+                    updatedAt: new Date().toISOString()
+                }
+            }));
+        }
+        return chunks;
+    } catch (error) {
+        wrapError(TABLES.DOCUMENT_CHUNKS, 'saveDocumentChunks', error);
+    }
+}
+
+export async function listDocumentChunksByOwnerKey(ownerKey, { limit = 120 } = {}) {
+    console.log(`[dynamo] listDocumentChunksByOwnerKey: ${ownerKey}`);
+    try {
+        const result = await docClient.send(new QueryCommand({
+            TableName: TABLES.DOCUMENT_CHUNKS,
+            IndexName: 'ownerKey-createdAt-index',
+            KeyConditionExpression: 'ownerKey = :ownerKey',
+            ExpressionAttributeValues: {
+                ':ownerKey': ownerKey
+            },
+            ScanIndexForward: false,
+            Limit: limit
+        }));
+        return result.Items || [];
+    } catch (error) {
+        wrapError(TABLES.DOCUMENT_CHUNKS, 'listDocumentChunksByOwnerKey', error);
+    }
+}
+
+export async function listDocumentChunksByDocId(docId, { limit = 64 } = {}) {
+    console.log(`[dynamo] listDocumentChunksByDocId: ${docId}`);
+    try {
+        const result = await docClient.send(new QueryCommand({
+            TableName: TABLES.DOCUMENT_CHUNKS,
+            IndexName: 'docId-createdAt-index',
+            KeyConditionExpression: 'docId = :docId',
+            ExpressionAttributeValues: {
+                ':docId': docId
+            },
+            ScanIndexForward: true,
+            Limit: limit
+        }));
+        return result.Items || [];
+    } catch (error) {
+        wrapError(TABLES.DOCUMENT_CHUNKS, 'listDocumentChunksByDocId', error);
+    }
+}
+
+export async function deleteDocumentChunksByDocId(docId) {
+    console.log(`[dynamo] deleteDocumentChunksByDocId: ${docId}`);
+    try {
+        const chunks = await listDocumentChunksByDocId(docId, { limit: 256 });
+        for (const chunk of chunks || []) {
+            await docClient.send(new DeleteCommand({
+                TableName: TABLES.DOCUMENT_CHUNKS,
+                Key: { chunkId: chunk.chunkId }
+            }));
+        }
+        return { success: true, count: chunks?.length || 0 };
+    } catch (error) {
+        wrapError(TABLES.DOCUMENT_CHUNKS, 'deleteDocumentChunksByDocId', error);
     }
 }
 
@@ -657,6 +808,7 @@ export async function deleteAllUserData(userId) {
         }));
         const docs = result.Items || [];
         for (const doc of docs) {
+            await deleteDocumentChunksByDocId(doc.docId);
             await deleteDocument(doc.docId, userId);
         }
         console.log(`[dynamo] ✅ Deleted ${docs.length} documents for user`);
@@ -679,6 +831,8 @@ export default {
     saveTeam, getTeam, listTeamsByUser, deleteTeam,
     // Conversations
     saveMessage, getConversation,
+    // Memories
+    searchRelevantMemories,
     // Tool Registry
     listTools, getToolsByCategory, getToolById,
     // Special Agents
@@ -689,6 +843,7 @@ export default {
     listModels, getModelById,
     // Documents
     saveDocument, getDocument, listDocumentsByOwner, deleteDocument,
+    saveDocumentChunks, listDocumentChunksByOwnerKey, listDocumentChunksByDocId, deleteDocumentChunksByDocId,
     // GDPR
     deleteAllUserData,
     // Constants

@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_SUPABASE_URL: string
-  readonly VITE_SUPABASE_ANON_KEY: string
-  // more env variables...
+  readonly VITE_BACKEND_URL: string
+  readonly VITE_PRISM_STREAM_URL?: string
+  readonly VITE_AGENT_STREAM_URL?: string
 }
 
 interface ImportMeta {
