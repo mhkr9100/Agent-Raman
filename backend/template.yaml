@@ -452,7 +452,6 @@ Resources:
           AllowOrigins: !Split [",", !Ref AllowedOrigins]
           AllowMethods:
             - POST
-            - OPTIONS
           AllowHeaders:
             - Content-Type
             - Authorization
@@ -617,7 +616,6 @@ Resources:
           AllowOrigins: !Split [",", !Ref AllowedOrigins]
           AllowMethods:
             - POST
-            - OPTIONS
           AllowHeaders:
             - Content-Type
             - Authorization
