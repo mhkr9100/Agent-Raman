@@ -881,38 +881,6 @@ Resources:
             Path: /api/v2/tools
             Method: OPTIONS
 
-  # ──── Special Agents (Read-Only) ────
-  SpecialAgentsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: functions/special-agents/index.handler
-      CodeUri: .
-      Runtime: nodejs22.x
-      Timeout: 10
-      MemorySize: 128
-      Environment:
-        Variables:
-          TABLE_PREFIX: 'RamN_'
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:Scan
-                - dynamodb:GetItem
-              Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/RamN*"
-      Events:
-        SpecialAgents:
-          Type: Api
-          Properties:
-            Path: /api/v2/special-agents
-            Method: GET
-        SpecialAgentsOptions:
-          Type: Api
-          Properties:
-            Path: /api/v2/special-agents
-            Method: OPTIONS
-
   # ──── UserMap Consolidate ────
   UserMapStoreFunction:
     Type: AWS::Serverless::Function

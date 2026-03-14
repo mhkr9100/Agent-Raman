@@ -10,7 +10,7 @@ export const VAULT = {
     }
 };
 
-// Runtime registries are backend-driven (/api/v2/models, /api/v2/tools, /api/v2/special-agents).
+// Runtime registries are backend-driven (/api/v2/models, /api/v2/tools).
 // Keep local arrays empty to avoid static/template fallback behavior.
 export const AI_RESUMES: AIModelProfile[] = [];
 export const AGENT_TEMPLATES: AgentTemplate[] = [];

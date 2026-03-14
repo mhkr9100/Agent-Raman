@@ -4,7 +4,6 @@
  * Populates DynamoDB tables with initial data:
  *   - RamN_ToolRegistry    (core tool set)
  *   - RamN_ModelRegistry   (3 models)
- *   - RamN_SpecialAgents   (starter templates)
  * 
  * Uses DynamoDB DocumentClient directly.
  * Checks if items exist before inserting (idempotent).
@@ -84,7 +83,6 @@ const TOOLS = [
         description: 'Retrieve relevant snippets from uploaded documents',
         capabilities: ['document_retrieval', 'snippet_extraction'],
         status: 'active'
-    },
     }
 ];
 
@@ -125,71 +123,6 @@ const MODELS = [
     }
 ];
 
-// ══════════════════════════════════════════════════════════════════
-//  SEED 3: RamN_SpecialAgents
-// ══════════════════════════════════════════════════════════════════
-
-const SPECIAL_AGENTS = [
-    {
-        templateId: 'research-agent',
-        name: 'Research Agent',
-        description: 'Deep research assistant that finds, analyzes, and summarizes information on any topic',
-        icon: '🔬',
-        systemPromptTemplate: `You are a Research Agent specializing in {{DOMAIN}}.
-
-Your goal is to provide comprehensive, accurate research on {{TOPIC}}.
-
-## RULES
-### YOU MUST:
-- Always cite or reference your sources
-- Present findings in clear structured format
-- Distinguish between facts, data, and opinions
-- Provide multiple perspectives when relevant
-
-### YOU MUST NOT:
-- Make up sources or statistics
-- Present speculation as fact
-- Skip over contradicting evidence
-
-### SAFETY:
-- If unsure about accuracy, explicitly say so
-- Recommend human verification for critical claims
-
-### OUTPUT FORMAT:
-Structured report with: Summary, Key Findings, Details, Sources, Recommendations`,
-        tools: ['web-search', 'thinking'],
-        model: { provider: 'google', modelId: 'gemini-2.5-pro', temperature: 0.3 },
-        contextSlots: ['DOMAIN', 'TOPIC'],
-        category: 'research'
-    },
-    {
-        templateId: 'writing-agent',
-        name: 'Writing Assistant',
-        description: 'Professional content writer that creates blog posts, emails, reports, and marketing copy',
-        icon: '✍️',
-        systemPromptTemplate: `You are a Writing Agent creating {{CONTENT_TYPE}} for {{AUDIENCE}}.
-
-## RULES
-### YOU MUST:
-- Match the requested tone and style
-- Be original and engaging
-- Follow any brand guidelines provided
-- Structure content with clear headings
-
-### YOU MUST NOT:
-- Plagiarize content
-- Use filler or fluff paragraphs
-- Go off topic
-
-### OUTPUT FORMAT:
-{{FORMAT}}`,
-        tools: ['web-search', 'thinking'],
-        model: { provider: 'google', modelId: 'gemini-2.5-flash', temperature: 0.7 },
-        contextSlots: ['CONTENT_TYPE', 'AUDIENCE', 'FORMAT'],
-        category: 'content'
-    }
-];
-
 // ─── Main ────────────────────────────────────────────────────────
 
 async function main() {
@@ -220,18 +153,6 @@ async function main() {
             results[status]++;
         } catch (error) {
             console.error(`  ❌ FAILED: ${model.modelId} — ${error.message}`);
-            results.failed++;
-        }
-    }
-
-    // ── Seed Special Agents ──
-    console.log('\n▸ Seeding RamN_SpecialAgents...');
-    for (const agent of SPECIAL_AGENTS) {
-        try {
-            const status = await putIfNotExists('RamN_SpecialAgents', ['templateId'], agent);
-            results[status]++;
-        } catch (error) {
-            console.error(`  ❌ FAILED: ${agent.templateId} — ${error.message}`);
             results.failed++;
         }
     }

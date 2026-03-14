@@ -28,8 +28,7 @@ const App: React.FC = () => {
     currentUser, isInitializing, login, logout, userProfile, setUserProfile, agents, setAgents, teams, setTeams,
     activeChatId, setActiveChatId, isProcessing, typingAgent, typingAgents, prismStatus, orchestrationWeights, agentModes,
     handleSendMessage, handleExecuteCommand, injectOutputToChat, clearChat, loadChatHistory, recruitAgent, createTeam, deleteAgent, deleteTeam, processSilentDirective,
-    rateLimitInfo,
-    sendSpecialAgentToPrism
+    rateLimitInfo
   } = useScatter();
 
   const { globalTasks, updateTaskStatus, deleteTask, updateTask, handleAddGlobalTask } = useTasks(processSilentDirective);
@@ -105,30 +104,6 @@ const App: React.FC = () => {
   const activeTeam = teams.find(g => g.id === activeChatId);
   const activeAgent = agents.find(e => e.id === activeChatId);
   const isPrism = activeChatId === 'prism-core';
-
-  const handleHireFromSpectrum = (p: any) => {
-    if ('modelId' in p) {
-      // AI Model Profile → open CreateEntityModal
-      setCreateModalInitialValues({ modelId: p.modelId, role: p.tags?.[0] || 'Specialist', jd: p.summary, isLiveSpaceEnabled: p.isLiveSpaceEnabled });
-      setCreateModalType('agent');
-    } else {
-      // Regular agent template → open CreateEntityModal
-      setCreateModalInitialValues({ modelId: p.defaultModelId, role: p.role, jd: p.jobDescription, name: p.name, isLiveSpaceEnabled: p.isLiveSpaceEnabled });
-      setCreateModalType('agent');
-    }
-  };
-
-  // Special ChatBot "Add via Prism" flow
-  const handleAddSpecialAgentViaPrism = (template: any) => {
-    setActiveView('prism');
-    sendSpecialAgentToPrism({
-      name: template.name,
-      role: template.role,
-      predefinedPrompt: template.predefinedPrompt,
-      defaultTools: template.defaultTools || [],
-      suggestedModel: template.suggestedModel || 'gemini-2.5-flash'
-    });
-  };
 
   const handleInjectSystemMessage = (text: string) => {
     const sysMsg: Message = {
@@ -236,7 +211,7 @@ const App: React.FC = () => {
       case 'home':
         return <HomeView onStartChat={() => { setActiveView('prism'); setActiveChatId('prism-core'); }} onOpenProfile={() => setIsUserProfileOpen(true)} />;
       case 'spectrum':
-        return <SpectrumView onHire={handleHireFromSpectrum} onAddViaPrism={handleAddSpecialAgentViaPrism} onFabricateAgent={() => setCreateModalType('agent')} onInitializeGroup={() => setCreateModalType('project')} onOpenChat={(id) => { setActiveChatId(id); setActiveView('chats'); }} agents={agents} teams={teams} userProfile={userProfile} />;
+        return <SpectrumView onFabricateAgent={() => setCreateModalType('agent')} onInitializeGroup={() => setCreateModalType('project')} onOpenChat={(id) => { setActiveChatId(id); setActiveView('chats'); }} agents={agents} teams={teams} />;
       case 'usermap':
         return <UserMapView tree={userMapTree} isConsolidating={isConsolidating} onUpdateNode={updateNode} onDeleteNode={deleteNode} onAddNode={addNode} onConsolidate={consolidate} onImportContext={() => setIsMemoryImportOpen(true)} />;
 

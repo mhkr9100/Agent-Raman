@@ -175,7 +175,6 @@ export const useScatter = () => {
         searchEnabled?: boolean,
         createEnabled?: boolean,
         prismMode?: 'ask' | 'create',
-        specialAgentContext?: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string },
         requestedCapability?: 'auto' | 'web-search' | 'thinking',
         targetChatId?: string
     ) => {
@@ -207,8 +206,7 @@ export const useScatter = () => {
                 mode: prismMode || 'ask',
                 conversationId: chatId,
                 attachments: runtimeAttachments,
-                focusDocumentIds,
-                ...(specialAgentContext ? { specialAgentContext } : {})
+                focusDocumentIds
             } as const;
 
             const runPrism = async (messageId: string) => {
@@ -339,15 +337,6 @@ export const useScatter = () => {
         }
     }, [currentUser, activeChatId, agents, teams, addMessage, addTeam, addDynamoAgent, applyStreamDelta, createStreamMessage, finalizeStreamMessage, handleExecuteCommand, prepareRuntimeAttachments, setActiveChatId]);
 
-    // === Special Agent → Prism Flow ===
-    const sendSpecialAgentToPrism = useCallback((template: { name: string; role: string; predefinedPrompt: string; defaultTools: string[]; suggestedModel: string }) => {
-        // Switch to Prism chat
-        setActiveChatId('prism-core');
-        // Auto-send create-mode message with special agent context
-        const message = `Personalize and deploy the "${template.name}" chatbot for me.`;
-        handleSendMessage(message, 1, undefined, false, false, 'create', template, undefined, 'prism-core');
-    }, [setActiveChatId, handleSendMessage]);
-
     return {
         currentUser, isInitializing, userProfile: currentUser as UserProfile, setUserProfile: setCurrentUser,
         login, logout,
@@ -358,8 +347,6 @@ export const useScatter = () => {
         processSilentDirective, injectOutputToChat,
         clearChat, loadChatHistory, recruitAgent: addDynamoAgent, deleteAgent, deleteTeam,
         createTeam: (data: any) => createTeam(data, setActiveChatId),
-        rateLimitInfo,
-        // Special Agent Flow
-        sendSpecialAgentToPrism
+        rateLimitInfo
     };
 };

@@ -9,7 +9,6 @@
  *   RamN_Teams           - Team blueprints (PK: teamId, SK: userId)
  *   RamN_Conversations   - Chat history (PK: conversationId, SK: timestamp)
  *   RamN_ToolRegistry    - Available tools (PK: toolId)
- *   RamN_SpecialAgents   - Special agent templates (PK: templateId)
  *   RamN_UserMap          - User context/preferences (PK: userId)
  *   RamN_Usage           - Per-user hourly usage counters (PK: usageKey)
  *   RamN_ModelRegistry   - Available AI models (PK: modelId)
@@ -42,7 +41,6 @@ const TABLES = {
     TEAMS: `${PREFIX}Teams`,
     CONVERSATIONS: `${PREFIX}Conversations`,
     TOOL_REGISTRY: `${PREFIX}ToolRegistry`,
-    SPECIAL_AGENTS: `${PREFIX}SpecialAgents`,
     USER_MAP: `${PREFIX}UserMap`,
     USAGE: `${PREFIX}Usage`,
     MODEL_REGISTRY: `${PREFIX}ModelRegistry`,
@@ -437,44 +435,6 @@ export async function getToolById(toolId) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  SPECIAL AGENTS — RamN_SpecialAgents (PK: templateId)
-// ══════════════════════════════════════════════════════════════════
-
-/**
- * List all special agent templates.
- * @returns {Array}
- */
-export async function listSpecialAgents() {
-    console.log('[dynamo] listSpecialAgents');
-    try {
-        const result = await docClient.send(new ScanCommand({
-            TableName: TABLES.SPECIAL_AGENTS
-        }));
-        console.log(`[dynamo] ✅ Found ${result.Items?.length || 0} special agent templates`);
-        return result.Items || [];
-    } catch (error) {
-        wrapError(TABLES.SPECIAL_AGENTS, 'listSpecialAgents', error);
-    }
-}
-
-/**
- * Get a single special agent template.
- * @returns {Object|null}
- */
-export async function getSpecialAgent(templateId) {
-    console.log(`[dynamo] getSpecialAgent: ${templateId}`);
-    try {
-        const result = await docClient.send(new GetCommand({
-            TableName: TABLES.SPECIAL_AGENTS,
-            Key: { templateId }
-        }));
-        return result.Item || null;
-    } catch (error) {
-        wrapError(TABLES.SPECIAL_AGENTS, 'getSpecialAgent', error);
-    }
-}
-
-// ══════════════════════════════════════════════════════════════════
 //  USER MAP — RamN_UserMap (PK: userId)
 // ══════════════════════════════════════════════════════════════════
 
@@ -835,8 +795,6 @@ export default {
     searchRelevantMemories,
     // Tool Registry
     listTools, getToolsByCategory, getToolById,
-    // Special Agents
-    listSpecialAgents, getSpecialAgent,
     // UserMap
     getUserMap, updateUserMap,
     // Model Registry

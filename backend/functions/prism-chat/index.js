@@ -17,9 +17,7 @@ import {
 import { validateToken } from '../../shared/auth.js';
 import { checkAndRecordUsage } from '../../shared/rate-limit.js';
 import { buildCorsHeaders } from '../../shared/cors.js';
-import { toCanonicalToolId } from '../../shared/tool-ids.js';
 import {
-    PUBLIC_TOOL_IDS,
     SUPPORTED_VERTEX_MODELS
 } from '../../shared/runtime-policy.js';
 import { getRelevantDocumentContext } from '../../shared/document-context.js';
@@ -297,7 +295,7 @@ Wrap JSON in \`\`\`json code block.`;
     };
 }
 
-async function handleCreate({ userId, message, conversationId, attachments = [], focusDocumentIds = [], specialAgentContext }) {
+async function handleCreate({ userId, message, conversationId, attachments = [], focusDocumentIds = [] }) {
     console.log(`PRISM: mode=create, userId=${userId}, conversationId=${conversationId}`);
 
     const convId = conversationId || crypto.randomUUID();
@@ -376,27 +374,6 @@ async function handleCreate({ userId, message, conversationId, attachments = [],
         temperature_default: model.temperature_default
     })), null, 2);
 
-    const allowedSpecialAgentTools = (specialAgentContext?.defaultTools || [])
-        .map((toolId) => toCanonicalToolId(toolId))
-        .filter((toolId) => PUBLIC_TOOL_IDS.has(toolId));
-
-    const specialAgentBlock = specialAgentContext ? `
-SPECIAL AGENT TEMPLATE (PRE-BUILT BY RAMNAI):
-Name: ${specialAgentContext.name}
-Role: ${specialAgentContext.role}
-Predefined System Prompt:
-${specialAgentContext.predefinedPrompt}
-Default Tools: ${(allowedSpecialAgentTools.length > 0 ? allowedSpecialAgentTools : ['thinking']).join(', ')}
-Suggested Model: ${specialAgentContext.suggestedModel || 'gemini-2.5-flash'}
-
-IMPORTANT: This is a pre-built Special ChatBot template. The user clicked "Add via Prism" to personalize it. You MUST:
-1. Set blueprintReady: true immediately — do NOT ask clarifying questions.
-2. Set blueprintType: "agent" (do NOT return team blueprints for this flow).
-3. Use the predefined prompt as the BASE, but ENRICH the BACKSTORY section with the USER CONTEXT below.
-4. Keep the same tools and model from the template unless there is a strong reason to change, but ONLY use supported capabilities from the available tools list.
-5. Keep explanation to 2-3 SHORT sentences.
-` : '';
-
     const systemPrompt = `You are Prism, the Meta Architect of RamN AI platform.
 You are an expert AI architect, prompt engineer, and tool strategist.
 
@@ -414,7 +391,6 @@ ${memoryContextBlock}
 ${documentContextBlock}
 
 ${conversationContext ? `CONVERSATION SO FAR:\n${conversationContext}` : ''}
-${specialAgentBlock}
 
 YOUR PROCESS:
 A. If the objective is vague, ask 1-3 clarifying questions. Do NOT generate a blueprint yet.
@@ -610,14 +586,14 @@ RULES FOR DESIGNING CHATBOTS:
     };
 }
 
-async function executeMode({ userId, mode, message, conversationId, attachments = [], focusDocumentIds = [], specialAgentContext, stream }) {
+async function executeMode({ userId, mode, message, conversationId, attachments = [], focusDocumentIds = [], stream }) {
     switch (mode) {
         case 'ask':
             return handleAsk({ userId, message, conversationId, attachments, focusDocumentIds, stream });
         case 'route':
             return handleRoute({ userId, message, conversationId, attachments, focusDocumentIds });
         case 'create':
-            return handleCreate({ userId, message, conversationId, attachments, focusDocumentIds, specialAgentContext });
+            return handleCreate({ userId, message, conversationId, attachments, focusDocumentIds });
         default:
             throw httpError(400, `Invalid mode: "${mode}". Must be: ask, route, or create`);
     }
@@ -629,7 +605,7 @@ async function parseAuthorizedRequest(event) {
     const userId = auth.userId;
 
     const body = JSON.parse(event.body || '{}');
-    const { message, mode, conversationId, specialAgentContext } = body;
+    const { message, mode, conversationId } = body;
     const attachments = Array.isArray(body.attachments) ? body.attachments : [];
     const focusDocumentIds = Array.isArray(body.focusDocumentIds) ? body.focusDocumentIds : [];
 
@@ -646,7 +622,6 @@ async function parseAuthorizedRequest(event) {
         message,
         mode,
         conversationId,
-        specialAgentContext,
         attachments,
         focusDocumentIds
     };

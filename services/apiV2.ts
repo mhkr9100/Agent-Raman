@@ -181,13 +181,6 @@ export interface PrismChatRequest {
     conversationId?: string;
     attachments?: RuntimeAttachment[];
     focusDocumentIds?: string[];
-    specialAgentContext?: {
-        name: string;
-        role: string;
-        predefinedPrompt: string;
-        defaultTools: string[];
-        suggestedModel: string;
-    };
 }
 
 export interface PrismChatResponse {
@@ -207,8 +200,7 @@ export async function prismChat(params: PrismChatRequest): Promise<PrismChatResp
             mode: params.mode,
             conversationId: params.conversationId || null,
             attachments: params.attachments || [],
-            focusDocumentIds: params.focusDocumentIds || [],
-            ...(params.specialAgentContext ? { specialAgentContext: params.specialAgentContext } : {})
+            focusDocumentIds: params.focusDocumentIds || []
         });
     } catch (error: any) {
         console.error('API: prismChat failed:', error.message);
@@ -233,8 +225,7 @@ export async function prismChatStream(
             mode: params.mode,
             conversationId: params.conversationId || null,
             attachments: params.attachments || [],
-            focusDocumentIds: params.focusDocumentIds || [],
-            ...(params.specialAgentContext ? { specialAgentContext: params.specialAgentContext } : {})
+            focusDocumentIds: params.focusDocumentIds || []
         })
     });
 
@@ -485,35 +476,6 @@ export async function fabricateTeam(params: FabricateTeamRequest): Promise<Fabri
         });
     } catch (error: any) {
         console.error('API: fabricateTeam failed:', error.message);
-        throw error;
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  Special Agents (Templates from DynamoDB)
-// ═══════════════════════════════════════════════════════════════
-
-export interface SpecialAgentTemplate {
-    id?: string;
-    templateId: string;
-    name: string;
-    role: string;
-    icon: string;
-    description: string;
-    predefinedPrompt: string;
-    defaultTools: string[];
-    suggestedModel: string;
-}
-
-export interface ListSpecialAgentsResponse {
-    templates: SpecialAgentTemplate[];
-}
-
-export async function listSpecialAgents(): Promise<ListSpecialAgentsResponse> {
-    try {
-        return await apiRequest<ListSpecialAgentsResponse>('GET', '/api/v2/special-agents');
-    } catch (error: any) {
-        console.error('API: listSpecialAgents failed:', error.message);
         throw error;
     }
 }

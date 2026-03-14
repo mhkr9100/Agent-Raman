@@ -1,50 +1,20 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { AIModelProfile, AgentTemplate, Agent, Team, UserProfile } from '../types';
-import { listSpecialAgents, SpecialAgentTemplate } from '../services/apiV2';
+import React, { useState, useRef } from 'react';
+import { Agent, Team } from '../types';
 import { ToolsView } from './ToolsView';
 import { ModelsView } from './ModelsView';
 
 interface SpectrumViewProps {
-    onHire: (profile: AIModelProfile | AgentTemplate) => void;
-    onAddViaPrism: (template: any) => void;
     onFabricateAgent: () => void;
     onInitializeGroup: () => void;
     onOpenChat: (id: string) => void;
     agents: Agent[];
     teams: Team[];
-    userProfile: UserProfile;
 }
 
-export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPrism, onFabricateAgent, onInitializeGroup, onOpenChat, agents, teams, userProfile }) => {
+export const SpectrumView: React.FC<SpectrumViewProps> = ({ onFabricateAgent, onInitializeGroup, onOpenChat, agents, teams }) => {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [specialAgents, setSpecialAgents] = useState<SpecialAgentTemplate[]>([]);
-    const [isLoadingAgents, setIsLoadingAgents] = useState(true);
-
-    useEffect(() => {
-        (async () => {
-            setIsLoadingAgents(true);
-            try {
-                const res = await listSpecialAgents();
-                if (res.templates && res.templates.length > 0) {
-                    const normalized = res.templates.map((template: any) => ({
-                        ...template,
-                        id: template.id || template.templateId,
-                        defaultTools: template.defaultTools || []
-                    }));
-                    setSpecialAgents(normalized);
-                } else {
-                    setSpecialAgents([]);
-                }
-            } catch (err) {
-                console.warn('[SpectrumView] Failed to load special agents from API:', err);
-                setSpecialAgents([]);
-            } finally {
-                setIsLoadingAgents(false);
-            }
-        })();
-    }, []);
 
     const userAgents = agents.filter(a => !a.isSystem);
     const userTeams = teams.filter(t => !t.isSystem);
@@ -92,7 +62,7 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                 ref={scrollContainerRef}
                 className="flex-1 flex overflow-x-auto snap-x snap-mandatory custom-scrollbar scroll-smooth"
             >
-                {/* SECTION 1: CHATBOTS (User + Special) */}
+                {/* SECTION 1: CHATBOTS */}
                 <div className="min-w-full snap-start p-8 overflow-y-auto custom-scrollbar">
                     <div className="max-w-5xl mx-auto">
                         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -125,33 +95,11 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onHire, onAddViaPris
                                 />
                             ))}
 
-                            {isLoadingAgents && (
+                            {userAgents.length === 0 && (
                                 <div className="col-span-full p-6 rounded-2xl border border-dashed border-black/10 dark:border-white/10 text-center text-[10px] text-gray-500 dark:text-white/40 uppercase tracking-[0.15em]">
-                                    Loading Special ChatBots...
+                                    No ChatBots Yet
                                 </div>
                             )}
-
-                            {!isLoadingAgents && specialAgents.length === 0 && (
-                                <div className="col-span-full p-6 rounded-2xl border border-dashed border-black/10 dark:border-white/10 text-center text-[10px] text-gray-500 dark:text-white/40 uppercase tracking-[0.15em]">
-                                    No Special ChatBots Found
-                                </div>
-                            )}
-
-                            {specialAgents.map(template => (
-                                <ListItem
-                                    key={template.id}
-                                    icon={template.icon}
-                                    name={template.name}
-                                    sub={template.role || 'Special ChatBot'}
-                                    tagline={template.description}
-                                    onClick={() => onAddViaPrism(template)}
-                                    isExpanded={expandedId === template.id}
-                                    onToggleExpand={() => setExpandedId(expandedId === template.id ? null : template.id)}
-                                    viewType="grid"
-                                    actionLabel="Add via Prism"
-                                    tools={template.defaultTools}
-                                />
-                            ))}
                         </div>
 
                         <div className="mt-10 mb-4 flex items-center justify-between">
@@ -272,12 +220,8 @@ const ListItem: React.FC<{
                 {/* Primary Action */}
                 <button
                     onClick={(e) => { e.stopPropagation(); onClick(); }}
-                    className={`w-full py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all active:scale-[0.98] ${actionLabel === 'Add via Prism'
-                        ? 'bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-700 dark:text-white/70'
-                        : 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 shadow-sm'
-                        }`}
+                    className="w-full py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all active:scale-[0.98] bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 shadow-sm"
                 >
-                    {actionLabel === 'Add via Prism' && <span className="text-sm">✦</span>}
                     {actionLabel}
                 </button>
             </div>

@@ -1,7 +1,7 @@
 /**
  * RamN AI — Create DynamoDB Tables
  * 
- * Creates all 6 tables required by the RamN backend.
+ * Creates the core RamN backend tables.
  * Skips tables that already exist.
  * 
  * Run: node backend/scripts/create-tables.js
@@ -71,16 +71,6 @@ const TABLE_DEFINITIONS = [
                 ],
                 Projection: { ProjectionType: 'ALL' }
             }
-        ],
-        BillingMode: 'PAY_PER_REQUEST'
-    },
-    {
-        TableName: 'RamN_SpecialAgents',
-        KeySchema: [
-            { AttributeName: 'templateId', KeyType: 'HASH' }
-        ],
-        AttributeDefinitions: [
-            { AttributeName: 'templateId', AttributeType: 'S' }
         ],
         BillingMode: 'PAY_PER_REQUEST'
     },

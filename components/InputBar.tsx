@@ -14,7 +14,6 @@ interface InputBarProps {
     searchEnabled?: boolean,
     createEnabled?: boolean,
     prismMode?: PrismMode,
-    specialAgentContext?: any,
     requestedCapability?: RequestedCapability
   ) => void;
   isLoading: boolean;

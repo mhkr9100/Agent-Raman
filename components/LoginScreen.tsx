@@ -110,7 +110,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onRegister })
     };
 
     return (
-        <div className="min-h-screen overflow-y-auto custom-scrollbar bg-[#f3f5f4] text-gray-950 transition-colors duration-300 selection:bg-emerald-500/20 dark:bg-[#0f1113] dark:text-white relative">
+        <div
+            className="h-screen overflow-y-auto overflow-x-hidden overscroll-y-contain custom-scrollbar bg-[#f3f5f4] text-gray-950 transition-colors duration-300 selection:bg-emerald-500/20 dark:bg-[#0f1113] dark:text-white relative"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+        >
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
                 <div className="absolute left-[-12%] top-[-8%] h-[28rem] w-[28rem] rounded-full bg-emerald-400/12 blur-3xl dark:bg-emerald-400/10" />
                 <div className="absolute right-[-8%] top-[12%] h-[24rem] w-[24rem] rounded-full bg-black/6 blur-3xl dark:bg-white/6" />
