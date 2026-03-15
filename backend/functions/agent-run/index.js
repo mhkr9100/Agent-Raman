@@ -30,6 +30,7 @@ import {
 import { getRelevantDocumentContext } from '../../shared/document-context.js';
 import { buildConversationContext } from '../../shared/conversation-context.js';
 import { summarizeAttachmentNames, toVertexUserParts } from '../../shared/chat-attachments.js';
+import { formatUserMapTreeContext } from '../../shared/usermap-context.js';
 
 const MAX_REACT_ITERATIONS = 5;
 
@@ -502,7 +503,10 @@ async function buildRuntimeContext({ userId, agentId, message, conversationId, a
 
     try {
         const userMap = await getUserMap(userId);
-        if (userMap && (userMap.preferences || userMap.orgContext || userMap.agentHistory)) {
+        const treeContext = formatUserMapTreeContext(userMap?.tree, { maxItems: 14 });
+        if (treeContext) {
+            systemPrompt = `${systemPrompt}\n\n# UPDATED USER CONTEXT (UserMap)\nThe following is the current, weighted context about the user you are assisting. Use this to personalize your response:\n${treeContext}`;
+        } else if (userMap && (userMap.preferences || userMap.orgContext || userMap.agentHistory)) {
             const contextSnippet = JSON.stringify({
                 preferences: userMap.preferences || {},
                 orgContext: userMap.orgContext || {},

@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-interface PageNode {
-    id: string;
-    label: string;
-    value?: string;
-    source?: string;
-    children: PageNode[];
-}
+import { PageNode, UserMapImportance } from '../types';
 
 interface UserMapViewProps {
     tree: PageNode;
@@ -17,6 +10,77 @@ interface UserMapViewProps {
     onAddNode: (parentId: string, newNode: PageNode) => void;
     onConsolidate: () => void;
     onImportContext: () => void;
+}
+
+const CATEGORY_ORDER = [
+    'Identity',
+    'Preferences',
+    'Career',
+    'Education',
+    'Projects',
+    'Operations',
+    'Marketing & Communications',
+    'Technical Stack',
+    'Business Goals',
+    'Instructions',
+    'General Context'
+];
+
+const IMPORTANCE_META: Record<UserMapImportance, { label: string; className: string }> = {
+    high: {
+        label: 'High Signal',
+        className: 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    },
+    medium: {
+        label: 'Medium',
+        className: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    },
+    low: {
+        label: 'Reference',
+        className: 'border-black/10 bg-black/[0.03] text-gray-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-white/50'
+    }
+};
+
+const IMPORTANCE_ORDER: Record<UserMapImportance, number> = {
+    high: 0,
+    medium: 1,
+    low: 2
+};
+
+function normalizeImportance(value?: string): UserMapImportance {
+    return value === 'high' || value === 'low' ? value : 'medium';
+}
+
+function compareNodes(left: PageNode, right: PageNode) {
+    const leftIsCategory = left.nodeType === 'category';
+    const rightIsCategory = right.nodeType === 'category';
+
+    if (leftIsCategory && rightIsCategory) {
+        const leftIndex = CATEGORY_ORDER.indexOf(left.label);
+        const rightIndex = CATEGORY_ORDER.indexOf(right.label);
+        return (leftIndex === -1 ? CATEGORY_ORDER.length : leftIndex) - (rightIndex === -1 ? CATEGORY_ORDER.length : rightIndex);
+    }
+
+    const leftImportance = IMPORTANCE_ORDER[normalizeImportance(left.importance)];
+    const rightImportance = IMPORTANCE_ORDER[normalizeImportance(right.importance)];
+    if (leftImportance !== rightImportance) return leftImportance - rightImportance;
+
+    const leftCluster = left.nodeType === 'cluster' ? 0 : 1;
+    const rightCluster = right.nodeType === 'cluster' ? 0 : 1;
+    if (leftCluster !== rightCluster) return leftCluster - rightCluster;
+
+    return left.label.localeCompare(right.label);
+}
+
+function getNextImportance(current?: string): UserMapImportance {
+    switch (normalizeImportance(current)) {
+        case 'high':
+            return 'low';
+        case 'low':
+            return 'medium';
+        default:
+            return 'high';
+    }
 }
 
 // Recursive tree node component
@@ -33,6 +97,11 @@ const TreeNode: React.FC<{
     const [editValue, setEditValue] = useState(node.value || '');
     const [isAddingChild, setIsAddingChild] = useState(false);
     const [newChildLabel, setNewChildLabel] = useState('');
+    const importance = normalizeImportance(node.importance);
+    const importanceMeta = IMPORTANCE_META[importance];
+    const confidence = typeof node.confidence === 'number'
+        ? `${Math.round(node.confidence * 100)}% confidence`
+        : null;
 
     const isLeaf = node.children.length === 0 && !!node.value;
     const isRoot = depth === 0;
@@ -47,6 +116,10 @@ const TreeNode: React.FC<{
         const newNode: PageNode = {
             id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             label: newChildLabel.trim(),
+            nodeType: 'fact',
+            importance: 'medium',
+            confidence: 1,
+            source: 'manual',
             children: []
         };
         onAdd(node.id, newNode);
@@ -94,14 +167,28 @@ const TreeNode: React.FC<{
                     </div>
                 ) : (
                     <div className="flex-1 min-w-0">
-                        <span
-                            className={`text-xs font-semibold cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors ${isRoot ? 'text-gray-900 dark:text-white/90 text-sm font-black uppercase tracking-widest' : isLeaf ? 'text-gray-500 dark:text-white/60' : 'text-gray-700 dark:text-white/80'}`}
-                            onClick={() => !isRoot && setIsEditing(true)}
-                        >
-                            {node.label}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span
+                                className={`text-xs font-semibold cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors ${isRoot ? 'text-gray-900 dark:text-white/90 text-sm font-black uppercase tracking-widest' : isLeaf ? 'text-gray-500 dark:text-white/60' : 'text-gray-700 dark:text-white/80'}`}
+                                onClick={() => !isRoot && setIsEditing(true)}
+                            >
+                                {node.label}
+                            </span>
+                            {!isRoot && (
+                                <>
+                                    <span className={`rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.16em] ${importanceMeta.className}`}>
+                                        {importanceMeta.label}
+                                    </span>
+                                    {confidence && (
+                                        <span className="text-[8px] uppercase tracking-[0.14em] text-gray-400 dark:text-white/25">
+                                            {confidence}
+                                        </span>
+                                    )}
+                                </>
+                            )}
+                        </div>
                         {node.value && (
-                            <span className="ml-2 text-[10px] text-gray-400 dark:text-white/30">{node.value}</span>
+                            <span className="mt-1 inline-block text-[10px] text-gray-400 dark:text-white/30">{node.value}</span>
                         )}
                     </div>
                 )}
@@ -109,6 +196,13 @@ const TreeNode: React.FC<{
                 {/* Actions (visible on hover) */}
                 {!isRoot && !isEditing && (
                     <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
+                        <button
+                            onClick={() => onUpdate(node.id, { importance: getNextImportance(node.importance) })}
+                            className="p-1 text-gray-400 dark:text-white/20 hover:text-amber-500 dark:hover:text-amber-300"
+                            title="Cycle importance"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="currentColor" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="m11.48 3.499 2.106 4.268a1.125 1.125 0 0 0 .847.616l4.71.684-3.408 3.322a1.125 1.125 0 0 0-.324.996l.804 4.692-4.212-2.214a1.125 1.125 0 0 0-1.046 0l-4.212 2.214.804-4.692a1.125 1.125 0 0 0-.324-.996L3.816 9.067l4.71-.684a1.125 1.125 0 0 0 .847-.616l2.106-4.268Z" /></svg>
+                        </button>
                         <button onClick={() => setIsEditing(true)} className="p-1 text-gray-400 dark:text-white/20 hover:text-gray-900 dark:hover:text-white/60" title="Edit">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" /></svg>
                         </button>
@@ -146,7 +240,7 @@ const TreeNode: React.FC<{
             <AnimatePresence>
                 {isExpanded && node.children.length > 0 && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                        {node.children.map(child => (
+                        {[...node.children].sort(compareNodes).map(child => (
                             <TreeNode key={child.id} node={child} depth={depth + 1} onUpdate={onUpdate} onDelete={onDelete} onAdd={onAdd} />
                         ))}
                     </motion.div>

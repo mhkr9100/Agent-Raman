@@ -1,19 +1,37 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { UserProfile } from '../types';
-
-export interface PageNode {
-    id: string;
-    label: string;
-    value?: string;
-    source?: string;
-    children: PageNode[];
-}
+import { PageNode, UserProfile } from '../types';
 
 const EMPTY_TREE: PageNode = {
     id: 'root',
     label: 'UserMap',
+    nodeType: 'root',
     children: []
 };
+
+function normalizeImportance(value?: string): 'high' | 'medium' | 'low' {
+    return value === 'high' || value === 'low' ? value : 'medium';
+}
+
+function normalizeTree(node: PageNode, depth = 0): PageNode {
+    const children = Array.isArray(node.children)
+        ? node.children.map((child) => normalizeTree(child, depth + 1))
+        : [];
+
+    const nodeType = node.nodeType
+        || (depth === 0
+            ? 'root'
+            : children.length > 0
+                ? (depth === 1 ? 'category' : 'cluster')
+                : 'fact');
+
+    return {
+        ...node,
+        nodeType,
+        importance: normalizeImportance(node.importance || (depth <= 1 ? 'high' : 'medium')),
+        confidence: typeof node.confidence === 'number' ? node.confidence : (depth === 0 ? 0.99 : undefined),
+        children
+    };
+}
 
 export const useUserMap = (currentUser: UserProfile | null) => {
     const [userMapTree, setUserMapTree] = useState<PageNode>(EMPTY_TREE);
@@ -33,7 +51,7 @@ export const useUserMap = (currentUser: UserProfile | null) => {
             try {
                 const { getUserMapTree } = await import('../services/apiV2');
                 const remote = await getUserMapTree();
-                const tree = remote?.tree && remote.tree.id === 'root' ? remote.tree : EMPTY_TREE;
+                const tree = remote?.tree && remote.tree.id === 'root' ? normalizeTree(remote.tree) : EMPTY_TREE;
                 const updatedAt = remote?.updatedAt || null;
 
                 if (!mounted) return;
@@ -63,13 +81,14 @@ export const useUserMap = (currentUser: UserProfile | null) => {
 
         const previousTree = latestTreeRef.current;
         const previousUpdatedAt = latestUpdatedAtRef.current;
+        const normalizedTree = normalizeTree(tree);
 
-        setUserMapTree(tree);
-        latestTreeRef.current = tree;
+        setUserMapTree(normalizedTree);
+        latestTreeRef.current = normalizedTree;
 
         try {
             const { saveUserMapTree } = await import('../services/apiV2');
-            const response = await saveUserMapTree(tree, previousUpdatedAt);
+            const response = await saveUserMapTree(normalizedTree, previousUpdatedAt);
             const nextUpdatedAt = response.updatedAt || new Date().toISOString();
 
             setServerUpdatedAt(nextUpdatedAt);
@@ -78,8 +97,9 @@ export const useUserMap = (currentUser: UserProfile | null) => {
             if (error?.code === 'CONFLICT' && error.currentTree?.id === 'root') {
                 const remoteTree = error.currentTree as PageNode;
                 const remoteUpdatedAt = error.currentUpdatedAt || null;
-                setUserMapTree(remoteTree);
-                latestTreeRef.current = remoteTree;
+                const normalizedRemoteTree = normalizeTree(remoteTree);
+                setUserMapTree(normalizedRemoteTree);
+                latestTreeRef.current = normalizedRemoteTree;
                 setServerUpdatedAt(remoteUpdatedAt);
                 latestUpdatedAtRef.current = remoteUpdatedAt;
                 return;

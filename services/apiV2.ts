@@ -584,12 +584,12 @@ export async function deleteDocument(docId: string): Promise<{ success: boolean;
 
 export interface ConsolidateUserMapRequest {
     memories: string[];
-    existingTree?: any;
+    existingTree?: PageNode;
 }
 
 export interface UserMapTreeResponse {
     userId: string;
-    tree: any;
+    tree: PageNode | null;
     updatedAt?: string | null;
 }
 
@@ -608,7 +608,7 @@ export async function getUserMapTree(): Promise<UserMapTreeResponse> {
     }
 }
 
-export async function saveUserMapTree(tree: any, expectedUpdatedAt?: string | null): Promise<SaveUserMapResponse> {
+export async function saveUserMapTree(tree: PageNode, expectedUpdatedAt?: string | null): Promise<SaveUserMapResponse> {
     const token = getAuthToken();
     const response = await fetch(`${API_BASE}/api/v2/usermap`, {
         method: 'POST',
@@ -638,9 +638,9 @@ export async function saveUserMapTree(tree: any, expectedUpdatedAt?: string | nu
     return await response.json() as SaveUserMapResponse;
 }
 
-export async function consolidateUserMap(params: ConsolidateUserMapRequest): Promise<any> {
+export async function consolidateUserMap(params: ConsolidateUserMapRequest): Promise<PageNode> {
     try {
-        return await apiRequest<any>('POST', '/api/v2/usermap/consolidate', {
+        return await apiRequest<PageNode>('POST', '/api/v2/usermap/consolidate', {
             userId: getUserId(),
             memories: params.memories,
             existingTree: params.existingTree || null
@@ -695,3 +695,4 @@ export async function extractMemory(params: ExtractMemoryRequest): Promise<{ fac
         throw error;
     }
 }
+import type { PageNode } from '../types';

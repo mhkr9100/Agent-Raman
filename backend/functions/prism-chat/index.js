@@ -23,6 +23,7 @@ import {
 import { getRelevantDocumentContext } from '../../shared/document-context.js';
 import { buildConversationContext } from '../../shared/conversation-context.js';
 import { toVertexUserParts } from '../../shared/chat-attachments.js';
+import { formatUserMapTreeContext } from '../../shared/usermap-context.js';
 
 function respond(statusCode, body, requestHeaders) {
     return {
@@ -315,11 +316,13 @@ async function handleCreate({ userId, message, conversationId, attachments = [],
     }
 
     const userMap = await getUserMap(userId);
-    const userContext = JSON.stringify({
+    const treeContext = formatUserMapTreeContext(userMap.tree, { maxItems: 16 });
+    const legacyUserContext = JSON.stringify({
         preferences: userMap.preferences || {},
         agentHistory: userMap.agentHistory || [],
         orgContext: userMap.orgContext || {}
     }, null, 2);
+    const userContext = treeContext || legacyUserContext;
 
     let memoryContextBlock = '';
     try {
