@@ -8,7 +8,7 @@
 
 - **Prism Orchestrator (Meta-Agent):** Prism automatically analyzes your objective and deploys customized, role-playing agents in seconds using **Create Agents** mode.
 - **Spectrum Model Roster:** Easily swap between API models utilizing your own OpenRouter and HuggingFace API keys, dynamically managing the AI's compute backing.
-- **Local Workspaces:** Configure Agents, manage Teams, and break down complex workflows manually or asynchronously.
+- **Local Workspaces:** Configure chatbots, manage groups, and break down complex workflows manually or asynchronously.
 - **Memory Data & Knowledge Processing:** Integrated smoothly with Amazon S3. Simply deploy an agent and load relevant "Memory Data" (PDF, TXT, DOCX) directly to the specific Agent.
 
 ## Quick Start (Local Development)
@@ -34,4 +34,3 @@ Once the app loads, provide any email at the login screen. Then, open your **Use
 ## Deployment
 
 This repository is optimized to deploy directly out of the box to edge providers like Vercel or Netlify, or AWS Amplify using the integrated YAML definitions. All execution takes place between the client and API providers, persisting metadata into DynamoDB and objects to S3.
-

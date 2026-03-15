@@ -21,8 +21,10 @@
 │      selectable. Current user-facing capabilities:          │
 │      web-search and thinking.                               │
 │  11. ChatBot creation must be Prism-driven from user intent │
-│      and saved through real backend persistence.            │
-│  12. UserMap, conversations, teams, chatbots, and documents │
+│      and saved through real backend persistence. Spectrum   │
+│      is display-first; only Group creation may originate    │
+│      there.                                                 │
+│  12. UserMap, conversations, groups, chatbots, and documents │
 │      must be server-authoritative and consistent across     │
 │      refresh, logout, and cross-browser sessions.           │
 │  13. Document understanding must happen server-side through │
@@ -30,7 +32,13 @@
 │      blindly into every user message.                       │
 │  14. Streaming must be real streamed model output, not      │
 │      simulated chunking.                                    │
-│  15. No temporary patching. Fix root causes structurally,   │
+│  15. UserMap parsing must produce human-quality nodes.      │
+│      Never store section headers, truncated labels, or      │
+│      duplicated label/value pairs as final memory nodes.    │
+│  16. Preserve semantic hierarchy when extracting context.   │
+│      Related facts like degree + institution must be nested │
+│      coherently, not flattened arbitrarily.                 │
+│  17. No temporary patching. Fix root causes structurally,   │
 │      remove dead code, and keep one canonical codepath.     │
-│  16. Test each changed workflow with real backend data      │
+│  18. Test each changed workflow with real backend data      │
 │      before considering the task complete."                 │

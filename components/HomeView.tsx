@@ -29,7 +29,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                         </h1>
                         <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 font-medium max-w-2xl mx-auto leading-relaxed">
                             A unified platform for context-aware AI work. Build specialized chatbots,
-                            organize them into teams, and orchestrate complex workflows with real backend memory.
+                            organize them into groups, and orchestrate complex workflows with real backend memory.
                         </p>
                     </div>
 
@@ -50,7 +50,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                     RamN AI bridges the gap between isolated conversational bots and truly collaborative AI workflows. Rather than relying on a single monolithic intelligence, you orchestrate a <span className="text-gray-900 dark:text-white font-bold">Spectrum</span> of specialized chatbots.
                                 </p>
                                 <p>
-                                    Each chatbot has explicit directives, real backend capabilities, and a defined role. By grouping them into <span className="text-gray-900 dark:text-white font-bold">Teams</span>, they can collaborate on multi-step problems that basic prompts simply cannot solve.
+                                    Each chatbot has explicit directives, real backend capabilities, and a defined role. By grouping them into <span className="text-gray-900 dark:text-white font-bold">Groups</span>, they can collaborate on multi-step problems that basic prompts simply cannot solve.
                                 </p>
                             </div>
                         </div>
@@ -68,7 +68,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">1. Enter the Workspace</h3>
                                         <p className="text-xs text-gray-600 dark:text-white/40 leading-relaxed">
-                                            Access your workspace and begin interacting with Prism, chatbots, and teams.
+                                            Access your workspace and begin interacting with Prism, chatbots, and groups.
                                             RamN AI manages the live backend infrastructure for you.
                                         </p>
                                     </div>
@@ -114,9 +114,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                         <Users size={20} />
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">4. Build Teams</h3>
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">4. Build Groups</h3>
                                         <p className="text-xs text-gray-600 dark:text-white/40 leading-relaxed">
-                                            Create a <span className="font-bold text-gray-900 dark:text-white">Team</span> to let multiple chatbots collaborate.
+                                            Create a <span className="font-bold text-gray-900 dark:text-white">Group</span> to let multiple chatbots collaborate.
                                             Mention them using <span className="font-bold text-gray-700 dark:text-white/60">@Name</span> to trigger their expertise.
                                         </p>
                                     </div>
@@ -151,8 +151,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onStartChat, onOpenProfile }
                                     <span className="text-[10px] font-black uppercase tracking-widest">Spectrum View</span>
                                 </div>
                                 <p className="text-[11px] text-gray-600 dark:text-white/40 leading-relaxed">
-                                    Explore the Spectrum to find pre-configured chatbot templates or
-                                    discover the strengths of different AI models.
+                                    Explore the Spectrum to review your chatbots and groups, then compare live capabilities and model options.
                                 </p>
                             </div>
                         </div>

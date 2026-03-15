@@ -72,7 +72,6 @@ export const InputBar: React.FC<InputBarProps> = ({
       false,
       prismMode === 'create',
       isPrism ? prismMode : undefined,
-      undefined,
       requestedCapability
     );
 
@@ -295,10 +294,10 @@ export const InputBar: React.FC<InputBarProps> = ({
               placeholder={
                 isPrism
                   ? prismMode === 'create'
-                    ? 'Describe the chatbot or team you want Prism to design...'
+                    ? 'Describe the chatbot or group you want Prism to design...'
                     : 'Ask Prism for strategy, prompts, or help...'
                   : isGroup
-                    ? 'Message the team. Use @Name to address a chatbot directly...'
+                    ? 'Message the group. Use @Name to address a chatbot directly...'
                     : 'Message this chatbot...'
               }
               rows={1}

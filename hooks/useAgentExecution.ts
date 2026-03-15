@@ -37,11 +37,11 @@ export const useAgentExecution = (
             try {
                 const specialists = Array.isArray(toolCall.args?.specialists) ? toolCall.args.specialists : [];
                 if (specialists.length === 0) {
-                    throw new Error('No specialists provided for team fabrication.');
+                    throw new Error('No specialists provided for group fabrication.');
                 }
 
                 const fabricatorResponse = await fabricateTeamApi({
-                    teamName: toolCall.args.teamName || 'New Team',
+                    teamName: toolCall.args.teamName || 'New Group',
                     objective: toolCall.args.objective || '',
                     specialists
                 });
@@ -68,7 +68,7 @@ export const useAgentExecution = (
                 const teamPayload: Team = {
                     id: fabricatorResponse.team.teamId,
                     userId: fabricatorResponse.team.userId || currentUser?.id,
-                    name: fabricatorResponse.team.name || toolCall.args.teamName || 'New Team',
+                    name: fabricatorResponse.team.name || toolCall.args.teamName || 'New Group',
                     description: fabricatorResponse.team.description || toolCall.args.objective,
                     type: 'rouge',
                     agents: createdAgents,
@@ -79,20 +79,20 @@ export const useAgentExecution = (
                     ? persistedTeam as Team
                     : null;
                 if (!newTeam) {
-                    throw new Error('Team could not be persisted by backend.');
+                    throw new Error('Group could not be persisted by backend.');
                 }
 
                 const updatedHistory = [...history];
                 updatedHistory[msgIndex] = {
                     ...updatedHistory[msgIndex],
-                    content: { ...updatedHistory[msgIndex].content, text: `✅ Command Initialized: The **${newTeam.name}** squad has been deployed.`, toolCall: undefined }
+                    content: { ...updatedHistory[msgIndex].content, text: `✅ Command Initialized: The **${newTeam.name}** group has been deployed.`, toolCall: undefined }
                 };
 
                 const introMessage: Message = {
                     id: `intro-${Date.now()}`,
                     userId: currentUser?.id,
                     agent: AGENTS.PRISM,
-                    content: { type: 'text', text: `The **${newTeam.name}** squad has been successfully deployed and synchronized. Instruct them when ready.` },
+                    content: { type: 'text', text: `The **${newTeam.name}** group has been successfully deployed and synchronized. Instruct them when ready.` },
                     type: 'agent'
                 };
 
@@ -108,7 +108,7 @@ export const useAgentExecution = (
                     ...updatedHistory[msgIndex],
                     content: {
                         ...updatedHistory[msgIndex].content,
-                        text: `⚠️ Team Fabrication Failed: ${err?.message || 'Unknown error'}`,
+                        text: `⚠️ Group Fabrication Failed: ${err?.message || 'Unknown error'}`,
                         toolCall: undefined
                     }
                 };

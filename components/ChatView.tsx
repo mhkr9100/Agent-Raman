@@ -70,7 +70,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               {isPrism ? 'Prism Core' : activeAgent?.name || activeTeam?.name || 'Active Session'}
             </h2>
             <span className="text-[8px] font-bold text-gray-500 dark:text-white/30 uppercase tracking-widest mt-0.5">
-              {isPrism ? 'Meta Architect' : activeAgent?.role || 'Team'}
+              {isPrism ? 'Meta Architect' : activeAgent?.role || 'Group'}
             </span>
           </div>
         </div>
@@ -83,7 +83,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               ? 'bg-gray-900 dark:bg-white border-transparent text-white dark:text-black'
               : 'border-black/10 dark:border-white/10 text-gray-500 dark:text-white/20 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/5 dark:hover:bg-white/5'
               }`}
-            title={isPrism ? 'Prism Profile' : activeTeam ? 'Team Profile' : 'ChatBot Profile'}
+            title={isPrism ? 'Prism Profile' : activeTeam ? 'Group Profile' : 'ChatBot Profile'}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
           </button>

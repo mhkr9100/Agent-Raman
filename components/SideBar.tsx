@@ -107,12 +107,12 @@ export function SideBar({
           </button>
 
           <button
-            onClick={() => onViewChange('spectrum')}
-            className={`flex flex-col items-center gap-1 group p-2 rounded-xl transition-all ${activeView === 'spectrum' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white/80'}`}
-            title="Spectrum Analysis"
+            onClick={() => onViewChange('usermap')}
+            className={`flex flex-col items-center gap-1 group p-2 rounded-xl transition-all ${activeView === 'usermap' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white/80'}`}
+            title="Context UserMap"
           >
-            <SpectrumIcon size={22} />
-            {!isRailCollapsed && <span className="text-[8px] font-bold uppercase tracking-widest mt-1 text-center">Spectrum</span>}
+            <UserMapIcon size={22} />
+            {!isRailCollapsed && <span className="text-[8px] font-bold uppercase tracking-widest mt-1">UserMap</span>}
           </button>
 
           <div className="relative">
@@ -140,6 +140,15 @@ export function SideBar({
               </svg>
             </button>
           </div>
+
+          <button
+            onClick={() => onViewChange('spectrum')}
+            className={`flex flex-col items-center gap-1 group p-2 rounded-xl transition-all ${activeView === 'spectrum' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white/80'}`}
+            title="Spectrum"
+          >
+            <SpectrumIcon size={22} />
+            {!isRailCollapsed && <span className="text-[8px] font-bold uppercase tracking-widest mt-1 text-center">Spectrum</span>}
+          </button>
         </nav>
 
         <div className="flex flex-col items-center space-y-4 pb-4">
@@ -150,15 +159,6 @@ export function SideBar({
             title="Feedback"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500 dark:text-white/40 group-hover:text-amber-500 dark:group-hover:text-amber-400 group-hover:scale-110 transition-all"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 12h9m-9 3h5.25m5.86 3.12A9 9 0 1 0 6.34 18.12L3 21l3.54-.89c.62-.15 1.27-.15 1.88 0Z" /></svg>
-          </button>
-
-          <button
-            onClick={() => onViewChange('usermap')}
-            className={`flex flex-col items-center gap-1 group p-2 rounded-xl transition-all ${activeView === 'usermap' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white/80'}`}
-            title="Context UserMap"
-          >
-            <UserMapIcon size={22} />
-            {!isRailCollapsed && <span className="text-[8px] font-bold uppercase tracking-widest mt-1">UserMap</span>}
           </button>
 
           <button
@@ -184,13 +184,13 @@ export function SideBar({
                 </div>
                 <h4 className="text-gray-900 dark:text-white font-black text-[10px] uppercase tracking-widest mb-2">No Conversations</h4>
                 <p className="text-gray-500 dark:text-white/40 text-[9px] leading-relaxed mb-4">
-                  Your workspace is clear. Create a chatbot in Spectrum to begin a conversation.
+                  Your workspace is clear. Ask Prism to create your first chatbot, then come back here to chat.
                 </p>
                 <button
-                  onClick={() => onViewChange('spectrum')}
+                  onClick={() => onViewChange('prism')}
                   className="w-full py-2 bg-gray-900 dark:bg-white text-white dark:text-black rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white/90 transition-colors"
                 >
-                  Open Spectrum
+                  Open Prism
                 </button>
               </div>
             )}
@@ -208,7 +208,7 @@ export function SideBar({
 
             {teams.length > 0 && (
               <div>
-                <h3 className="text-[8px] font-black text-gray-400 dark:text-white/20 uppercase tracking-[0.3em] mb-3 px-2">Teams</h3>
+                <h3 className="text-[8px] font-black text-gray-400 dark:text-white/20 uppercase tracking-[0.3em] mb-3 px-2">Groups</h3>
                 <div className="space-y-0.5">
                   {teams.map(team => (
                     <ChatListItem key={team.id} id={team.id} name={team.name} isSystem={team.isSystem} isActive={activeChatId === team.id} onClick={onSelectChat} onDelete={onDeleteTeam} />

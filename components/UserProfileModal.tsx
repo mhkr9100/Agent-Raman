@@ -148,7 +148,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, isOpen
                             <div className="space-y-3">
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight leading-7">Delete Account?</h3>
                                 <p className="text-gray-500 dark:text-white/40 text-[11px] leading-relaxed px-4">
-                                    This will permanently remove your profile from our systems. You will lose access to all your chatbots, teams, and data. This action is irreversible.
+                                    This will permanently remove your profile from our systems. You will lose access to all your chatbots, groups, and data. This action is irreversible.
                                 </p>
                             </div>
                             <div className="flex flex-col gap-3 px-4 pt-4">

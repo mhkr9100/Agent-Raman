@@ -55,7 +55,7 @@ export const OnboardingModal: React.FC<Props> = ({ isOpen, onClose, onOpenProfil
                             Welcome to RamN AI
                         </h2>
                         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', lineHeight: 1.6 }}>
-                            Your AI workspace for chatbots, teams, and automation.
+                            Your AI workspace for chatbots, groups, and automation.
                             <br />Get started in 30 seconds.
                         </p>
                     </div>

@@ -172,7 +172,7 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
             <div className="w-full max-w-xl rounded-[28px] shadow-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#15171a] flex flex-col overflow-hidden max-h-[90vh]">
                 <div className="flex items-center justify-between p-6 border-b border-black/10 dark:border-white/10">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white uppercase tracking-tight">
-                        {type === 'employee' ? 'Create ChatBot' : 'Create Team'}
+                        {type === 'employee' ? 'Create ChatBot' : 'Create Group'}
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-900 dark:text-white/40 dark:hover:text-white transition"><XMarkIcon /></button>
                 </div>
@@ -280,12 +280,12 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
                     ) : (
                         <>
                             <div>
-                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-2">Team Name</label>
+                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-2">Group Name</label>
                                 <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-3 text-sm text-gray-900 dark:text-white outline-none transition-colors focus:border-gray-900 dark:focus:border-white" placeholder="e.g. Proposal Ops" />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-2">Team Objective</label>
-                                <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full resize-none rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-3 text-sm text-gray-900 dark:text-white outline-none transition-colors focus:border-gray-900 dark:focus:border-white" placeholder="What is the goal of this team?" />
+                                <label className="block text-[10px] font-black text-gray-500 dark:text-white/40 uppercase tracking-widest mb-2">Group Objective</label>
+                                <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full resize-none rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-3 text-sm text-gray-900 dark:text-white outline-none transition-colors focus:border-gray-900 dark:focus:border-white" placeholder="What is the goal of this group?" />
                             </div>
 
                             <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-[#F8F9FA] dark:bg-[#101214] p-4">
@@ -316,7 +316,7 @@ export const CreateEntityModal: React.FC<CreateEntityModalProps> = ({
                         }
                         className="rounded-2xl bg-gray-900 dark:bg-white px-12 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-white dark:text-black transition hover:bg-black dark:hover:bg-white/90 active:scale-95 disabled:opacity-30"
                     >
-                        {type === 'employee' ? (isCreating ? 'Creating...' : 'Create ChatBot') : 'Create Team'}
+                        {type === 'employee' ? (isCreating ? 'Creating...' : 'Create ChatBot') : 'Create Group'}
                     </button>
                 </div>
             </div>

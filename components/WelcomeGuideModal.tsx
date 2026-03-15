@@ -40,13 +40,13 @@ export const WelcomeGuideModal: React.FC<WelcomeGuideModalProps> = ({ onComplete
         {
             title: "1. Prism Core",
             subtitle: "Your Meta-Agent",
-            description: "Prism is the central architect of your workspace. Use Prism to answer questions, map out projects, and create specialized custom chatbots tailored to your needs.",
+            description: "Prism is the central architect of your workspace. Use Prism to answer questions, map out projects, and create specialized chatbots tailored to your needs.",
             icon: <PrismIcon size={64} className="text-gray-900 dark:text-white" />
         },
         {
             title: "2. The Spectrum",
-            subtitle: "ChatBot & Capability Management",
-            description: "The Spectrum is where your custom chatbots, live capabilities, and supported Vertex models live. Organize them into teams and configure the exact runtime they should use.",
+            subtitle: "Workspace Registry",
+            description: "Spectrum is where you review your chatbots, groups, live capabilities, and supported models. Ask Prism to create chatbots, then use Spectrum to inspect and launch them.",
             icon: <SpectrumIcon size={64} className="text-gray-900 dark:text-white" />
         },
         {

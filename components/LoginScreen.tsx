@@ -300,7 +300,7 @@ rules:
                                 </div>
                                 <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">Collaboration</div>
                                 <p className="mt-3 text-[12px] leading-6 text-gray-600 dark:text-white/58">
-                                    Build focused chatbots first, then evolve toward team collaboration when a workflow needs multiple specialists.
+                                    Build focused chatbots first, then evolve toward group collaboration when a workflow needs multiple specialists.
                                 </p>
                             </div>
                         </div>

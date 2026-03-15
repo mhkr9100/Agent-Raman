@@ -124,7 +124,7 @@ export const useEntities = (currentUser: UserProfile | null) => {
 
     const addTeam = useCallback(async (teamInput: Team | any) => {
         const ownerId = currentUser?.id || teamInput.userId;
-        if (!ownerId) throw new Error('Cannot create team without user context');
+        if (!ownerId) throw new Error('Cannot create group without user context');
 
         const teamAgentIds = Array.isArray(teamInput.agents)
             ? teamInput.agents.map((a: Agent) => a.id).filter(Boolean)
@@ -164,7 +164,7 @@ export const useEntities = (currentUser: UserProfile | null) => {
             : agents.filter(a => data.agentIds?.includes(a.id));
         const newTeam = await addTeam({
             id: data.id,
-            name: data.name || 'New Team',
+            name: data.name || 'New Group',
             description: data.description || '',
             userId: currentUser?.id,
             agents: resolvedAgents,

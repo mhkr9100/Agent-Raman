@@ -46,10 +46,10 @@ const App: React.FC = () => {
   const [isMemoryImportOpen, setIsMemoryImportOpen] = useState(false);
   const [isMemoryImporting, setIsMemoryImporting] = useState(false);
 
-  const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean, id: string, name: string, type: 'ChatBot' | 'Team' | null }>({ isOpen: false, id: '', name: '', type: null });
+  const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean, id: string, name: string, type: 'ChatBot' | 'Group' | null }>({ isOpen: false, id: '', name: '', type: null });
   const ingestedAssistantMessageIdsRef = useRef<Set<string>>(new Set());
 
-  const triggerDelete = (id: string, name: string, type: 'ChatBot' | 'Team') => {
+  const triggerDelete = (id: string, name: string, type: 'ChatBot' | 'Group') => {
     setDeleteModalState({ isOpen: true, id, name, type });
   };
 
@@ -57,7 +57,7 @@ const App: React.FC = () => {
     try {
       if (deleteModalState.type === 'ChatBot') {
         await deleteAgent(deleteModalState.id);
-      } else if (deleteModalState.type === 'Team') {
+      } else if (deleteModalState.type === 'Group') {
         await deleteTeam(deleteModalState.id);
       }
       setDeleteModalState({ isOpen: false, id: '', name: '', type: null });
@@ -211,7 +211,7 @@ const App: React.FC = () => {
       case 'home':
         return <HomeView onStartChat={() => { setActiveView('prism'); setActiveChatId('prism-core'); }} onOpenProfile={() => setIsUserProfileOpen(true)} />;
       case 'spectrum':
-        return <SpectrumView onFabricateAgent={() => setCreateModalType('agent')} onInitializeGroup={() => setCreateModalType('project')} onOpenChat={(id) => { setActiveChatId(id); setActiveView('chats'); }} agents={agents} teams={teams} />;
+        return <SpectrumView onInitializeGroup={() => setCreateModalType('project')} onOpenChat={(id) => { setActiveChatId(id); setActiveView('chats'); }} agents={agents} teams={teams} />;
       case 'usermap':
         return <UserMapView tree={userMapTree} isConsolidating={isConsolidating} onUpdateNode={updateNode} onDeleteNode={deleteNode} onAddNode={addNode} onConsolidate={consolidate} onImportContext={() => setIsMemoryImportOpen(true)} />;
 
@@ -228,7 +228,7 @@ const App: React.FC = () => {
                 </svg>
               </div>
               <h3 className="text-gray-700 dark:text-white/40 font-black uppercase tracking-[0.2em] text-xs">No ChatBot Selected</h3>
-              <p className="text-gray-500 dark:text-white/20 text-[10px] mt-2 font-medium">Select a chatbot or team from the sidebar to begin.</p>
+              <p className="text-gray-500 dark:text-white/20 text-[10px] mt-2 font-medium">Select a chatbot or group from the sidebar to begin.</p>
             </div>
           );
         }
@@ -299,7 +299,7 @@ const App: React.FC = () => {
             setActiveView('chats');
             setIsMobileMenuOpen(false);
           }}
-          onDeleteTeam={(id) => triggerDelete(id, teams.find(t => t.id === id)?.name || 'Team', 'Team')}
+          onDeleteTeam={(id) => triggerDelete(id, teams.find(t => t.id === id)?.name || 'Group', 'Group')}
           onDeleteAgent={(id) => triggerDelete(id, agents.find(a => a.id === id)?.name || 'ChatBot', 'ChatBot')}
           onOpenFeedback={() => setIsFeedbackModalOpen(true)}
           userProfile={userProfile}

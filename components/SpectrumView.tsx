@@ -5,14 +5,13 @@ import { ToolsView } from './ToolsView';
 import { ModelsView } from './ModelsView';
 
 interface SpectrumViewProps {
-    onFabricateAgent: () => void;
     onInitializeGroup: () => void;
     onOpenChat: (id: string) => void;
     agents: Agent[];
     teams: Team[];
 }
 
-export const SpectrumView: React.FC<SpectrumViewProps> = ({ onFabricateAgent, onInitializeGroup, onOpenChat, agents, teams }) => {
+export const SpectrumView: React.FC<SpectrumViewProps> = ({ onInitializeGroup, onOpenChat, agents, teams }) => {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -67,20 +66,15 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onFabricateAgent, on
                     <div className="max-w-5xl mx-auto">
                         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
-                                <h3 className="text-xs font-black text-gray-500 dark:text-white/40 uppercase tracking-[0.3em]">ChatBots Interface</h3>
+                                <h3 className="text-xs font-black text-gray-500 dark:text-white/40 uppercase tracking-[0.3em]">ChatBots Library</h3>
                                 <div className="h-px w-12 bg-black/10 dark:bg-white/5 hidden md:block" />
                             </div>
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-white/35">
+                                Ask Prism to create new chatbots. Spectrum is for review and launch.
+                            </p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max items-start">
-                            <button
-                                onClick={onFabricateAgent}
-                                className="h-[104px] flex flex-col items-center justify-center gap-2 bg-white/50 dark:bg-white/[0.02] border border-dashed border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 rounded-2xl p-4 group transition-all"
-                            >
-                                <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-gray-400 dark:text-white/40 group-hover:bg-gray-900 dark:group-hover:bg-white group-hover:text-white dark:group-hover:text-black transition-all text-xl font-bold">+</div>
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Custom ChatBot</span>
-                            </button>
-
                             {userAgents.map(agent => (
                                 <ListItem
                                     key={agent.id}
@@ -92,6 +86,8 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onFabricateAgent, on
                                     isExpanded={expandedId === agent.id}
                                     onToggleExpand={() => setExpandedId(expandedId === agent.id ? null : agent.id)}
                                     viewType="grid"
+                                    actionLabel="Open Chat"
+                                    tools={agent.capabilities}
                                 />
                             ))}
 
@@ -103,12 +99,12 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onFabricateAgent, on
                         </div>
 
                         <div className="mt-10 mb-4 flex items-center justify-between">
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500 dark:text-white/40">Teams Interface</h4>
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-500 dark:text-white/40">Groups</h4>
                             <button
                                 onClick={onInitializeGroup}
                                 className="px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-[9px] font-black uppercase tracking-[0.15em] text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 transition-all"
                             >
-                                Create Team
+                                Add Group
                             </button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max items-start">
@@ -117,18 +113,19 @@ export const SpectrumView: React.FC<SpectrumViewProps> = ({ onFabricateAgent, on
                                     key={team.id}
                                     icon="⬡"
                                     name={team.name}
-                                    sub="Team Command"
+                                    sub="Group Command"
                                     tagline={team.description || "No objective defined."}
                                     onClick={() => onOpenChat(team.id)}
                                     isExpanded={expandedId === team.id}
                                     onToggleExpand={() => setExpandedId(expandedId === team.id ? null : team.id)}
                                     viewType="grid"
                                     teamSize={team.agents.length}
+                                    actionLabel="Open Group"
                                 />
                             ))}
                             {userTeams.length === 0 && (
                                 <div className="col-span-full p-6 rounded-2xl border border-dashed border-black/10 dark:border-white/10 text-center text-[10px] text-gray-500 dark:text-white/40 uppercase tracking-[0.15em]">
-                                    No Teams Yet
+                                    No Groups Yet
                                 </div>
                             )}
                         </div>
@@ -161,7 +158,7 @@ const ListItem: React.FC<{
     actionLabel?: string;
     teamSize?: number;
     tools?: string[];
-}> = ({ icon, name, sub, tagline, onClick, isExpanded, onToggleExpand, actionLabel = 'Deploy', teamSize, tools }) => {
+}> = ({ icon, name, sub, tagline, onClick, isExpanded, onToggleExpand, actionLabel = 'Open', teamSize, tools }) => {
     return (
         <div className={`group relative bg-white dark:bg-black/20 border transition-all duration-300 rounded-2xl overflow-hidden shadow-sm dark:shadow-none flex flex-col justify-between ${isExpanded ? 'border-gray-900 dark:border-white/40 ring-1 ring-gray-900/5 dark:ring-white/10' : 'border-black/5 dark:border-white/5 hover:border-black/20 dark:hover:border-white/20'}`}>
             <div className="p-4 flex flex-col h-full">

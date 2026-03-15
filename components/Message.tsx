@@ -104,7 +104,7 @@ const CommandProposal: React.FC<{
                 <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.35)]" />
                     <span className="text-[9px] font-black text-emerald-700 dark:text-emerald-300 uppercase tracking-[0.2em]">
-                        {isSquad ? 'Team Blueprint' : 'ChatBot Suggestion'}
+                        {isSquad ? 'Group Blueprint' : 'ChatBot Suggestion'}
                     </span>
                 </div>
                 <span className="text-[8px] font-mono text-gray-500 dark:text-white/20 tracking-[0.1em] uppercase font-bold">READY</span>
@@ -184,7 +184,7 @@ const CommandProposal: React.FC<{
                         onClick={handleDeploy}
                         className="w-full py-2.5 bg-white hover:bg-slate-100 text-black text-[9px] font-black uppercase tracking-[0.2em] rounded-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
                     >
-                        <span>{isSquad ? 'Deploy Team' : 'Deploy ChatBot'}</span>
+                        <span>{isSquad ? 'Deploy Group' : 'Deploy ChatBot'}</span>
                         <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </button>
                 )}

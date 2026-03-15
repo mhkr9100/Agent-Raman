@@ -8,14 +8,14 @@ const PRISM_INTRO = `Prism is active. I am your prompt and context architect.
 
 **Quick Guide:**
 - **Ask Prism**: Get help with objectives, workflows, prompts, and system design.
-- **Create ChatBots**: Design a focused chatbot or team from one clear objective.
+- **Create ChatBots**: Design a focused chatbot or group from one clear objective.
 - **Bring Context**: Attach files or import memory so Prism can work from your real context.
 
 Tell me what you want to accomplish, and I will help shape the right chatbot or workflow for it.`;
 
 const getAgentIntro = (name: string, role: string) => `**${name}** is online. I am configured for **${role}**. What do you want to work on?`;
 
-const getTeamIntro = (name: string) => `**${name}** is ready. Mention a chatbot using **@Name** to direct work, or ask the team to coordinate the task together.`;
+const getTeamIntro = (name: string) => `**${name}** is ready. Mention a chatbot using **@Name** to direct work, or ask the group to coordinate the task together.`;
 
 export const useChatSessions = (currentUser: UserProfile | null) => {
     const chatHistory = useAppStore(state => state.chatHistory);
@@ -79,8 +79,8 @@ export const useChatSessions = (currentUser: UserProfile | null) => {
 
         return {
             id: `msg-squad-init-${Date.now()}`,
-            agent: { id: entityId, name: 'Team', type: 'team', icon: '👥' } as any,
-            content: { type: 'text', text: `This team is synchronized. Use **@Name** to trigger a chatbot's expertise or ask a general question to start the coordination.` },
+            agent: { id: entityId, name: 'Group', type: 'team', icon: '👥' } as any,
+            content: { type: 'text', text: `This group is synchronized. Use **@Name** to trigger a chatbot's expertise or ask a general question to start the coordination.` },
             type: 'agent'
         };
     }, []);

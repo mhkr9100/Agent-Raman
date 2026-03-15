@@ -64,7 +64,7 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
     const title = type === 'prism'
         ? 'Prism Profile'
         : type === 'team'
-            ? 'Team Profile'
+            ? 'Group Profile'
             : 'Profile';
 
     return (
@@ -84,7 +84,7 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                         {type === 'team' ? (
                             <>
                                 <div>
-                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">Team Name</label>
+                                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-white/40">Group Name</label>
                                     <input
                                         value={teamName}
                                         onChange={e => setTeamName(e.target.value)}

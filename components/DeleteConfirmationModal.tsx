@@ -3,7 +3,7 @@ import React from 'react';
 interface DeleteConfirmationModalProps {
     isOpen: boolean;
     itemName: string;
-    itemType: 'ChatBot' | 'Team';
+    itemType: 'ChatBot' | 'Group';
     onConfirm: () => void;
     onCancel: () => void;
 }
