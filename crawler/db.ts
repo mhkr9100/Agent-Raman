@@ -11,7 +11,10 @@ export function serviceClient(): SupabaseClient {
 
 /** Upsert one batch through public.upsert_capabilities (merge rules live in SQL). */
 export async function upsertBatch(db: SupabaseClient, source: string, curated: boolean, rows: SourceRecord[]) {
-  const { data, error } = await db.rpc("upsert_capabilities", { p_source: source, p_curated: curated, p_rows: rows });
+  // Raw payloads cost ~84 MB per 75k rows (measured 2026-11-08) against the 500 MB free tier; store them only on request.
+  const keepRaw = process.env.CRAWL_KEEP_RAW === "1";
+  const payload = keepRaw ? rows : rows.map(({ raw: _raw, ...r }) => r);
+  const { data, error } = await db.rpc("upsert_capabilities", { p_source: source, p_curated: curated, p_rows: payload });
   if (error) throw new Error(`upsert_capabilities(${source}): ${error.message}`);
   return data as number;
 }
