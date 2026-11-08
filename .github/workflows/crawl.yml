@@ -1,0 +1,52 @@
+# Daily catalog crawl (RAMAN-TASK CAP-07). Facts verified 2026-11-07/08:
+# - free on public repos; schedules can be delayed or dropped at high load (avoid minute 0)
+# - scheduled workflows are disabled after 60 days without repo activity → monthly keep-alive commit below
+# - the crawler's REST writes also count as Supabase activity (free projects pause after 7 idle days)
+name: crawl
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Source name, or 'all'"
+        default: "all"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crawl
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Crawl
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: npm run crawl -- "${{ inputs.source || 'all' }}" --embed 3000
+      - name: Monthly keep-alive commit
+        if: github.event_name == 'schedule'
+        run: |
+          if [ "$(date -u +%d)" = "01" ]; then
+            mkdir -p catalog
+            date -u +%Y-%m-%dT%H:%M:%SZ > catalog/last-keepalive.txt
+            git config user.name "raman-crawler"
+            git config user.email "raman-crawler@users.noreply.github.com"
+            git add catalog/last-keepalive.txt
+            git commit -m "chore: crawler keep-alive" && git push || true
+          fi
