@@ -42,21 +42,66 @@ export async function embedEdge(texts: string[]): Promise<number[][]> {
   return body.embeddings;
 }
 
+type Pending = { id: string; name: string; description: string | null; kind: string; official: boolean; slug: string; install: Record<string, string> | null; installs: number | null };
+
+/** MCP servers only: remote host, else registry namespace; mirrors public.capability_publisher_key (migration 20261108000005). */
+export function publisherKey(kind: string, slug: string, install: Record<string, string> | null): string | null {
+  if (kind !== "mcp_server") return null;
+  const host = install?.claude_code?.match(/https?:\/\/([^/ ]+)/)?.[1];
+  if (host) return host;
+  const ns = slug.slice(4).split("/")[0];
+  return ns && ns !== "github.com" ? ns : null;
+}
+
+/**
+ * Rows still to embed, best first: plugins / curated / official, models, MCP servers, then skills by installs.
+ * Mass publishers (public.publisher_flag) are skipped. Ranking runs here because one SQL sort over ~84k rows
+ * exceeded PostgREST's 8 s timeout on free-tier compute (2026-11-08); id-keyed pages stay fast.
+ */
+async function rankedPending(db: SupabaseClient): Promise<Pending[]> {
+  const [{ data: flags, error: fe }, { data: curated, error: ce }] = await Promise.all([
+    db.from("publisher_flag").select("key"),
+    db.from("capability_source").select("capability_id").eq("curated", true).limit(100000),
+  ]);
+  if (fe || ce) throw new Error(`rank inputs: ${(fe ?? ce)!.message}`);
+  const flagged = new Set((flags ?? []).map((f) => f.key as string));
+  const curatedIds = new Set((curated ?? []).map((c) => c.capability_id as string));
+
+  const rows: Pending[] = [];
+  let after = "00000000-0000-0000-0000-000000000000";
+  for (;;) {
+    const { data, error } = await db
+      .from("capability")
+      .select("id, name, description, kind, official, slug, install, installs:signals->clawhub->installs")
+      .is("embedding", null)
+      .in("status", ["active", "provisional"])
+      .gt("id", after)
+      .order("id")
+      .limit(1000);
+    if (error) throw new Error(`select pending embeddings: ${error.message}`);
+    if (!data?.length) break;
+    rows.push(...(data as unknown as Pending[]));
+    after = data[data.length - 1].id;
+  }
+  const tier = (r: Pending) =>
+    r.kind === "plugin" || r.official || curatedIds.has(r.id) ? 0 : r.kind === "model" ? 1 : r.kind === "mcp_server" ? 2 : 3;
+  return rows
+    .filter((r) => { const k = publisherKey(r.kind, r.slug, r.install); return !k || !flagged.has(k); })
+    .sort((a, b) => tier(a) - tier(b) || Number(b.installs ?? 0) - Number(a.installs ?? 0) || a.id.localeCompare(b.id));
+}
+
 /** Embed up to `max` capabilities without an embedding, best first, until the size cap. Returns how many were embedded. */
 export async function embedPending(db: SupabaseClient, max: number, log: (m: string) => void): Promise<number> {
+  const queue = (await rankedPending(db)).slice(0, max);
+  log(`${queue.length} rows queued for embedding`);
   let done = 0;
-  while (done < max) {
+  for (let b = 0; b < queue.length; b += SELECT_BATCH) {
     const bytes = await dbBytes(db);
     if (bytes > EMBED_CAP_BYTES) {
       log(`database at ${Math.round(bytes / 2 ** 20)} MB, over the ${EMBED_CAP_BYTES / 2 ** 20} MB embedding cap; stopping`);
       break;
     }
-    // Priority order and mass-publisher exclusion live in SQL (migration 20261108000005).
-    const { data: rows, error } = await db.rpc("pending_embeddings", { p_limit: Math.min(SELECT_BATCH, max - done) });
-    const data = rows as { id: string; name: string; description: string | null }[] | null;
-    if (error) throw new Error(`select pending embeddings: ${error.message}`);
-    if (!data?.length) break;
-
+    const data = queue.slice(b, b + SELECT_BATCH);
     const vectors = await embedLocal(data.map((r) => embedText(r.name, r.description)));
     for (let i = 0; i < data.length; i += WRITE_BATCH) {
       const items = data.slice(i, i + WRITE_BATCH).map((r, j) => ({ id: r.id, embedding: vectors[i + j] }));

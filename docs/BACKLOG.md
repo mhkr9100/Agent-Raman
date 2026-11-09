@@ -37,6 +37,7 @@ Framework improvements go to `RAMAN-TASK.md` R13. This file holds known implemen
 - [ ] Some prices (image, audio) stored without a unit.
 
 ## Retrieval (hybrid_search smoke test, 2026-11-08, 57k of 144k rows embedded)
-- [ ] Keyword and semantic top-3 never overlapped on 3 test queries; official servers (e.g. Slack, Postgres) did not surface. The R6 re-rank must weight curation, quality and usage.
+- [ ] With 57k rows embedded, keyword and semantic top-3 never overlapped on 3 test queries (at 81k embedded, each query had at least one overlap); official servers (e.g. Slack, Postgres) did not surface. The R6 re-rank must weight curation, quality and usage.
 - [ ] RPC latency 1.0–2.5 s on the free tier; measure again once all rows are embedded and the cache is warm.
-- [ ] 24.8k dead tuples in `capability` after the embed pass; reclaim with VACUUM FULL when there is room.
+- [ ] 29.6k dead tuples (~40 MB) left by `set_embeddings` updates hold the DB at the 440 MB embedding cap with 81k of 144k rows embedded (2026-11-08). A table rewrite (see 20261108000006) would free room for roughly 15-20k more vectors. Longer term: write embeddings in the same upsert as the row, or move to a larger free Postgres (`docs/research/free-db-options.md`).
+- [ ] Once the catalog grows past the 470 MB write cap, crawls stop and the catalog goes stale. Needs a retention rule (drop rows below a quality floor) or a bigger database before then.
