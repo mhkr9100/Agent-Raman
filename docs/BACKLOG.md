@@ -35,3 +35,8 @@ Framework improvements go to `RAMAN-TASK.md` R13. This file holds known implemen
 
 ## openrouter
 - [ ] Some prices (image, audio) stored without a unit.
+
+## Retrieval (hybrid_search smoke test, 2026-11-08, 57k of 144k rows embedded)
+- [ ] Keyword and semantic top-3 never overlapped on 3 test queries; official servers (e.g. Slack, Postgres) did not surface. The R6 re-rank must weight curation, quality and usage.
+- [ ] RPC latency 1.0–2.5 s on the free tier; measure again once all rows are embedded and the cache is warm.
+- [ ] 24.8k dead tuples in `capability` after the embed pass; reclaim with VACUUM FULL when there is room.

@@ -5,7 +5,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const SELECT_BATCH = 256;
-const WRITE_BATCH = 64;
+// 64 rows per set_embeddings call hit the 8 s PostgREST statement timeout at ~56k rows (HNSW + GIN upkeep, 2026-11-08).
+const WRITE_BATCH = 16;
 
 export function embedText(name: string, description: string | null): string {
   return description ? `${name}. ${description}` : name;
@@ -56,7 +57,8 @@ export async function embedPending(db: SupabaseClient, max: number, log: (m: str
     const vectors = await embedLocal(data.map((r) => embedText(r.name, r.description)));
     for (let i = 0; i < data.length; i += WRITE_BATCH) {
       const items = data.slice(i, i + WRITE_BATCH).map((r, j) => ({ id: r.id, embedding: vectors[i + j] }));
-      const { error: setErr } = await db.rpc("set_embeddings", { p_items: items });
+      let { error: setErr } = await db.rpc("set_embeddings", { p_items: items });
+      if (setErr?.message.includes("statement timeout")) ({ error: setErr } = await db.rpc("set_embeddings", { p_items: items }));
       if (setErr) throw new Error(`set_embeddings: ${setErr.message}`);
     }
     done += data.length;
