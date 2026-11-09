@@ -42,6 +42,18 @@ export async function embedEdge(texts: string[]): Promise<number[][]> {
   return body.embeddings;
 }
 
+/**
+ * set_embeddings with timeout recovery: a 16-row call occasionally exceeds PostgREST's 8 s limit on free-tier
+ * compute while HNSW absorbs inserts (2026-11-09). On timeout the chunk is retried in pieces of 4, then 1.
+ */
+async function writeEmbeddings(db: SupabaseClient, items: { id: string; embedding: number[] }[]): Promise<void> {
+  const { error } = await db.rpc("set_embeddings", { p_items: items });
+  if (!error) return;
+  if (!error.message.includes("statement timeout") || items.length === 1) throw new Error(`set_embeddings: ${error.message}`);
+  const piece = items.length > 4 ? 4 : 1;
+  for (let i = 0; i < items.length; i += piece) await writeEmbeddings(db, items.slice(i, i + piece));
+}
+
 type Pending = { id: string; name: string; description: string | null; kind: string; official: boolean; slug: string; install: Record<string, string> | null; installs: number | null };
 
 /** MCP servers only: remote host, else registry namespace; mirrors public.capability_publisher_key (migration 20261108000005). */
@@ -105,9 +117,7 @@ export async function embedPending(db: SupabaseClient, max: number, log: (m: str
     const vectors = await embedLocal(data.map((r) => embedText(r.name, r.description)));
     for (let i = 0; i < data.length; i += WRITE_BATCH) {
       const items = data.slice(i, i + WRITE_BATCH).map((r, j) => ({ id: r.id, embedding: vectors[i + j] }));
-      let { error: setErr } = await db.rpc("set_embeddings", { p_items: items });
-      if (setErr?.message.includes("statement timeout")) ({ error: setErr } = await db.rpc("set_embeddings", { p_items: items }));
-      if (setErr) throw new Error(`set_embeddings: ${setErr.message}`);
+      await writeEmbeddings(db, items);
     }
     done += data.length;
     if (done % 2560 === 0) log(`embedded ${done}`);
