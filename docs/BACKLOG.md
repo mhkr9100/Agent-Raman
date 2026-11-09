@@ -41,3 +41,12 @@ Framework improvements go to `RAMAN-TASK.md` R13. This file holds known implemen
 - [ ] RPC latency 1.0–2.5 s on the free tier; measure again once all rows are embedded and the cache is warm.
 - [ ] 29.6k dead tuples (~40 MB) left by `set_embeddings` updates hold the DB at the 440 MB embedding cap with 81k of 144k rows embedded (2026-11-08). A table rewrite (see 20261108000006) would free room for roughly 15-20k more vectors. Longer term: write embeddings in the same upsert as the row, or move to a larger free Postgres (`docs/research/free-db-options.md`).
 - [ ] Once the catalog grows past the 470 MB write cap, crawls stop and the catalog goes stale. Needs a retention rule (drop rows below a quality floor) or a bigger database before then.
+
+## Binder (R6, 2026-11-09)
+- [ ] LLM-mode eval not run yet: needs `EVAL_PROVIDER`, `EVAL_MODEL`, `EVAL_API_KEY` in `.env.local` (`npm run eval:binder -- --llm`). Gates still open: zero wrong binds, cadence trap.
+- [ ] `capability.official` is unreliable: it marks registry namespace = repo owner (self-published spam gets `true`; github/github-mcp-server gets `false`). Re-rank ignores it until fixed.
+- [ ] Usage and vote signals exist only for ClawHub skills, so the re-rank tilts toward skills over curated MCP servers. Add GitHub stars (awesome-mcp / repo metadata) or normalize per kind.
+- [ ] Anthropic's own document skills (pdf, docx, xlsx, pptx from anthropics/skills) are missing from the catalog; only ClawHub copies exist. Add that marketplace (R4).
+- [ ] No `platform_feature` / `procedure` rows yet (GitHub Actions schedule, OS cron, Apps Script triggers). Without them a scheduled-host need can only end UNVERIFIED (R4 seed list with vendor-doc URLs).
+- [ ] Retrieval miss: "generate an image" ranks video models first (image-generation eval item).
+- [ ] Keyword OR fallback (`binder_keyword(p_any => true)`) costs ~3 s for long needs on Nano and is unused; revisit if a stored tsvector fits the budget again.

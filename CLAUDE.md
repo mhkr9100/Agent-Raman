@@ -8,7 +8,7 @@ Design source of truth: `docs/FRAMEWORK.md` (method), `docs/RAMAN-TASK.md` (buil
 
 ## Layout
 - `src/app/` — Next.js 16 App Router UI and API routes
-- `src/lib/` — shared code: catalog types, prism engine, binder, renderer
+- `src/lib/` — shared code: `binder/` (R6, done), `llm.ts` (per-request BYOK models), prism engine, renderer
 - `supabase/migrations/` — SQL, applied in order; never edit an applied migration, add a new one
 - `supabase/functions/` — Edge Functions (`embed`: gte-small, 384-d)
 - `crawler/` — daily catalog crawler (Node + tsx, run by GitHub Actions); one adapter per source in `crawler/sources/`
@@ -37,3 +37,4 @@ Project "Agent Raman", ref `gxgnfetzwevydmqqujwi`, us-west-2. Free tier: 500 MB 
 ## Commands
 - `npm run dev` / `npm run build` / `npm run lint`
 - `npm run crawl -- <source>` — run one crawler adapter locally (needs `.env.local`)
+- `npm run eval:binder` — Binder retrieval gate (top-3 ≥ 80%); add `-- --llm` for full binds (needs `EVAL_*` in `.env.local`)

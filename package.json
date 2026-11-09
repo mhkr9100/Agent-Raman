@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "crawl": "tsx --env-file-if-exists=.env.local crawler/run.ts",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "eval:binder": "tsx --env-file-if-exists=.env.local evals/run-binder.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.99",

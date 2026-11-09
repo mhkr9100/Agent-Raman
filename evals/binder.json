@@ -1,0 +1,37 @@
+{
+  "about": "Binder eval set (RAMAN-TASK R6 gate: expected item in top-3 for >= 80%; zero false binds on the cadence trap). `accept` lists lowercase substrings matched against the slug with 'github.com/' removed; any match counts. Expected items were chosen from canonical tools present in the catalog on 2026-11-09, before running the Binder, and are not tuned to its output. Needs avoid tool names unless a user would name the system (Slack, Notion, ...).",
+  "items": [
+    { "id": "slack-post", "need": "Post a message to a team Slack channel when a job finishes", "accept": ["slack"] },
+    { "id": "postgres-query", "need": "Run read-only SQL queries against a PostgreSQL database and inspect its schema", "accept": ["postgres", "pgsql", "pg-mcp"] },
+    { "id": "github-issues", "need": "Create GitHub issues and open pull requests on a repository", "accept": ["github-mcp-server", "claude-plugins-official/github", "github/"] },
+    { "id": "browser-automation", "need": "Automate a real web browser: open pages, click buttons and fill in forms", "accept": ["playwright", "puppeteer", "browser"] },
+    { "id": "web-search", "need": "Search the web for current information and return result links", "accept": ["brave", "exa", "tavily", "serper", "perplexity", "web-search", "websearch", "searxng", "duckduckgo", "kagi", "google-search"] },
+    { "id": "scrape-markdown", "need": "Fetch a web page and convert its content to clean markdown", "accept": ["firecrawl", "fetch", "scrap", "crawl", "jina", "markdown"] },
+    { "id": "notion-pages", "need": "Read and update pages in a Notion workspace", "accept": ["notion"] },
+    { "id": "stripe-billing", "need": "Create Stripe customers and payment links", "accept": ["stripe"] },
+    { "id": "sentry-errors", "need": "Look up recent error events and stack traces in Sentry", "accept": ["sentry"] },
+    { "id": "linear-issues", "need": "Create and update issues in Linear", "accept": ["linear"] },
+    { "id": "google-sheets", "need": "Append rows to a Google Sheets spreadsheet and read ranges back", "accept": ["sheet"] },
+    { "id": "transactional-email", "need": "Send a transactional email to a customer from code", "accept": ["resend", "sendgrid", "mailgun", "postmark", "email", "mail", "smtp"] },
+    { "id": "apollo-leads", "need": "Search Apollo for people at a company and enrich their contact details", "accept": ["apollo"] },
+    { "id": "filesystem", "need": "Read, write and list files in allowed local directories", "accept": ["filesystem", "file-system"] },
+    { "id": "vercel-deploy", "need": "Deploy a project to Vercel and check deployment logs", "accept": ["vercel"] },
+    { "id": "supabase-project", "need": "Manage a Supabase project: run SQL, apply migrations and list tables", "accept": ["supabase"] },
+    { "id": "image-generation", "need": "Generate an image from a text prompt", "constraints": { "kinds": ["model"] }, "accept": ["gpt-image", "flux", "imagen", "dall-e", "stable-diffusion", "sdxl", "seedream", "image"] },
+    { "id": "speech-to-text", "need": "Transcribe an audio recording to text", "constraints": { "kinds": ["model"] }, "accept": ["whisper", "transcribe", "speech-to-text", "stt", "asr"] },
+    { "id": "docx-write", "need": "Create a Word .docx document with headings and tables", "accept": ["docx", "word"] },
+    { "id": "pdf-extract", "need": "Extract text and tables from PDF files", "accept": ["pdf"] },
+    { "id": "kubernetes", "need": "Inspect pods and deployments in a Kubernetes cluster", "accept": ["kubernetes", "k8s", "kubectl"] },
+    { "id": "jira", "need": "Search and create tickets in Jira", "accept": ["jira", "atlassian"] },
+    { "id": "figma", "need": "Read frames and components from a Figma design file", "accept": ["figma"] },
+    { "id": "proposed-name-github", "need": "Manage pull requests on GitHub", "proposed_names": ["github-mcp-server", "GitHub"], "accept": ["github-mcp-server", "claude-plugins-official/github", "github/"] },
+    {
+      "id": "cadence-trap",
+      "need": "Run a data-sync script automatically every 30 minutes without anyone present",
+      "constraints": { "runtime": "scheduled_host" },
+      "accept": [],
+      "expect_status": ["partial", "none"],
+      "note": "FRAMEWORK §3: no catalog item here runs as a scheduler on a scheduled host; a bind is a false bind. Retrieval-only mode skips this item."
+    }
+  ]
+}
