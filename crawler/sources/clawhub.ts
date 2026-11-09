@@ -161,8 +161,7 @@ function toRecord(item: ClawHubSkill): SourceRecord {
     signals,
     quality,
     licence: item.latestVersion?.license ?? null,
-    tos_notes:
-      "ClawHub public catalog reuse: cache results, link back to the canonical ClawHub listing, do not imply endorsement, do not mirror hidden/private/moderation-blocked content.",
+    // Terms note lives once on source_sync.tos_notes (migration 20261108000004), not on 70k+ rows.
     status: "active",
     source_id: `${ownerKey}/${slug.toLowerCase()}`,
     source_url: listingUrl,

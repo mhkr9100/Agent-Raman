@@ -35,3 +35,14 @@ export async function writeSync(
     .upsert({ source, last_run_at: new Date().toISOString(), ...fields }, { onConflict: "source" });
   if (error) throw new Error(`source_sync write: ${error.message}`);
 }
+
+// Supabase free tier caps the database at 500 MB (https://supabase.com/pricing, verified 2026-11-08).
+// Writes stop below that so the project never goes read-only; embeddings stop earlier to leave room for row growth.
+export const WRITE_CAP_BYTES = 470 * 1024 * 1024;
+export const EMBED_CAP_BYTES = 440 * 1024 * 1024;
+
+export async function dbBytes(db: SupabaseClient): Promise<number> {
+  const { data, error } = await db.rpc("catalog_db_bytes");
+  if (error) throw new Error(`catalog_db_bytes: ${error.message}`);
+  return Number(data);
+}

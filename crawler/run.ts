@@ -5,7 +5,7 @@
 // --embed N   after upserting, embed up to N pending capabilities (default 2000)
 import { ADAPTERS } from "./sources";
 import { embedPending } from "./embed";
-import { readCursor, serviceClient, upsertBatch, writeSync } from "./db";
+import { WRITE_CAP_BYTES, dbBytes, readCursor, serviceClient, upsertBatch, writeSync } from "./db";
 import { CATEGORY_NAMES } from "./taxonomy";
 import { SECRET_LIKE } from "./secrets";
 import type { SourceAdapter, SourceRecord } from "./types";
@@ -53,7 +53,11 @@ async function crawl(adapter: SourceAdapter) {
       });
       seen += step.value.length;
       if (dryRun) sample.push(...batch.slice(0, Math.max(0, 3 - sample.length)));
-      else if (batch.length) written += await upsertBatch(db!, adapter.name, adapter.curated, batch);
+      else if (batch.length) {
+        const bytes = await dbBytes(db!);
+        if (bytes > WRITE_CAP_BYTES) throw new Error(`database at ${Math.round(bytes / 2 ** 20)} MB, over the ${WRITE_CAP_BYTES / 2 ** 20} MB write cap; stopping`);
+        written += await upsertBatch(db!, adapter.name, adapter.curated, batch);
+      }
       if (limit && seen >= limit) break;
       step = await it.next();
     }

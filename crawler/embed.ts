@@ -3,6 +3,7 @@
 // - query time (app): the `embed` Edge Function (≤4 texts/request; 16 hit the 2 s CPU limit → HTTP 546)
 // Parity verified 2026-11-08: cosine(local, edge) = 1.00000 on 3 sample texts.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { EMBED_CAP_BYTES, dbBytes } from "./db";
 
 const SELECT_BATCH = 256;
 // 64 rows per set_embeddings call hit the 8 s PostgREST statement timeout at ~56k rows (HNSW + GIN upkeep, 2026-11-08).
@@ -41,16 +42,18 @@ export async function embedEdge(texts: string[]): Promise<number[][]> {
   return body.embeddings;
 }
 
-/** Embed up to `max` capabilities that have no embedding yet. Returns how many were embedded. */
+/** Embed up to `max` capabilities without an embedding, best first, until the size cap. Returns how many were embedded. */
 export async function embedPending(db: SupabaseClient, max: number, log: (m: string) => void): Promise<number> {
   let done = 0;
   while (done < max) {
-    const { data, error } = await db
-      .from("capability")
-      .select("id, name, description")
-      .is("embedding", null)
-      .in("status", ["active", "provisional"])
-      .limit(Math.min(SELECT_BATCH, max - done));
+    const bytes = await dbBytes(db);
+    if (bytes > EMBED_CAP_BYTES) {
+      log(`database at ${Math.round(bytes / 2 ** 20)} MB, over the ${EMBED_CAP_BYTES / 2 ** 20} MB embedding cap; stopping`);
+      break;
+    }
+    // Priority order and mass-publisher exclusion live in SQL (migration 20261108000005).
+    const { data: rows, error } = await db.rpc("pending_embeddings", { p_limit: Math.min(SELECT_BATCH, max - done) });
+    const data = rows as { id: string; name: string; description: string | null }[] | null;
     if (error) throw new Error(`select pending embeddings: ${error.message}`);
     if (!data?.length) break;
 
