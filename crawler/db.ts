@@ -9,14 +9,22 @@ export function serviceClient(): SupabaseClient {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+// Rows per upsert_capabilities call. Adapters yield up to 200; 200-row calls hit PostgREST's 8 s timeout on
+// free-tier compute in the first Actions run (2026-11-09), so the write path splits them.
+const UPSERT_CHUNK = 100;
+
 /** Upsert one batch through public.upsert_capabilities (merge rules live in SQL). */
 export async function upsertBatch(db: SupabaseClient, source: string, curated: boolean, rows: SourceRecord[]) {
   // Raw payloads cost ~84 MB per 75k rows (measured 2026-11-08) against the 500 MB free tier; store them only on request.
   const keepRaw = process.env.CRAWL_KEEP_RAW === "1";
   const payload = keepRaw ? rows : rows.map(({ raw: _raw, ...r }) => r);
-  const { data, error } = await db.rpc("upsert_capabilities", { p_source: source, p_curated: curated, p_rows: payload });
-  if (error) throw new Error(`upsert_capabilities(${source}): ${error.message}`);
-  return data as number;
+  let written = 0;
+  for (let i = 0; i < payload.length; i += UPSERT_CHUNK) {
+    const { data, error } = await db.rpc("upsert_capabilities", { p_source: source, p_curated: curated, p_rows: payload.slice(i, i + UPSERT_CHUNK) });
+    if (error) throw new Error(`upsert_capabilities(${source}): ${error.message}`);
+    written += data as number;
+  }
+  return written;
 }
 
 export async function readCursor(db: SupabaseClient, source: string): Promise<string | null> {

@@ -1,4 +1,5 @@
 # Daily catalog crawl (RAMAN-TASK CAP-07). Facts verified 2026-11-07/08:
+# - checkout@v7 and setup-node@v7 run on node24 (action.yml checked 2026-11-09); v4 targeted the deprecated Node 20
 # - free on public repos; schedules can be delayed or dropped at high load (avoid minute 0)
 # - scheduled workflows are disabled after 60 days without repo activity → monthly keep-alive commit below
 # - the crawler's REST writes also count as Supabase activity (free projects pause after 7 idle days)
@@ -25,8 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm

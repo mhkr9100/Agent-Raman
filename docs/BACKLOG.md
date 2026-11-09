@@ -39,7 +39,7 @@ Framework improvements go to `RAMAN-TASK.md` R13. This file holds known implemen
 ## Retrieval (hybrid_search smoke test, 2026-11-08, 57k of 144k rows embedded)
 - [ ] With 57k rows embedded, keyword and semantic top-3 never overlapped on 3 test queries (at 81k embedded, each query had at least one overlap); official servers (e.g. Slack, Postgres) did not surface. The R6 re-rank must weight curation, quality and usage.
 - [ ] RPC latency 1.0–2.5 s on the free tier; measure again once all rows are embedded and the cache is warm.
-- [ ] 29.6k dead tuples (~40 MB) left by `set_embeddings` updates hold the DB at the 440 MB embedding cap with 81k of 144k rows embedded (2026-11-08). A table rewrite (see 20261108000006) would free room for roughly 15-20k more vectors. Longer term: write embeddings in the same upsert as the row, or move to a larger free Postgres (`docs/research/free-db-options.md`).
+- [x] Dead tuples reclaimed 2026-11-09 (454 → 408 MB with HNSW rebuilt; procedure in 20261109000012). Remaining: `set_embeddings` still leaves one dead tuple per embedded row, so compaction must be repeated after large embed passes.
 - [ ] Once the catalog grows past the 470 MB write cap, crawls stop and the catalog goes stale. Needs a retention rule (drop rows below a quality floor) or a bigger database before then.
 
 ## Binder (R6, 2026-11-09)
@@ -50,3 +50,8 @@ Framework improvements go to `RAMAN-TASK.md` R13. This file holds known implemen
 - [ ] No `platform_feature` / `procedure` rows yet (GitHub Actions schedule, OS cron, Apps Script triggers). Without them a scheduled-host need can only end UNVERIFIED (R4 seed list with vendor-doc URLs).
 - [ ] Retrieval miss: "generate an image" ranks video models first (image-generation eval item).
 - [ ] Keyword OR fallback (`binder_keyword(p_any => true)`) costs ~3 s for long needs on Nano and is unused; revisit if a stored tsvector fits the budget again.
+
+## Crawl write path (first Actions run, 2026-11-09)
+- [x] v1 upsert rewrote every row each crawl → 8 s timeouts (mcp_registry, awesome_mcp) and +9 MB of dead tuples. Fixed: skip unchanged rows, weekly "seen" stamps, 100-row calls (20261109000010).
+- [x] Two sources overwrote each other's name/description and nulled embeddings for all 2,175 servers listed in both awesome-mcp and the MCP Registry. Fixed with `text_source` precedence (20261109000011).
+- [ ] The embed size guard reads `pg_database_size`, which counts reusable free space; after heavy churn it can block embedding until compaction even when live data fits.
