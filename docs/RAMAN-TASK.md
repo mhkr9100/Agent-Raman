@@ -94,6 +94,31 @@ Not selected: **Glama** (licence §15.3/15.4 requires visible attribution per re
 | R12 | Deploy: Vercel project, env vars, Schedules; README (no licence decision implied) | CAP-23 | R9 | public URL | production run succeeds | rollback deploy | public |
 | R13 | **Final self-improvement run** (your call, 2026-11-08): run the finished Raman on "improve the Raman framework", then apply the accepted changes. Backlog it must consider: probe every bound item before emitting · executor walkthrough gate · real execution evals (`claude -p` on the eval set) · recurring-pattern library · unverified claims C5–C9, M7–M9 | everything | R11, R12 | changes applied + re-run of the eval set | eval coverage ≥ previous | revert change | reversible |
 
+### 6a. Build status (2026-11-10) and additions to the R13 backlog
+
+| Step | State | Evidence | Still open |
+|---|---|---|---|
+| R7 | built | `npm run test:engine` passes with a scripted model (gates, cadence, budget stop, redaction) | no run with a real model key yet |
+| R8 | built | renderer tests in the same suite; sections 1–11 + Appendix A | index < 200 lines depends on plan size |
+| R9 | built | end-to-end run in the browser with the mock model | same: no real key |
+| R10 | built | second run of the same request showed the diff in the browser | history is unauthenticated (see below) |
+| R11 | partly | `npm run eval:tasks`: 20 tasks, trend in `evals/trend.jsonl` (95% → 100% after the cadence rule fix) | `--llm` mode not run (no key); `claude plugin eval` cases in `evals/` not run (needs Claude Code ≥ 2.1.269 and a deployed host) |
+| MCP + skill | built (not in the original runbook; requested 2026-11-10) | `/api/mcp`, `/api/v1/*`, `skills/agent-raman`, `.claude-plugin/`; `npm run test:agent` passes | marketplace install and plugin-bundled server untested |
+| R12 | not started | — | needs the licence decision (D6) and the owner's go-ahead |
+| R13 | not started | — | needs R11 `--llm` and R12 |
+
+Deviations from the framework made while building. Per the rule "no framework changes mid-build" they are listed
+here for R13 to accept or revert, not written into `docs/FRAMEWORK.md`:
+
+- Intake makes one cut plus a gap pass, not two independent cuts; the Chapman estimate uses rough overlap matching.
+- Budgets (tokens, nodes, depth per preset) are provisional numbers, not measured ones. Concurrent expands can overshoot the node cap.
+- A repeating need becomes a `build` leaf: the catalog has no `platform_feature` scheduler rows, and MCP servers, skills and plugins are session-only.
+- On the MCP path the calling agent judges coverage; Raman's code checks only catalog membership, runtime, executor and the gates. The file says so.
+- A search leg that fails twice (statement timeout) is left out instead of failing the need; `degraded` is recorded but not yet shown to the user.
+- The `--llm` eval gate tolerates 0.03 of noise between runs (provisional).
+- The no-key task eval is saturated (100%): it protects against regressions but cannot show improvement. Harder needs, or the `--llm` score, must carry the trend.
+- With/without test, 2026-11-10 (`evals/ab/RESULTS.md`): on the agent path the method made plans worse and dearer to write for Sonnet and Haiku planners. For R13 to consider, not applied: a short file by default (sections only when they carry content); method detail in step cards; "prefer the built-in path, bind a catalog item only when it adds something"; an explicit verified / not verified mark on every fact; execution evals as the gate instead of document review.
+
 ## 7. Checks
 
 - Per step: the Gate column. Final acceptance (machine-checkable where possible): `npm run build` ✓ · migrations idempotent ✓ · `hybrid_search` p95 < 300 ms on the full catalog ✓ · crawler run upserts from ≥5 sources ✓ · eval set: expected leaf in top-3 ≥ 80%, zero false-binds on the cadence trap ✓ · generated `task.md` for the Apollo task contains: ≥1 decision input, an Assumptions ledger, a BoM with `invoke_when` on every row, a Runbook DAG, a coverage appendix ✓ · no secret pattern anywhere in the repo (`gitleaks` or equivalent) ✓.

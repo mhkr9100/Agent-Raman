@@ -38,12 +38,24 @@ export async function expandNeed(model: LanguageModel, input: NeedInput): Promis
   };
 }
 
-type RankedList = { method: Method; ids: { id: string; rank: number }[] };
+type RankedList = { method: Method; ids: { id: string; rank: number }[]; failed?: string };
+
+// One search leg. A leg that fails twice (on the free tier: a statement timeout under concurrent calls, seen
+// 2026-11-10) returns an empty list instead of failing the whole need; the other legs still rank the catalog.
+async function rpcRows<T>(db: SupabaseClient, fn: string, args: Record<string, unknown>): Promise<{ rows: T[]; failed?: string }> {
+  let message = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 400));
+    const { data, error } = await db.rpc(fn, args);
+    if (!error) return { rows: (data ?? []) as T[] };
+    message = `${fn}: ${error.message}`;
+  }
+  return { rows: [], failed: message };
+}
 
 async function rpcList(db: SupabaseClient, method: Method, fn: string, args: Record<string, unknown>): Promise<RankedList> {
-  const { data, error } = await db.rpc(fn, args);
-  if (error) throw new Error(`${fn}: ${error.message}`);
-  return { method, ids: ((data ?? []) as { id: string; rank: number }[]).map((r) => ({ id: r.id, rank: r.rank })) };
+  const { rows, failed } = await rpcRows<{ id: string; rank: number }>(db, fn, args);
+  return { method, ids: rows.map((r) => ({ id: r.id, rank: r.rank })), failed };
 }
 
 export interface RetrievalResult {
@@ -51,6 +63,8 @@ export interface RetrievalResult {
   exact: { id: string; proposed: string; how: string }[];
   unverified_names: string[];
   expansion: Expansion;
+  /** Search legs that failed twice and were left out of the ranking. */
+  degraded: string[];
 }
 
 /**
@@ -93,12 +107,16 @@ export async function retrieve(
       : []),
   ];
   const exactJob = names.length
-    ? db.rpc("binder_exact", { p_names: names, p_limit: 20 }).then(({ data, error }) => {
-        if (error) throw new Error(`binder_exact: ${error.message}`);
-        return (data ?? []) as { id: string; rank: number; proposed: string; how: string }[];
-      })
-    : Promise.resolve([]);
-  const [lists, exact] = await Promise.all([Promise.all(jobs), exactJob]);
+    ? rpcRows<{ id: string; rank: number; proposed: string; how: string }>(db, "binder_exact", { p_names: names, p_limit: 20 })
+    : Promise.resolve({ rows: [] as { id: string; rank: number; proposed: string; how: string }[], failed: undefined as string | undefined });
+  const [lists, exactReply] = await Promise.all([Promise.all(jobs), exactJob]);
+  const exact = exactReply.rows;
+  const degraded = [...lists.map((l) => l.failed), exactReply.failed].filter((f): f is string => !!f);
+  // The need's own semantic and keyword legs are the floor: with both gone there is nothing to rank.
+  if (lists[0].failed && lists[1].failed) throw new Error(degraded[0]);
+  // A failed exact match must not read as "this name is not in the catalog".
+  if (exactReply.failed) throw new Error(exactReply.failed);
+  if (degraded.length) console.warn("binder: search legs left out:", degraded.join(" | "));
 
   // Keyword search uses AND semantics. An OR fallback (p_any) was measured at 3.3 s for a long need on the free
   // tier and timed out under concurrent calls (2026-11-09), so recall for long needs comes from the short
@@ -121,5 +139,6 @@ export async function retrieve(
     exact: exact.map(({ id, proposed, how }) => ({ id, proposed, how })),
     unverified_names: names.filter((n) => !matched.has(n.toLowerCase())),
     expansion,
+    degraded,
   };
 }

@@ -114,4 +114,6 @@ export interface BindResult {
   web_suggestions: { name: string; url: string; why: string }[];
   queries: { rewrites: string[]; keywords: string[]; ideal_tool: string | null };
   timings_ms: Record<string, number>;
+  /** Search legs that failed twice and were left out of the ranking (empty in a normal bind). */
+  degraded?: string[];
 }

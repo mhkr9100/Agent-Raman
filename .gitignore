@@ -48,3 +48,6 @@ next-env.d.ts
 
 # local caches
 .npm_cache/
+
+# plugin eval output
+evals/results/

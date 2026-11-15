@@ -1,0 +1,9 @@
+{
+  "name": "agent-raman",
+  "description": "Plan a task before an agent starts it: needs, real tools from the AgentRamaN catalog, one task.md.",
+  "version": "0.1.0",
+  "author": {
+    "name": "mhkr9100"
+  },
+  "repository": "https://github.com/mhkr9100/Agent-Raman"
+}

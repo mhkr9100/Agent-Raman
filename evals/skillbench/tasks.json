@@ -1,0 +1,62 @@
+{
+  "about": "PM pilot: write a product spec (PRD). Context is given in full so no tools are needed. Requirements were written before any output existed. Do not edit after seeing results; add new tasks under new ids.",
+  "written_on": "2026-11-11",
+  "tasks": [
+    {
+      "id": "p1-recurring-invoices",
+      "request": "Write a PRD for recurring invoices in our invoicing app.",
+      "context": "Product: a web invoicing app for freelancers and small agencies (about 14,000 paying accounts). Today every invoice is created by hand. In the last 90 days, 212 support tickets asked for recurring or scheduled invoices; 38 of those accounts later cancelled and named it as a reason in the exit survey. Payments run through Stripe, which the app already uses for one-off invoices. Engineering: 3 engineers for one quarter. Finance lead says late fees and tax rules must not change in this release. Sales wants 'auto-charge the card on file' in v1; the payments engineer says storing mandates for auto-charge needs extra customer consent in the EU (SCA) and has not been scoped.",
+      "requirements": [
+        "Problem statement uses the evidence given (212 tickets, 38 cancellations) without inventing other numbers as fact",
+        "Defines the core recurring behaviour: frequency, start/end, what happens on each run (invoice created and sent)",
+        "Handles the auto-charge conflict explicitly: v1 or not, and why, citing the unscoped EU consent issue",
+        "Non-goals include unchanged late fees and tax rules",
+        "Requirements are prioritised and each has testable acceptance criteria, including failure cases (card declined, account paused, edited template)",
+        "Success metrics with a measurement method, tied to the cancellation or ticket evidence",
+        "Open questions name who must answer them"
+      ]
+    },
+    {
+      "id": "p2-onboarding-dropoff",
+      "request": "We should do something about onboarding drop-off in our fitness app. Write a PRD.",
+      "context": "Product: a mobile fitness app (iOS and Android). Funnel data from the last 30 days: 100% open app, 81% create account, 44% finish the 6-step onboarding, 31% log a first workout within 7 days. The biggest single drop is at step 3, the health-data permission screen (Apple Health / Health Connect): 37% of users who reach it leave. Steps 4 to 6 ask for goals, schedule and a paywall. No user interviews have been done on onboarding. Design team has capacity for one sprint; there is no budget for new research tools.",
+      "requirements": [
+        "Frames the problem from the funnel data given and identifies step 3 as the largest drop without inventing causes as fact",
+        "States what is unknown (why users leave step 3) and proposes how to learn it within the stated limits",
+        "Proposes a scoped change (for example deferring or explaining the permission request) rather than a full onboarding redesign",
+        "Addresses the platform permission rules: the app cannot re-prompt freely after a denial on iOS",
+        "Success metric is tied to the funnel (step 3 completion and first workout within 7 days) with a baseline from the data and a measurement window",
+        "Keeps the paywall step in scope or out of scope explicitly",
+        "Open questions name who must answer them"
+      ]
+    },
+    {
+      "id": "p3-csv-export",
+      "request": "Spec a CSV export of reports for enterprise admins.",
+      "context": "Product: a B2B HR analytics dashboard. Enterprise admins (about 300 customer accounts) want to download any report as CSV to use in Excel. Reports can contain employee names, salaries and performance ratings. Legal has said that exports containing personal data must be logged (who exported what, when) and that salary data may only be exported by users with the 'Payroll' role. The largest reports have about 2 million rows. Today reports render in the browser from an API that pages 500 rows at a time. Security wants no export links that work without login.",
+      "requirements": [
+        "Restricts salary columns to the Payroll role and says what other users get (column removed or export blocked)",
+        "Logs every export with who, what, when, as Legal requires",
+        "Handles the 2-million-row case: asynchronous generation or a limit, not a synchronous browser download through the 500-row API",
+        "Download links require login, as Security requires; states link expiry",
+        "Covers Excel-specific risks: formula (CSV) injection and character encoding",
+        "Testable acceptance criteria including role-based negative cases",
+        "Open questions name who must answer them"
+      ]
+    },
+    {
+      "id": "p4-instant-payouts",
+      "request": "Write a PRD for instant payouts for sellers on our marketplace.",
+      "context": "Product: an online marketplace for handmade goods, about 9,000 active sellers in the US. Sellers are paid out weekly today. Seller survey (n=640): 58% said slow payouts are their top complaint. Our payment provider offers instant payouts to debit cards for a fee of 1.5% of the payout (minimum $0.50); we pay that fee unless we pass it on. Refunds and chargebacks can arrive up to 120 days after a sale; today we hold weekly payouts partly to cover them. Finance will not approve anything that raises our loss from negative seller balances. Leadership wants this live before the holiday season, in 6 weeks.",
+      "requirements": [
+        "Uses the survey evidence given without inventing other numbers as fact",
+        "Decides who pays the 1.5% fee (seller, marketplace, or split) or poses it as a decision with options",
+        "Handles refund and chargeback risk: a reserve, eligibility rule or limit so negative balances do not rise, as Finance requires",
+        "Defines seller eligibility (for example account age, dispute rate) and the failure path when an instant payout fails",
+        "Scopes v1 to fit 6 weeks and states what is cut",
+        "Success and guardrail metrics, including negative-balance loss",
+        "Open questions name who must answer them"
+      ]
+    }
+  ]
+}

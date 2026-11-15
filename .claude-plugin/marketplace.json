@@ -1,0 +1,17 @@
+{
+  "name": "agent-raman",
+  "owner": {
+    "name": "mhkr9100"
+  },
+  "metadata": {
+    "description": "AgentRamaN: know what your agent needs before it starts.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "agent-raman",
+      "description": "Plan a task before an agent starts it: needs, real tools from the AgentRamaN catalog, one task.md.",
+      "source": "./"
+    }
+  ]
+}

@@ -61,6 +61,7 @@ export async function bind(input: NeedInput, opts: BindOptions): Promise<BindRes
     web_suggestions: [],
     queries: { rewrites: r.expansion.rewrites, keywords: r.expansion.keywords, ideal_tool: r.expansion.ideal_tool },
     timings_ms: timings,
+    degraded: r.degraded,
   };
 
   // No model → retrieval only. Similarity alone never binds (FRAMEWORK §3 rule 2).

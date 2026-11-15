@@ -1,26 +1,90 @@
 @import "tailwindcss";
 
+/* Raman scattering: a green 532 nm beam goes in, shifted lines come out. The beam colour is the accent; the
+   shifted colours carry the status of each need. Dark only, like a spectrograph. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+  --ink: #090b0f;
+  --panel: #10131a;
+  --raised: #171b26;
+  --rule: #252b3a;
+  --text: #e9e7e0;
+  --muted: #9096a6;
+  --faint: #5d6375;
+  --laser: #3fe0a0;
+  --stokes: #f3b54a;
+  --person: #9db0ff;
+  --gap: #ff6a5c;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-ink: var(--ink);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-rule: var(--rule);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-laser: var(--laser);
+  --color-stokes: var(--stokes);
+  --color-person: var(--person);
+  --color-gap: var(--gap);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-display);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+::selection { background: color-mix(in srgb, var(--laser) 35%, transparent); }
+
+:focus-visible { outline: 2px solid var(--laser); outline-offset: 2px; border-radius: 4px; }
+
+.label { font-family: var(--font-geist-mono), monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+.field {
+  width: 100%; background: var(--ink); color: var(--text); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 9px 11px; font-size: 14px; line-height: 1.4;
+}
+.field::placeholder { color: var(--faint); }
+.field:hover { border-color: color-mix(in srgb, var(--rule) 60%, var(--muted)); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; padding: 9px 16px;
+  font-size: 14px; font-weight: 500; border: 1px solid var(--rule); background: var(--raised); color: var(--text); cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--laser); border-color: var(--laser); color: #04130c; font-weight: 600; }
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--laser) 85%, white); border-color: transparent; }
+.btn-quiet { background: transparent; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 14rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--muted);
+  padding: 4px 10px; font-size: 12px; cursor: pointer; transition: border-color 0.15s, color 0.15s;
+}
+.chip:hover { border-color: var(--muted); color: var(--text); }
+
+/* The prompt box shows focus on its frame, not on the text area inside it. */
+.bare, .bare:focus-visible { outline: none; }
+
+/* The end of a run: one white flash, then the task file fades in and floats. One flash only, never repeated. */
+@keyframes flash { 0% { opacity: 0; } 18% { opacity: 1; } 38% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes appear { from { opacity: 0; scale: 0.94; } to { opacity: 1; scale: 1; } }
+@keyframes float { 0%, 100% { transform: translateY(-5px); } 50% { transform: translateY(5px); } }
+.flash { animation: flash 2.1s ease-out both; }
+.appear { animation: appear 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.file { animation: float 5s ease-in-out infinite; }
+.file svg { filter: drop-shadow(0 0 26px rgba(255, 255, 255, 0.4)) drop-shadow(0 12px 30px rgba(0, 0, 0, 0.6)); transition: filter 0.2s; }
+.file:hover svg { filter: drop-shadow(0 0 40px rgba(255, 255, 255, 0.7)) drop-shadow(0 12px 30px rgba(0, 0, 0, 0.6)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .flash { display: none; }
+  .appear, .file { animation: none; }
 }

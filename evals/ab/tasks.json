@@ -1,0 +1,80 @@
+{
+  "about": "With/without test. Six requests, none of them in evals/tasks.json. The requirement lists were written on 2026-11-10 before any plan was generated; do not edit them after seeing results.",
+  "tasks": [
+    {
+      "id": "t1-hubspot-teams",
+      "request": "Every weekday at 8am, post a summary of the HubSpot deals that changed stage in the last 24 hours to our #sales channel in Microsoft Teams. Do not include contact email addresses or phone numbers in the post.",
+      "requirements": [
+        "Reads the deals whose stage changed in the last 24 hours from HubSpot, by a named and real access path",
+        "Posts the summary to the #sales channel in Microsoft Teams, by a named and real access path",
+        "Runs every weekday at 8am on a named host that runs when no agent session is open",
+        "Keeps contact email addresses and phone numbers out of the post, with a check that proves it",
+        "Names the credentials as environment variable names (HubSpot, Teams) and where each comes from",
+        "States or asks the time zone for 8am"
+      ]
+    },
+    {
+      "id": "t2-vector-db-pricing",
+      "request": "Compare the pricing of the three most widely used managed vector databases for a workload of 5 million 768-dimension vectors and about 50 queries per second. Give me a one-page markdown report with a table, and a source link for every number.",
+      "requirements": [
+        "Says how the three most widely used managed vector databases are chosen (evidence or a question to the user), not just a list",
+        "Prices the stated workload: 5 million vectors, 768 dimensions, about 50 queries per second",
+        "Output is a one-page markdown report with a table",
+        "Every number carries a source link, with a check that enforces it",
+        "Handles freshness: prices are read from the vendors' current pages and dated",
+        "Names a real capability for web search or page fetching"
+      ]
+    },
+    {
+      "id": "t3-lighthouse-issues",
+      "request": "Run Lighthouse on the 10 most visited pages of our production site, compare the performance scores with last week's run, and open a GitHub issue for every page whose score dropped by more than 10 points, listing the heaviest resources on that page.",
+      "requirements": [
+        "Says where the list of the 10 most visited pages comes from (an analytics source or a question to the user)",
+        "Runs Lighthouse on each of the 10 pages with a named and real tool",
+        "Says where last week's scores are stored and what happens when there is no earlier run",
+        "Applies the rule: score dropped by more than 10 points",
+        "Opens one GitHub issue per affected page that lists the heaviest resources, by a named and real access path",
+        "Treats issue creation as an outside write: avoids duplicates or says how to undo",
+        "Names the credentials as environment variable names"
+      ]
+    },
+    {
+      "id": "t4-zorbtrack-sheet",
+      "request": "Export all open tickets from our ZorbTrack 7 helpdesk and load them into a Google Sheet, one row per ticket, with the ticket id, title, assignee and age in days.",
+      "requirements": [
+        "Says plainly that ZorbTrack 7 could not be found or verified and asks the user for its API documentation or export method",
+        "Invents no ZorbTrack endpoint, package, MCP server, CLI or field name (ZorbTrack 7 is a made-up product)",
+        "Writes to Google Sheets by a named and real access path",
+        "One row per ticket with ticket id, title, assignee and age in days; says how age is computed",
+        "Only open tickets are exported, with a check",
+        "Names the credentials as environment variable names"
+      ]
+    },
+    {
+      "id": "t5-interviews-deck",
+      "request": "I have 12 customer interview recordings as mp3 files in ./interviews. Transcribe them, pull out the five most common pain points with two direct quotes for each, and build a 6-slide deck I can present on Friday.",
+      "requirements": [
+        "Transcribes mp3 files with a named and real capability",
+        "Handles all 12 files, with a check on the count",
+        "Finds the five most common pain points with evidence of how common each is",
+        "Two direct quotes per pain point, each traceable word for word to a transcript",
+        "Builds a deck of exactly 6 slides in a stated format with a named and real capability",
+        "Flags that customer recordings would be sent to a third party (privacy or consent)",
+        "Gives no invented price or limit for transcription"
+      ]
+    },
+    {
+      "id": "t6-pricing-watch",
+      "request": "Check our three competitors' pricing pages once a day and email me a diff when anything changes. The whole thing has to cost under $5 a month to run.",
+      "requirements": [
+        "Asks for the three competitor URLs and the recipient address as inputs",
+        "Runs once a day on a named host that runs when no agent session is open",
+        "Fetches each page and keeps the previous snapshot somewhere stated",
+        "Sends a diff by email only when something changed",
+        "Names a real way to send email, with its credential as an environment variable name",
+        "Addresses the limit of under $5 a month with sourced or clearly flagged numbers, not invented ones",
+        "Considers pages rendered by JavaScript, bot blocking or terms of use"
+      ]
+    }
+  ]
+}

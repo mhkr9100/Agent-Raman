@@ -1,0 +1,53 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "raman-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "raman-test",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "RAMAN_RATE_LIMIT=off",
+        "RAMAN_TEST_LOG=evals/results/ab",
+        "npm",
+        "run",
+        "start",
+        "--",
+        "-p",
+        "3100"
+      ],
+      "port": 3100
+    },
+    {
+      "name": "raman-check",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "RAMAN_RATE_LIMIT=off",
+        "RAMAN_TEST_LOG=evals/results/check",
+        "npm",
+        "run",
+        "start",
+        "--",
+        "-p",
+        "3100"
+      ],
+      "port": 3100
+    },
+    {
+      "name": "channel-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/hemanthkrmalle/Desktop/Channel && CHANNEL_DATA=data-dev exec node scripts/dev.mjs --test-agents"
+      ],
+      "port": 5173
+    }
+  ]
+}

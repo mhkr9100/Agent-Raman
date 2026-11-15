@@ -9,13 +9,19 @@
     "lint": "eslint",
     "crawl": "tsx --env-file-if-exists=.env.local crawler/run.ts",
     "typecheck": "next typegen && tsc --noEmit",
-    "eval:binder": "tsx --env-file-if-exists=.env.local evals/run-binder.ts"
+    "eval:binder": "tsx --env-file-if-exists=.env.local evals/run-binder.ts",
+    "test:engine": "tsx --env-file-if-exists=.env.local evals/engine-mock.ts",
+    "test:agent": "tsx --env-file-if-exists=.env.local evals/agent-api-test.ts",
+    "mock:llm": "tsx evals/mock-llm-server.ts",
+    "build:skill": "tsx scripts/build-skill.ts",
+    "eval:tasks": "tsx --env-file=.env.local evals/run-tasks.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.99",
     "@ai-sdk/google": "^4.0.114",
     "@ai-sdk/openai": "^4.0.111",
     "@ai-sdk/openai-compatible": "^3.0.87",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@openrouter/ai-sdk-provider": "^3.1.0",
     "@supabase/supabase-js": "^2.119.0",
     "ai": "^7.0.165",
