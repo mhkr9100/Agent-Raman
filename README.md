@@ -43,6 +43,17 @@ npm run dev
 Checks: `npm run test:engine`, `npm run test:agent`, `npm run eval:binder`, `npm run eval:tasks`.
 Crawler: `npm run crawl -- <source|all> [--dry-run] [--limit N]`.
 
+## Earlier generations
+
+This repository is the single home of the RamN project. Two earlier versions are kept here as branches, each with its full history. They are separate codebases and are not maintained.
+
+| Branch | What it was | Active |
+|---|---|---|
+| [`gen-1-web-beta`](https://github.com/mhkr9100/Agent-Raman/tree/gen-1-web-beta) | RamN AI (Beta): a web app for arranging several AI agents into workspaces | Feb to Mar 2026 |
+| [`gen-2-desktop`](https://github.com/mhkr9100/Agent-Raman/tree/gen-2-desktop) | Raman AI: an Electron desktop workspace with local storage and a local model runtime | Mar to Oct 2026 |
+
+The repositories they came from, `RamN-AI` and `RamNAI`, are archived.
+
 ## Read more
 
 - Method: [`docs/FRAMEWORK.md`](docs/FRAMEWORK.md)
